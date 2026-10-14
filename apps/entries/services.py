@@ -275,6 +275,8 @@ def _apply_action(user, e, action, reason):
     if action in ("accept", "accept_admit"):
         if e.decision == Entry.Decision.ACCEPTED and action == "accept":
             raise ValueError("уже принято")
+        if e.decision == Entry.Decision.REJECTED:
+            money_hook("entry_restored", e, user)
         e.decision, e.decided_by, e.decided_at, e.decision_reason = Entry.Decision.ACCEPTED, user, now, ""
         if action == "accept_admit":
             e.admission, e.admission_by, e.admission_at = Entry.Admission.ADMITTED, user, now

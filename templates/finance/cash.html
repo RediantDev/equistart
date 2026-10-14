@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Касса — {{ t.pub_title|default:t.title }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% if manage %}{% url 'tournaments:step' t.pk 5 %}{% else %}{% url 'tournaments:public' t.pk %}{% endif %}">← {{ t.pub_title|default:t.title }}</a>
+    <h1 class="h1">Касса</h1>
+    <p class="muted">Деньги через EquiStart не проходят: здесь отмечаются оплаты наличными, переводом организатору и иначе.</p>
+  </div>
+  <div class="form-actions">
+    <a class="btn btn--ghost" href="{% url 'finance:refunds' t.pk %}">Возвраты{% if open_refunds %} <span class="count-pill">{{ open_refunds }}</span>{% endif %}</a>
+    <a class="btn btn--ghost" href="{% url 'finance:export' t.pk %}">Excel</a>
+  </div>
+</div>
+
+<div class="stat-grid">
+  <div class="stat"><div class="caption muted">НАЧИСЛЕНО</div><div class="stat__value">{{ total.amount|money }}</div></div>
+  <div class="stat"><div class="caption muted">ОПЛАЧЕНО</div><div class="stat__value">{{ total.paid|money }}</div>{% if total.refunded %}<div class="table__sub">возвращено {{ total.refunded|money }}</div>{% endif %}</div>
+  <div class="stat stat--accent"><div class="caption muted">ДОЛГИ</div><div class="stat__value">{{ total.debt|money }}</div></div>
+  <div class="stat"><div class="caption muted">К ВОЗВРАТУ</div><div class="stat__value">{{ total.refund_pending|money }}</div>{% if total.overpaid %}<div class="table__sub">переплата {{ total.overpaid|money }}</div>{% endif %}</div>
+</div>
+<div class="chips" style="margin: var(--space-3) 0 var(--space-4);">
+  {% for label, v in by_dir %}{% if v.amount or v.paid %}<span class="chip">{{ label }}: {{ v.paid|money }} из {{ v.amount|money }}</span>{% endif %}{% endfor %}
+  {% for label, v in methods %}{% if v %}<span class="chip chip--info">{{ label }}: {{ v|money }}</span>{% endif %}{% endfor %}
+</div>
+
+<form method="get" class="filters__body" style="margin: 0 0 var(--space-4);">
+  <div class="field"><label class="field__label" for="q">Поиск</label><input id="q" name="q" type="search" value="{{ f.q }}" placeholder="Плательщик, спортсмен, лошадь"></div>
+  <div class="field"><label class="field__label" for="direction">Направление</label><select id="direction" name="direction"><option value="">Все</option>{% for v, l in directions %}<option value="{{ v }}"{% if v == f.direction %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="field"><label class="field__label" for="only">Показать</label><select id="only" name="only"><option value="">Всех</option><option value="debt"{% if f.only == "debt" %} selected{% endif %}>С долгом</option><option value="refund"{% if f.only == "refund" %} selected{% endif %}>К возврату / переплата</option></select></div>
+  <div class="filters__actions"><button class="btn btn--dark btn--sm">Показать</button></div>
+</form>
+
+{% if rows %}
+<div class="list-cards">
+  {% for r in rows %}
+    <a class="row-card row-card--link" href="{% url 'finance:payer' t.pk r.user.pk %}{% if f.direction %}?direction={{ f.direction }}{% endif %}">
+      <div style="flex: 1 1 220px; min-width: 0;"><strong>{{ r.user.full_name }}</strong><span class="table__sub">позиций: {{ r.count }}{% if r.cancelled %} · отменённых без решения: {{ r.cancelled }}{% endif %}</span></div>
+      <div class="money-cols">
+        <span><span class="caption muted">НАЧИСЛЕНО</span><span class="num">{{ r.t.amount|money }}</span></span>
+        <span><span class="caption muted">ОПЛАЧЕНО</span><span class="num">{{ r.t.paid|money }}</span></span>
+        <span>{% if r.t.debt %}<span class="caption muted">ДОЛГ</span><strong class="num" style="color: var(--danger);">{{ r.t.debt|money }}</strong>{% elif r.t.refund_pending %}<span class="caption muted">К ВОЗВРАТУ</span><strong class="num">{{ r.t.refund_pending|money }}</strong>{% elif r.t.overpaid %}<span class="caption muted">ПЕРЕПЛАТА</span><strong class="num">{{ r.t.overpaid|money }}</strong>{% else %}<span class="chip chip--success">Оплачено</span>{% endif %}</span>
+      </div>
+    </a>
+  {% endfor %}
+</div>
+{% else %}
+  <div class="card empty"><h2 class="h3">{% if f.q or f.only or f.direction %}Ничего не найдено{% else %}Начислений пока нет{% endif %}</h2><p class="muted">Начисления появляются автоматически при подаче заявок{% if not f.q %}, броней и заказов услуг{% endif %}.</p></div>
+{% endif %}
+{% endblock %}

@@ -236,6 +236,12 @@ def cancel(user, tournament_id: int, revision, reason: str) -> Tournament:
     t.revision += 1
     t.save()
     audit(user, "tournament.cancel", t, reason=reason)
+    try:
+        from apps.finance.services import tournament_cancelled
+    except ImportError:
+        pass
+    else:
+        tournament_cancelled(t, user)
     return t
 
 

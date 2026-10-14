@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}{{ payer.full_name }} — касса — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'finance:cash' t.pk %}">← Касса</a>
+    <h1 class="h1">{{ payer.full_name }}</h1>
+    <div class="chips"><span class="chip">Начислено {{ total.amount|money }}</span><span class="chip chip--success">Оплачено {{ total.paid|money }}</span>{% if total.refunded %}<span class="chip">Возвращено {{ total.refunded|money }}</span>{% endif %}{% if total.debt %}<span class="chip chip--danger">Долг {{ total.debt|money }}</span>{% endif %}{% if total.refund_pending %}<span class="chip chip--warning">К возврату {{ total.refund_pending|money }}</span>{% endif %}</div>
+  </div>
+</div>
+
+<div class="wizard-grid wizard-grid--aside-first">
+  <div class="wizard-main">
+    <form method="post" action="{% url 'finance:action' t.pk 'pay' %}" id="payform">{% csrf_token %}
+      <input type="hidden" name="payer" value="{{ payer.pk }}"><input type="hidden" name="key" value="{{ key }}"><input type="hidden" name="next" value="{{ request.path }}">
+      <div class="list-cards">
+        {% for c in charges %}
+          <article class="entry-row{% if c.source_cancelled %} is-muted{% endif %}">
+            {% if c.balance > 0 %}<input type="checkbox" name="charges" value="{{ c.pk }}" data-due="{{ c.balance }}" checked aria-label="Оплачивается: {{ c.title }}">{% else %}<span style="width: 20px;"></span>{% endif %}
+            <div style="flex: 1; min-width: 0;">
+              <div class="entry-row__head"><strong>{{ c.title }}</strong><span class="tag tag--{% if c.direction == 'sport' %}sky{% else %}mint{% endif %}">{{ c.get_kind_display }}</span></div>
+              <div class="table__sub">{{ c.subtitle }}</div>
+              {% if c.source_cancelled %}<div class="table__sub" style="color: var(--danger); font-weight: 600;">{{ c.source_note }}{% if c.balance > 0 %} — решите по условиям отмены: списать остаток или оставить к оплате{% endif %}</div>{% endif %}
+              <div class="money-cols" style="margin-top: 8px;">
+                <span><span class="caption muted">НАЧИСЛЕНО</span><span class="num">{{ c.amount|money }}</span>{% if c.adjusted %}<span class="table__sub">было {{ c.base_kopecks|money }}</span>{% endif %}</span>
+                <span><span class="caption muted">ОПЛАЧЕНО</span><span class="num">{{ c.paid|money }}</span></span>
+                {% if c.refunded or c.refund_pending %}<span><span class="caption muted">ВОЗВРАТ</span><span class="num">{{ c.refunded|money }}</span>{% if c.refund_pending %}<span class="table__sub">ожидает {{ c.refund_pending|money }}</span>{% endif %}</span>{% endif %}
+                <span><span class="caption muted">{% if c.balance < 0 %}ПЕРЕПЛАТА{% else %}ОСТАТОК{% endif %}</span><strong class="num">{% if c.balance < 0 %}{{ c.balance|money|slice:"1:" }}{% else %}{{ c.balance|money }}{% endif %}</strong></span>
+              </div>
+              {% for a in c.adjustments.all %}<div class="table__sub">Корректировка {% if a.delta_kopecks > 0 %}+{% endif %}{{ a.delta_kopecks|money }} · {{ a.reason }} · {{ a.created_at|date:"j E H:i" }}</div>{% endfor %}
+              <div class="chips" style="margin-top: 8px;">
+                <button type="button" class="btn btn--ghost btn--sm" data-open="adj-{{ c.pk }}">Корректировка</button>
+                {% if c.refundable > 0 %}<button type="button" class="btn btn--ghost btn--sm" data-open="ref-{{ c.pk }}">Возврат</button>{% endif %}
+                {% if c.source_cancelled and c.balance > 0 %}<button type="button" class="btn btn--ghost btn--sm" data-open="wo-{{ c.pk }}">Списать остаток</button>{% endif %}
+              </div>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </form>
+    {% for c in charges %}
+      <form method="post" action="{% url 'finance:action' t.pk 'adjust' %}" class="card sub-form" id="adj-{{ c.pk }}" hidden>{% csrf_token %}<input type="hidden" name="charge" value="{{ c.pk }}"><input type="hidden" name="next" value="{{ request.path }}">
+        <h3 class="h3">Корректировка: {{ c.title }}</h3>
+        <div class="form-row"><div class="field"><label class="field__label" for="aa{{ c.pk }}">Новая сумма, ₽</label><input id="aa{{ c.pk }}" name="amount" type="text" inputmode="decimal" value="{{ c.amount|rub_input }}" required></div>
+        <div class="field"><label class="field__label" for="ar{{ c.pk }}">Основание</label><input id="ar{{ c.pk }}" name="reason" type="text" required placeholder="Скидка, изменение цены…"></div></div>
+        <div class="form-actions"><button class="btn btn--dark btn--sm">Сохранить</button><button type="button" class="btn btn--ghost btn--sm" data-close>Отмена</button></div>
+      </form>
+      {% if c.refundable > 0 %}
+      <form method="post" action="{% url 'finance:action' t.pk 'refund' %}" class="card sub-form" id="ref-{{ c.pk }}" hidden>{% csrf_token %}<input type="hidden" name="charge" value="{{ c.pk }}"><input type="hidden" name="next" value="{{ request.path }}">
+        <h3 class="h3">Задача возврата: {{ c.title }}</h3>
+        <div class="form-row"><div class="field"><label class="field__label" for="ra{{ c.pk }}">Сумма, ₽ (не больше {{ c.refundable|money }})</label><input id="ra{{ c.pk }}" name="amount" type="text" inputmode="decimal" value="{{ c.refundable|rub_input }}" required></div>
+        <div class="field"><label class="field__label" for="rr{{ c.pk }}">Основание</label><input id="rr{{ c.pk }}" name="reason" type="text" required value="{{ c.source_note }}"></div></div>
+        <p class="table__sub">Задача — ещё не факт выдачи. Выдачу отмечают в разделе «Возвраты».</p>
+        <div class="form-actions"><button class="btn btn--dark btn--sm">Создать задачу</button><button type="button" class="btn btn--ghost btn--sm" data-close>Отмена</button></div>
+      </form>
+      {% endif %}
+      {% if c.source_cancelled and c.balance > 0 %}
+      <form method="post" action="{% url 'finance:action' t.pk 'write_off' %}" class="card sub-form" id="wo-{{ c.pk }}" hidden>{% csrf_token %}<input type="hidden" name="charge" value="{{ c.pk }}"><input type="hidden" name="next" value="{{ request.path }}">
+        <h3 class="h3">Списать остаток {{ c.balance|money }}?</h3>
+        <div class="field"><label class="field__label" for="wr{{ c.pk }}">Основание</label><input id="wr{{ c.pk }}" name="reason" type="text" required value="{{ c.source_note }}: остаток списан по условиям отмены"></div>
+        <div class="form-actions"><button class="btn btn--dark btn--sm">Списать</button><button type="button" class="btn btn--ghost btn--sm" data-close>Отмена</button></div>
+      </form>
+      {% endif %}
+    {% endfor %}
+
+    <section style="margin-top: var(--space-5);">
+      <h2 class="h3">Оплаты</h2>
+      {% if payments %}<ul class="list">{% for p in payments %}
+        <li class="list__row{% if p.is_void %} is-muted{% endif %}"><span style="flex: 1; min-width: 0;"><strong class="num">{{ p.amount_kopecks|money }}</strong> · {{ p.get_method_display }} · {{ p.paid_on|date:"j E" }}<span class="table__sub">{% for a in p.allocations.all %}{{ a.charge.title }} — {{ a.amount_kopecks|money }}{% if not forloop.last %}; {% endif %}{% endfor %}</span><span class="table__sub">отметил {{ p.recorded_by.short_name }} {{ p.created_at|date:"j E H:i" }}{% if p.note %} · {{ p.note }}{% endif %}</span>{% if p.is_void %}<span class="table__sub" style="color: var(--danger);">Аннулировано: {{ p.void_reason }}</span>{% endif %}</span>
+          {% if not p.is_void %}<details class="inline-details"><summary class="btn btn--ghost btn--sm">Аннулировать</summary><form method="post" action="{% url 'finance:action' t.pk 'void' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="payment" value="{{ p.pk }}"><input type="hidden" name="next" value="{{ request.path }}"><input type="text" name="reason" required placeholder="Причина" aria-label="Причина аннулирования"><button class="btn btn--danger btn--sm">Аннулировать</button></form></details>{% endif %}
+        </li>{% endfor %}</ul>
+      {% else %}<p class="muted">Оплат пока не отмечено.</p>{% endif %}
+      {% if refunds %}<h2 class="h3" style="margin-top: var(--space-4);">Возвраты</h2><ul class="list">{% for r in refunds %}
+        <li class="list__row"><span style="flex: 1;"><strong class="num">{{ r.amount_kopecks|money }}</strong> · {{ r.charge.title }}<span class="table__sub">{{ r.reason }}</span></span><span class="chip{% if r.state == 'done' %} chip--success{% elif r.state == 'open' %} chip--warning{% endif %}">{{ r.get_state_display }}{% if r.done_on %} {{ r.done_on|date:"j E" }}{% endif %}</span></li>{% endfor %}</ul>
+        <a class="btn btn--ghost btn--sm" href="{% url 'finance:refunds' t.pk %}">Отметить выдачу</a>{% endif %}
+    </section>
+  </div>
+  <aside class="wizard-aside">
+    <section class="card pay-card">
+      <h2 class="h3">Отметить оплату</h2>
+      {% if total.debt %}
+        <div class="field"><label class="field__label" for="amount">Сумма, ₽</label><input id="amount" name="amount" form="payform" type="text" inputmode="decimal" value="{{ total.debt|rub_input }}" required class="input-lg"><p class="field__help">По отмеченным позициям: <strong id="due">{{ total.debt|money }}</strong>. Частичная оплата распределяется по порядку позиций.</p></div>
+        <fieldset class="field choice-set"><legend class="field__label">Способ</legend><div class="choice-list">{% for v, l in methods %}<label class="choice"><input type="radio" name="method" value="{{ v }}" form="payform"{% if forloop.first %} checked{% endif %}><span>{{ l }}</span></label>{% endfor %}</div></fieldset>
+        <div class="field"><label class="field__label" for="paid_on">Дата</label><input id="paid_on" name="paid_on" form="payform" type="date" value="{{ today|date:'Y-m-d' }}" required></div>
+        <div class="field"><label class="field__label" for="note">Примечание</label><input id="note" name="note" form="payform" type="text" placeholder="Необязательно"></div>
+        <button class="btn btn--primary btn--block" form="payform">Отметить оплату</button>
+      {% else %}<p class="muted">Долга нет.</p>{% endif %}
+    </section>
+  </aside>
+</div>
+<script>
+(function () {
+  document.querySelectorAll("[data-open]").forEach(function (b) { b.addEventListener("click", function () { var f = document.getElementById(b.dataset.open); f.hidden = false; f.querySelector("input:not([type=hidden])").focus(); f.scrollIntoView({block: "nearest"}); }); });
+  document.querySelectorAll("[data-close]").forEach(function (b) { b.addEventListener("click", function () { b.closest("form").hidden = true; }); });
+  var boxes = document.querySelectorAll("#payform input[name=charges]"), out = document.getElementById("due"), amount = document.getElementById("amount");
+  function fmt(k) { var r = Math.floor(k / 100), c = k % 100; return r.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + (c ? "," + String(c).padStart(2, "0") : "") + " ₽"; }
+  function upd() { var s = 0; boxes.forEach(function (b) { if (b.checked) s += +b.dataset.due; }); if (out) out.textContent = fmt(s); if (amount) amount.value = s % 100 ? Math.floor(s / 100) + "," + String(s % 100).padStart(2, "0") : String(s / 100); }
+  boxes.forEach(function (b) { b.addEventListener("change", upd); });
+})();
+</script>
+{% endblock %}

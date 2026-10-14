@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "apps.profiles",
     "apps.entries",
     "apps.conduct",
+    "apps.finance",
 ]
 
 MIDDLEWARE = [

@@ -634,6 +634,8 @@ def public_detail(request, pk):
             "open": t.public_entries_open(), "card": _card(t),
             "can_manage": request.user.is_authenticated and services.can_manage(request.user, t),
             "can_judge": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "judge"}),
+            "can_cash": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "cashier"}),
+            "can_stable": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "stable"}),
             **_public_tabs(request, t),
         },
     )

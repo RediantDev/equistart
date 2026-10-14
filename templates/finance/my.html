@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Начисления и оплаты — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head"><div><a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a><h1 class="h1">Начисления и оплаты</h1><p class="muted">Оплата — на месте или переводом организатору. Отметку об оплате ставит касса турнира, деньги через EquiStart не проходят.</p></div>{% if filtered %}<a class="btn btn--ghost" href="{% url 'finance:my' %}">Все турниры</a>{% endif %}</div>
+{% for g in groups %}
+  <section class="card" style="margin-bottom: var(--space-4);">
+    <div class="section-head" style="margin-bottom: var(--space-3);"><h2 class="h3"><a href="{% url 'tournaments:public' g.t.pk %}">{{ g.t.pub_title|default:g.t.title }}</a><span class="table__sub">{% daterange g.t.starts_on g.t.ends_on %}</span></h2>
+      <div class="chips">{% if g.total.debt %}<span class="chip chip--danger">К оплате {{ g.total.debt|money }}</span>{% elif g.total.overpaid %}<span class="chip chip--warning">Переплата {{ g.total.overpaid|money }}</span>{% else %}<span class="chip chip--success">Оплачено</span>{% endif %}{% if g.total.refund_pending %}<span class="chip chip--warning">Ожидает возврата {{ g.total.refund_pending|money }}</span>{% endif %}</div></div>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Позиция</th><th class="num">Начислено</th><th class="num">Оплачено</th><th class="num">Возврат</th><th class="num">Остаток</th></tr></thead>
+      <tbody>{% for c in g.charges %}<tr{% if c.source_cancelled %} class="is-muted"{% endif %}>
+        <td><strong>{{ c.title }}</strong><span class="table__sub">{{ c.subtitle }}</span>{% if c.source_cancelled %}<span class="table__sub">{{ c.source_note }}</span>{% endif %}{% for a in c.adjustments.all %}<span class="table__sub">Корректировка {% if a.delta_kopecks > 0 %}+{% endif %}{{ a.delta_kopecks|money }}: {{ a.reason }}</span>{% endfor %}</td>
+        <td class="num">{{ c.amount|money }}</td><td class="num">{{ c.paid|money }}</td><td class="num">{{ c.refunded|money }}{% if c.refund_pending %}<span class="table__sub">ожидает {{ c.refund_pending|money }}</span>{% endif %}</td><td class="num"><strong>{{ c.balance|money }}</strong></td></tr>{% endfor %}</tbody>
+      <tfoot><tr><td><strong>Итого</strong></td><td class="num">{{ g.total.amount|money }}</td><td class="num">{{ g.total.paid|money }}</td><td class="num">{{ g.total.refunded|money }}</td><td class="num"><strong>{{ g.total.balance|money }}</strong></td></tr></tfoot>
+    </table></div>
+    {% if g.payments %}<details style="margin-top: var(--space-3);"><summary class="label" style="cursor: pointer;">Отметки об оплате ({{ g.payments|length }})</summary><ul class="list">{% for p in g.payments %}<li class="list__row{% if p.is_void %} is-muted{% endif %}"><span style="flex: 1;">{{ p.paid_on|date:"j E Y" }} · {{ p.get_method_display }}{% if p.is_void %}<span class="table__sub">Аннулировано: {{ p.void_reason }}</span>{% endif %}</span><strong class="num">{{ p.amount_kopecks|money }}</strong></li>{% endfor %}</ul></details>{% endif %}
+  </section>
+{% empty %}
+  <div class="card empty"><h2 class="h3">Начислений пока нет</h2><p class="muted">Они появятся после подачи заявок.</p></div>
+{% endfor %}
+{% endblock %}

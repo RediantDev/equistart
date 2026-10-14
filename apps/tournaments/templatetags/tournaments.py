@@ -80,3 +80,25 @@ def num(v):
     if f == int(f):
         return str(int(f))
     return f"{f:.2f}".rstrip("0").replace(".", ",")
+
+
+@register.filter
+def money(kopecks):
+    """Суммы учёта: 0 → «0 ₽», отрицательные со знаком «−»."""
+    if kopecks is None or kopecks == "":
+        return ""
+    k = int(kopecks)
+    r, kop = divmod(abs(k), 100)
+    s = f"{r:,}".replace(",", " ")
+    if kop:
+        s += f",{kop:02d}"
+    return ("−" if k < 0 else "") + s + " ₽"
+
+
+@register.filter
+def rub_input(kopecks):
+    """Копейки → значение для поля ввода: 150050 → «1500,50»."""
+    if kopecks is None or kopecks == "":
+        return ""
+    r, kop = divmod(abs(int(kopecks)), 100)
+    return f"{r},{kop:02d}" if kop else str(r)

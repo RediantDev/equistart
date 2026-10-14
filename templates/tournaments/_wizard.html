@@ -15,7 +15,7 @@
         {% if t.publication == "cancelled" %}<span class="chip chip--danger">Отменён</span>{% endif %}
         {% if t.is_published %}<a class="tag tag--lemon" href="{% url 'tournaments:public' t.pk %}">Страница в календаре</a>{% endif %}
         <a class="tag" href="{% url 'tournaments:team' t.pk %}">Команда турнира</a>
-        {% if t.is_published %}<a class="tag tag--sky" href="{% url 'entries:manage' t.pk %}">Заявки</a><a class="tag tag--mint" href="{% url 'conduct:overview' t.pk %}">Проведение</a>{% endif %}
+        {% if t.is_published %}<a class="tag tag--sky" href="{% url 'entries:manage' t.pk %}">Заявки</a><a class="tag tag--mint" href="{% url 'conduct:overview' t.pk %}">Проведение</a><a class="tag tag--peach" href="{% url 'finance:cash' t.pk %}">Касса</a>{% endif %}
       </div>
     {% endif %}
   </div>

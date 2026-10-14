@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Возвраты — {{ t.pub_title|default:t.title }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head"><div><a class="back" href="{% url 'finance:cash' t.pk %}">← Касса</a><h1 class="h1">Возвраты</h1><p class="muted">Задача — основание и сумма. Факт — когда деньги выданы: способ, дата и кто выдал.</p></div></div>
+<div class="chips" style="margin-bottom: var(--space-4);">{% for v, l in states %}<a class="chip{% if v == state %} chip--info{% endif %}" href="?state={{ v }}">{{ l }}</a>{% endfor %}<a class="chip{% if state == 'all' %} chip--info{% endif %}" href="?state=all">Все</a></div>
+{% if refunds %}<div class="list-cards">{% for r in refunds %}
+  <article class="row-card" style="align-items: flex-start;">
+    <div style="flex: 1 1 240px; min-width: 0;"><strong class="num">{{ r.amount_kopecks|money }}</strong> · <a href="{% url 'finance:payer' t.pk r.charge.payer_id %}">{{ r.charge.payer.full_name }}</a><span class="table__sub">{{ r.charge.title }} · {{ r.charge.subtitle }}</span><span class="table__sub">Основание: {{ r.reason }} · создал {{ r.created_by.short_name|default:"система" }} {{ r.created_at|date:"j E H:i" }}</span>
+      {% if r.state == "done" %}<span class="table__sub">Выдан {{ r.done_on|date:"j E" }} ({{ r.get_method_display|lower }}), отметил {{ r.done_by.short_name }}</span>{% elif r.state == "cancelled" %}<span class="table__sub">Отменена: {{ r.cancel_reason }}</span>{% endif %}</div>
+    {% if r.state == "open" %}
+      <form method="post" action="{% url 'finance:action' t.pk 'refund_done' %}" class="inline-row" style="margin: 0;">{% csrf_token %}<input type="hidden" name="refund" value="{{ r.pk }}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <select name="method" aria-label="Способ выдачи" style="width: auto;">{% for v, l in methods %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
+        <input type="date" name="done_on" value="{{ today|date:'Y-m-d' }}" aria-label="Дата выдачи" style="width: auto;">
+        <button class="btn btn--primary btn--sm">Выдан</button>
+      </form>
+      <details class="inline-details"><summary class="btn btn--ghost btn--sm">Отменить задачу</summary><form method="post" action="{% url 'finance:action' t.pk 'refund_cancel' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="refund" value="{{ r.pk }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="text" name="reason" required placeholder="Причина" aria-label="Причина отмены"><button class="btn btn--ghost btn--sm">Отменить</button></form></details>
+    {% else %}<span class="chip{% if r.state == 'done' %} chip--success{% endif %}">{{ r.get_state_display }}</span>{% endif %}
+  </article>
+{% endfor %}</div>
+{% else %}<div class="card empty"><h2 class="h3">Нет возвратов</h2></div>{% endif %}
+{% endblock %}

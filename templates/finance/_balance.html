@@ -1,0 +1,14 @@
+{% load tournaments %}
+<section class="card money-card">
+  <h2 class="h3">Начисления</h2>
+  <ul class="list">{% for c in charges.charges %}
+    <li class="list__row"><span style="flex: 1; min-width: 0;">{{ c.title }}<span class="table__sub">{{ c.subtitle }}{% if c.source_cancelled %} · {{ c.source_note }}{% endif %}</span></span><span class="num">{{ c.amount|money }}</span></li>
+  {% endfor %}</ul>
+  <dl class="facts facts--money">
+    <div><dt>Начислено</dt><dd>{{ charges.totals.amount|money }}</dd></div>
+    <div><dt>Оплачено</dt><dd>{{ charges.totals.paid|money }}</dd></div>
+    {% if charges.totals.refunded %}<div><dt>Возвращено</dt><dd>{{ charges.totals.refunded|money }}</dd></div>{% endif %}
+    <div><dt>{% if charges.totals.balance < 0 %}Переплата{% else %}К оплате{% endif %}</dt><dd><strong>{% if charges.totals.balance < 0 %}{{ charges.totals.overpaid|money }}{% else %}{{ charges.totals.debt|money }}{% endif %}</strong></dd></div>
+  </dl>
+  <p class="table__sub">Оплата — на месте или переводом организатору; отметку ставит касса турнира. <a href="{% url 'finance:my' %}?t={{ t.pk }}">Подробнее</a></p>
+</section>
