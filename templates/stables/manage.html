@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Денники и услуги — {{ t.pub_title|default:t.title }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head"><div>
+  <a class="back" href="{% if manage %}{% url 'tournaments:step' t.pk 5 %}{% else %}{% url 'tournaments:public' t.pk %}{% endif %}">← {{ t.pub_title|default:t.title }}</a>
+  <h1 class="h1">Денники и услуги</h1></div>
+  <a class="btn btn--ghost" href="{% url 'stables:book' t.pk %}">Страница для участников</a>
+</div>
+<nav class="tabs" aria-label="Разделы">{% for v, l in tabs %}<a class="tabs__item{% if v == tab %} is-active{% endif %}" href="?tab={{ v }}">{{ l }}{% if v == "bookings" and pending %} <span class="count-pill">{{ pending }}</span>{% endif %}</a>{% endfor %}</nav>
+
+{% if tab == "bookings" %}
+  <div class="chips" style="margin-bottom: var(--space-4);">{% for v, l in states %}<a class="chip{% if v == state %} chip--info{% endif %}" href="?tab=bookings&state={{ v }}">{{ l }}</a>{% endfor %}<a class="chip{% if state == 'all' %} chip--info{% endif %}" href="?tab=bookings&state=all">Все</a></div>
+  {% if bookings %}<div class="list-cards">{% for b in bookings %}
+    <article class="row-card" style="align-items: flex-start;" id="b{{ b.pk }}">
+      <div style="flex: 1 1 260px; min-width: 0;"><strong>{{ b.horse_name }}</strong> · {{ b.category.name }}
+        <span class="table__sub">{{ b.arrive|date:"j E" }} — {{ b.depart|date:"j E" }}, суток: {{ b.nights }} · {{ b.amount_kopecks|money }}</span>
+        <span class="table__sub">{{ b.requested_by.full_name }}{% if b.contact_phone %} · {{ b.contact_phone|phone }}{% endif %}</span>
+        {% if b.required %}<span class="tag tag--peach">Без денника не выступает</span>{% endif %}
+        {% if b.comment %}<span class="table__sub">«{{ b.comment }}»</span>{% endif %}
+        {% if b.reason and b.state != "pending" %}<span class="table__sub">Причина: {{ b.reason }}</span>{% endif %}</div>
+      <span class="chip{% if b.state == 'confirmed' %} chip--success{% elif b.state == 'pending' %} chip--warning{% elif b.state == 'rejected' %} chip--danger{% endif %}">{{ b.get_state_display }}</span>
+      <div style="flex: 1 1 240px;">
+      {% if b.state == "pending" %}
+        <form method="post" action="{% url 'stables:action' t.pk 'confirm' %}" class="inline-row" style="margin: 0 0 6px;">{% csrf_token %}<input type="hidden" name="booking" value="{{ b.pk }}"><input type="hidden" name="revision" value="{{ b.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn--primary btn--sm">Подтвердить</button></form>
+        <details class="inline-details"><summary class="btn btn--ghost btn--sm">Отклонить</summary><form method="post" action="{% url 'stables:action' t.pk 'reject' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="booking" value="{{ b.pk }}"><input type="hidden" name="revision" value="{{ b.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="text" name="reason" required placeholder="Причина" aria-label="Причина отказа"><button class="btn btn--danger btn--sm">Отклонить</button></form></details>
+      {% elif b.state == "confirmed" %}
+        <form method="post" action="{% url 'stables:action' t.pk 'box' %}" class="order-ctl">{% csrf_token %}<input type="hidden" name="booking" value="{{ b.pk }}"><input type="hidden" name="next" value="{{ request.get_full_path }}#b{{ b.pk }}"><input class="input-sm" type="text" name="box" value="{{ b.box_number }}" placeholder="№" aria-label="Номер денника" style="width: 90px; flex-basis: 90px;"><button class="btn btn--ghost btn--sm">{% if b.box_number %}Сменить денник{% else %}Назначить денник{% endif %}</button></form>
+        <details class="inline-details"><summary class="btn btn--ghost btn--sm">Отменить бронь</summary><form method="post" action="{% url 'stables:action' t.pk 'cancel' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="booking" value="{{ b.pk }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="text" name="reason" required placeholder="Причина" aria-label="Причина отмены"><button class="btn btn--danger btn--sm">Отменить</button></form></details>
+      {% endif %}</div>
+    </article>{% endfor %}</div>
+  {% else %}<div class="card empty"><h2 class="h3">Броней нет</h2></div>{% endif %}
+
+{% elif tab == "grid" %}
+  {% for g in grid %}
+    <h2 class="h3" style="margin-top: var(--space-4);">{{ g.c.name }} · вместимость {{ g.c.capacity }}</h2>
+    <div class="occ">{% for d, n, cap in g.cells %}<div class="occ__cell{% if n >= cap %} is-full{% elif n %} is-part{% endif %}"><span class="caption">{{ d|date:"D" }}</span><strong>{{ d|date:"j.m" }}</strong><span class="num">{{ n }}/{{ cap }}</span></div>{% endfor %}</div>
+  {% empty %}<div class="card empty"><h2 class="h3">Нет категорий денников</h2></div>{% endfor %}
+  <p class="table__sub" style="margin-top: var(--space-3);">Учитываются ожидающие и подтверждённые брони: место держится до решения.</p>
+
+{% elif tab == "orders" %}
+  <div class="chips" style="margin-bottom: var(--space-4);"><a class="chip{% if show == 'open' %} chip--info{% endif %}" href="?tab=orders&show=open">К выдаче</a><a class="chip{% if show != 'open' %} chip--info{% endif %}" href="?tab=orders&show=all">Все</a></div>
+  {% if orders %}<div class="list-cards">{% for o in orders %}
+    <article class="row-card" id="o{{ o.pk }}"><div style="flex: 1 1 240px; min-width: 0;"><strong>{{ o.service.name }}</strong> × {{ o.quantity }} {{ o.service.unit }} · {{ o.recipient_label }}<span class="table__sub">{{ o.ordered_by.full_name }}{% if o.for_date %} · на {{ o.for_date|date:"j E" }}{% endif %}{% if o.comment %} · «{{ o.comment }}»{% endif %}</span>
+      {% for d in o.deliveries.all %}<span class="table__sub">Выдано {{ d.quantity }} · {{ d.at|date:"j E H:i" }}{% if d.note %} · {{ d.note }}{% endif %}</span>{% endfor %}</div>
+      <span class="chip{% if o.delivered == o.quantity %} chip--success{% elif o.delivered %} chip--warning{% elif o.state == 'cancelled' %} chip--danger{% endif %}">{{ o.delivery_state }}</span>
+      {% if o.state == "ordered" and o.delivered < o.quantity %}<form method="post" action="{% url 'stables:action' t.pk 'deliver' %}" class="order-ctl">{% csrf_token %}<input type="hidden" name="order" value="{{ o.pk }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><input class="input-sm" type="number" name="quantity" min="1" max="{{ o.quantity|add:0 }}" value="{{ o.quantity|add:0 }}" aria-label="Выдано, {{ o.service.unit }}"><button class="btn btn--primary btn--sm">Выдано</button></form>{% endif %}
+    </article>{% endfor %}</div>
+  {% else %}<div class="card empty"><h2 class="h3">{% if show == 'open' %}Всё выдано{% else %}Заказов нет{% endif %}</h2></div>{% endif %}
+
+{% else %}
+  <div class="section-head"><h2 class="h2">Категории денников</h2><a class="btn btn--dark btn--sm" href="{% url 'stables:category_new' t.pk %}">+ Категория</a></div>
+  {% if cats %}<div class="list-cards">{% for c in cats %}<a class="row-card row-card--link" href="{% url 'stables:category_edit' t.pk c.pk %}"><div style="flex: 1; min-width: 0;"><strong>{{ c.name }}</strong><span class="table__sub">{{ c.price_kopecks|money }} {{ c.get_price_mode_display }} · {{ c.available_from|date:"j E" }} — {{ c.available_to|date:"j E" }} · вместимость {{ c.capacity }} · броней {{ c.used }}</span></div>{% if not c.is_active %}<span class="chip">Приём закрыт</span>{% endif %}</a>{% endfor %}</div>
+  {% else %}<p class="muted">Добавьте категорию: название, цена, даты и вместимость.</p>{% endif %}
+  <div class="section-head" style="margin-top: var(--space-5);"><h2 class="h2">Услуги</h2><a class="btn btn--dark btn--sm" href="{% url 'stables:service_new' t.pk %}">+ Услуга</a></div>
+  {% if svcs %}<div class="list-cards">{% for s in svcs %}<a class="row-card row-card--link" href="{% url 'stables:service_edit' t.pk s.pk %}"><div style="flex: 1; min-width: 0;"><strong>{{ s.name }}</strong><span class="table__sub">{{ s.price_kopecks|money }} за {{ s.unit }} · {{ s.get_recipient_display|lower }} · заказано {{ s.used }}{% if s.limit %} из {{ s.limit }}{% endif %}</span></div>{% if not s.is_active %}<span class="chip">Приём закрыт</span>{% endif %}</a>{% endfor %}</div>
+  {% else %}<p class="muted">Например: опилки (мешок), сено (тюк), электричество для коневоза (сутки).</p>{% endif %}
+{% endif %}
+{% endblock %}

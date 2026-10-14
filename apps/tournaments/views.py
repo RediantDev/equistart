@@ -636,6 +636,7 @@ def public_detail(request, pk):
             "can_judge": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "judge"}),
             "can_cash": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "cashier"}),
             "can_stable": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "stable"}),
+            "has_stables": t.stable_categories.filter(is_active=True).exists() or t.services.filter(is_active=True).exists(),
             **_public_tabs(request, t),
         },
     )

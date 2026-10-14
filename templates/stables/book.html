@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Денники и услуги — {{ t.pub_title }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head"><div><a class="back" href="{% url 'tournaments:public' t.pk %}">← {{ t.pub_title }}</a><h1 class="h1">Денники и услуги</h1><p class="muted">Выберите категорию и свой период — конкретный денник назначит конюшня после подтверждения. Оплата — в кассе турнира.</p></div><a class="btn btn--ghost" href="{% url 'stables:my' %}">Мои брони и заказы</a></div>
+{% if not open %}<div class="alert">Бронирование закрыто: турнир {% if t.publication == "cancelled" %}отменён{% else %}завершён{% endif %}.</div>{% endif %}
+
+<div class="wizard-grid wizard-grid--aside-first">
+  <div class="wizard-main">
+    <h2 class="h2">Денники</h2>
+    {% if cats %}<div class="list-cards">{% for c in cats %}
+      <article class="row-card" style="align-items: flex-start;">
+        <div style="flex: 1 1 260px; min-width: 0;"><strong class="h3">{{ c.name }}</strong>
+          <div class="table__sub">с {{ c.available_from|date:"j E" }} по {{ c.available_to|date:"j E" }}{% if c.checkin_time %} · заезд с {{ c.checkin_time|time:"H:i" }}{% endif %}{% if c.checkout_time %} · выезд до {{ c.checkout_time|time:"H:i" }}{% endif %}</div>
+          {% if c.conditions %}<div class="table__sub">{{ c.conditions|linebreaksbr }}</div>{% endif %}</div>
+        <div style="text-align: right;"><strong class="num">{{ c.price_kopecks|money }}</strong><div class="table__sub">{{ c.get_price_mode_display }}</div>
+          {% if c.free_total > 0 %}<span class="chip chip--success">свободно на весь период: {{ c.free_total }}</span>{% else %}<span class="chip chip--warning">на весь период мест нет — проверьте свои даты</span>{% endif %}</div>
+      </article>{% endfor %}</div>
+    {% else %}<div class="card empty"><h3 class="h3">Организатор пока не добавил денники</h3></div>{% endif %}
+
+    <h2 class="h2" id="services" style="margin-top: var(--space-5);">Услуги</h2>
+    {% if svcs %}<div class="list-cards">{% for s in svcs %}
+      <form method="post" action="{% url 'stables:order' t.pk %}" class="row-card" style="align-items: flex-end;">{% csrf_token %}<input type="hidden" name="service" value="{{ s.pk }}"><input type="hidden" name="key" value="{{ okey }}-{{ s.pk }}">
+        <div style="flex: 1 1 200px; min-width: 0;"><strong>{{ s.name }}</strong><div class="table__sub">{{ s.price_kopecks|money }} за {{ s.unit }} · получатель: {{ s.get_recipient_display|lower }}{% if s.available_from %} · с {{ s.available_from|date:"j E" }}{% endif %}{% if s.available_to %} по {{ s.available_to|date:"j E" }}{% endif %}</div></div>
+        {% if open %}
+        {% if s.recipient == "horse" %}<label class="field" style="flex: 1 1 150px;"><span class="field__label">Лошадь</span><select name="horse" required><option value="">—</option>{% for h in horses %}<option value="{{ h.pk }}">{{ h.name }}</option>{% endfor %}</select></label>
+        {% elif s.recipient == "trailer" %}<label class="field" style="flex: 1 1 150px;"><span class="field__label">Номер коневоза</span><input type="text" name="trailer" required maxlength="40"></label>{% endif %}
+        {% if s.available_from or s.available_to %}<label class="field" style="flex: 0 1 160px;"><span class="field__label">На дату</span><input type="date" name="for_date"{% if s.available_from %} min="{{ s.available_from|date:'Y-m-d' }}"{% endif %}{% if s.available_to %} max="{{ s.available_to|date:'Y-m-d' }}"{% endif %}></label>{% endif %}
+        <label class="field" style="flex: 0 1 90px;"><span class="field__label">Кол-во</span><input type="number" name="quantity" min="1" value="1" required></label>
+        <button class="btn btn--dark btn--sm">Заказать</button>{% endif %}
+      </form>{% endfor %}</div>
+    {% else %}<p class="muted">Услуг нет.</p>{% endif %}
+  </div>
+
+  <aside class="wizard-aside">
+    {% if open and cats %}
+    <form method="post" class="card form" id="book">{% csrf_token %}<input type="hidden" name="key" value="{{ form.key }}">
+      <h2 class="h3">Забронировать денник</h2>
+      {% for e in errors %}<div class="alert alert--error">{{ e }}</div>{% endfor %}
+      {% if not horses %}<div class="alert">Сначала добавьте лошадь в <a href="{% url 'profiles:horses' %}">«Лошади»</a> — бронь оформляется на лошадь.</div>{% endif %}
+      <div class="field"><label class="field__label" for="b-cat">Категория</label><select id="b-cat" name="category" required><option value="">—</option>{% for c in cats %}<option value="{{ c.pk }}"{% if form.category == c.pk|stringformat:"s" %} selected{% endif %}>{{ c.name }} — {{ c.price_kopecks|money }} {{ c.get_price_mode_display }}</option>{% endfor %}</select></div>
+      <div class="field"><label class="field__label" for="b-horse">Лошадь</label><select id="b-horse" name="horse" required><option value="">—</option>{% for h in horses %}<option value="{{ h.pk }}"{% if form.horse == h.pk|stringformat:"s" %} selected{% endif %}>{{ h.name }}</option>{% endfor %}</select></div>
+      <div class="form-row"><div class="field"><label class="field__label" for="b-a">Заезд</label><input id="b-a" type="date" name="arrive" value="{{ form.arrive }}" required></div><div class="field"><label class="field__label" for="b-d">Выезд</label><input id="b-d" type="date" name="depart" value="{{ form.depart }}" required></div></div>
+      <label class="check"><input type="checkbox" name="required"{% if form.required %} checked{% endif %}><span>Без денника выступления этой лошади невозможны</span></label>
+      <p class="field__help">Тогда выступления лошади попадут в стартовый протокол только после подтверждения брони.</p>
+      <div class="field"><label class="field__label" for="b-p">Телефон для связи по брони <span class="field__optional">необязательно</span></label><input id="b-p" type="tel" name="contact_phone" value="{{ form.contact_phone }}" placeholder="+7 900 000-00-00"><p class="field__help">Увидит только конюшня турнира.</p></div>
+      <div class="field"><label class="field__label" for="b-c">Комментарий <span class="field__optional">необязательно</span></label><input id="b-c" type="text" name="comment" value="{{ form.comment }}" maxlength="500"></div>
+      {% if preview %}
+        <div class="summary-box">
+          <div class="caption muted">ИТОГО</div>
+          <div class="stat__value">{{ preview.amount|money }}</div>
+          <div class="table__sub">{{ preview.c.name }} · {{ preview.h.name }} · {{ preview.arrive|date:"j E" }} — {{ preview.depart|date:"j E" }}, суток: {{ preview.nights }}{% if preview.c.price_mode == "day" %} × {{ preview.c.price_kopecks|money }}{% endif %}</div>
+        </div>
+        <input type="hidden" name="amount" value="{{ preview.amount }}"><input type="hidden" name="confirm" value="1">
+        <button class="btn btn--primary btn--block">Забронировать за {{ preview.amount|money }}</button>
+      {% else %}
+        <button class="btn btn--dark btn--block"{% if not horses %} disabled{% endif %}>Рассчитать сумму</button>
+      {% endif %}
+    </form>
+    {% endif %}
+  </aside>
+</div>
+<script>
+document.querySelectorAll("#book select, #book input[type=date]").forEach(function (el) {
+  el.addEventListener("change", function () { var c = document.querySelector("#book input[name=confirm]"); if (c) { c.remove(); var b = document.querySelector("#book button.btn--primary"); if (b) { b.className = "btn btn--dark btn--block"; b.textContent = "Пересчитать сумму"; } } });
+});
+</script>
+{% endblock %}

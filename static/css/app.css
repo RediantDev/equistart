@@ -360,9 +360,17 @@ input.input-lg { font-size: 22px; font-weight: 700; min-height: 54px; font-varia
 .segmented label.segmented__item { display: inline-flex; align-items: center; }
 .choice-set { border: 0; padding: 0; margin: 0; min-width: 0; }
 .choice-list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.choice { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; min-height: 42px; border: 1px solid var(--control-border); border-radius: var(--radius-pill); background: var(--surface); font-weight: 650; font-size: 14px; cursor: pointer; }
-.choice input { accent-color: var(--ink); margin: 0; }
-.choice:has(input:checked) { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-.choice:has(input:focus-visible) { outline: 3px solid var(--focus); }
+.pay-choice { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; min-height: 42px; border: 1px solid var(--control-border); border-radius: var(--radius-pill); background: var(--surface); font-weight: 650; font-size: 14px; cursor: pointer; }
+.pay-choice input { accent-color: var(--ink); margin: 0; }
+.pay-choice:has(input:checked) { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.pay-choice:has(input:focus-visible) { outline: 3px solid var(--focus); }
 @media (max-width: 480px) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stat__value { font-size: 18px; } }
 @media (max-width: 900px) { .wizard-grid--aside-first .wizard-aside { order: -1; } }
+
+/* Денники */
+.occ { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+.occ__cell { display: flex; flex-direction: column; align-items: center; padding: 8px 4px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border); }
+.occ__cell.is-part { background: var(--accent-soft); border-color: var(--accent); }
+.occ__cell.is-full { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.summary-box { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: var(--radius-md); padding: 12px 14px; }
+a.chip, a.tag { text-decoration: none; }

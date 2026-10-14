@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head"><div><a class="back" href="{% url 'stables:manage' t.pk %}?tab=setup">← Денники и услуги</a><h1 class="h1">{{ title }}</h1></div></div>
+<form method="post" class="card form" style="max-width: 720px;" novalidate>{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert--error">{% for e in form.non_field_errors %}{{ e }} {% endfor %}</div>{% endif %}
+  {% for field in form %}{% include "partials/field.html" %}{% endfor %}
+  <div class="form-actions"><button class="btn btn--primary">Сохранить</button><a class="btn btn--ghost" href="{% url 'stables:manage' t.pk %}?tab=setup">Отмена</a></div>
+</form>
+{% endblock %}

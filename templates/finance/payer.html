@@ -81,7 +81,7 @@
       <h2 class="h3">Отметить оплату</h2>
       {% if total.debt %}
         <div class="field"><label class="field__label" for="amount">Сумма, ₽</label><input id="amount" name="amount" form="payform" type="text" inputmode="decimal" value="{{ total.debt|rub_input }}" required class="input-lg"><p class="field__help">По отмеченным позициям: <strong id="due">{{ total.debt|money }}</strong>. Частичная оплата распределяется по порядку позиций.</p></div>
-        <fieldset class="field choice-set"><legend class="field__label">Способ</legend><div class="choice-list">{% for v, l in methods %}<label class="choice"><input type="radio" name="method" value="{{ v }}" form="payform"{% if forloop.first %} checked{% endif %}><span>{{ l }}</span></label>{% endfor %}</div></fieldset>
+        <fieldset class="field choice-set"><legend class="field__label">Способ</legend><div class="choice-list">{% for v, l in methods %}<label class="pay-choice"><input type="radio" name="method" value="{{ v }}" form="payform"{% if forloop.first %} checked{% endif %}><span>{{ l }}</span></label>{% endfor %}</div></fieldset>
         <div class="field"><label class="field__label" for="paid_on">Дата</label><input id="paid_on" name="paid_on" form="payform" type="date" value="{{ today|date:'Y-m-d' }}" required></div>
         <div class="field"><label class="field__label" for="note">Примечание</label><input id="note" name="note" form="payform" type="text" placeholder="Необязательно"></div>
         <button class="btn btn--primary btn--block" form="payform">Отметить оплату</button>

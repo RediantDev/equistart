@@ -30,6 +30,8 @@
     {% if can_manage %}<a class="btn btn--ghost btn--block" href="{% url 'tournaments:step' t.pk 5 %}">Управление турниром</a>{% endif %}
     {% if can_judge %}<a class="btn btn--ghost btn--block" href="{% url 'entries:manage' t.pk %}">Заявки турнира</a><a class="btn btn--ghost btn--block" href="{% url 'conduct:overview' t.pk %}">Проведение</a>{% endif %}
     {% if can_cash %}<a class="btn btn--ghost btn--block" href="{% url 'finance:cash' t.pk %}">Касса</a>{% endif %}
+    {% if can_stable %}<a class="btn btn--ghost btn--block" href="{% url 'stables:manage' t.pk %}">Конюшня и услуги</a>{% endif %}
+    {% if has_stables %}<a class="btn btn--ghost btn--block" href="{% url 'stables:book' t.pk %}">Денники и услуги</a>{% endif %}
     <p class="table__sub" style="margin: 0;">Проводит: {{ s.organizer_name }}.</p>
   </div>
 </section>
