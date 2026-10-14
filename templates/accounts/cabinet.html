@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Кабинет — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="h1">Кабинет</h1>
+    <p class="muted">{{ user.full_name }} · {{ user.phone_display }}</p>
+  </div>
+  <div class="mode-bar">
+    {% if modes|length > 1 %}
+      <form method="post" action="{% url 'accounts:switch_mode' %}" class="segmented" aria-label="Режим кабинета">
+        {% csrf_token %}
+        {% for value, label in modes %}
+          <button type="submit" name="mode" value="{{ value }}" class="segmented__item{% if value == mode %} is-active{% endif %}" {% if value == mode %}aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>{{ label }}</button>
+        {% endfor %}
+      </form>
+    {% elif modes %}
+      <span class="badge">{{ modes.0.1 }}</span>
+    {% endif %}
+    {% if can_add_role %}
+      <a href="{% url 'accounts:add_role' %}" class="btn btn--ghost btn--sm">+ Добавить роль</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="tiles">
+  {% if mode == "athlete" %}
+    {% include "accounts/_tile.html" with title="Мои заявки" text="Здесь будут ваши заявки и решения по ним." %}
+    {% include "accounts/_tile.html" with title="Мои лошади" text="Профили лошадей, на которых вы выступаете." %}
+    {% include "accounts/_tile.html" with title="Профиль спортсмена" text="Разряд, клуб, номер ФКСР." %}
+  {% elif mode == "coach" %}
+    {% include "accounts/_tile.html" with title="Заявки" text="Индивидуальные и групповые заявки ваших спортсменов." %}
+    {% include "accounts/_tile.html" with title="Спортсмены" text="Спортсмены, которых вы ведёте." %}
+    {% include "accounts/_tile.html" with title="Лошади" text="Лошади, которыми вы управляете." %}
+  {% elif mode == "organizer" %}
+    {% include "accounts/_tile.html" with title="Мои соревнования" text="Черновики, турниры на проверке и опубликованные." %}
+    {% include "accounts/_tile.html" with title="Приглашения в команду" text="Турниры, где вам выдали роль." %}
+  {% elif mode == "moderator" %}
+    <a class="tile tile--link" href="{% url 'admin:index' %}">
+      <h2 class="h3">Панель модерации</h2>
+      <p class="muted">Проверка турниров и обращений.</p>
+    </a>
+  {% endif %}
+</div>
+{% endblock %}

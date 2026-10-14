@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Регистрация — EquiStart{% endblock %}
+{% block content %}
+<section class="auth">
+  <div class="card auth__card auth__card--wide">
+    <h1 class="h1">Регистрация</h1>
+    <p class="muted">Номер телефона будет вашим логином.</p>
+    <form method="post" novalidate class="form">
+      {% csrf_token %}
+      {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
+
+      <div class="form__group">
+        <h2 class="h3">Вход в аккаунт</h2>
+        {% include "partials/field.html" with field=form.phone %}
+        <div class="grid-2">
+          {% include "partials/field.html" with field=form.password1 %}
+          {% include "partials/field.html" with field=form.password2 %}
+        </div>
+      </div>
+
+      <div class="form__group">
+        <h2 class="h3">О вас</h2>
+        <div class="grid-3">
+          {% include "partials/field.html" with field=form.last_name %}
+          {% include "partials/field.html" with field=form.first_name %}
+          {% include "partials/field.html" with field=form.middle_name %}
+        </div>
+        {% include "partials/field.html" with field=form.email %}
+      </div>
+
+      <div class="form__group">
+        {% include "partials/field.html" with field=form.categories %}
+      </div>
+
+      {% include "partials/field.html" with field=form.pd_consent consent_link=True %}
+      <button type="submit" class="btn btn--primary btn--block">Создать аккаунт</button>
+    </form>
+    <p class="auth__switch">Уже есть аккаунт? <a href="{% url 'accounts:login' %}">Войти</a></p>
+  </div>
+</section>
+{% endblock %}

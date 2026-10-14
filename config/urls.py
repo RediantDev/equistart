@@ -1,0 +1,12 @@
+from django.contrib import admin
+from django.urls import include, path
+
+admin.site.site_header = "EquiStart — управление"
+admin.site.site_title = "EquiStart"
+admin.site.index_title = "Модерация и администрирование"
+
+urlpatterns = [
+    path("manage/", admin.site.urls),
+    path("", include("apps.accounts.urls")),
+    path("", include("apps.core.urls")),
+]

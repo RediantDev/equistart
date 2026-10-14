@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: equistart
+          POSTGRES_USER: equistart
+          POSTGRES_PASSWORD: equistart
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U equistart"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://equistart:equistart@127.0.0.1:5432/equistart
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Проверка конфигурации
+        run: python manage.py check
+      - name: Нет незаписанных миграций
+        run: python manage.py makemigrations --check --dry-run
+      - name: Тесты
+        run: python manage.py test --verbosity 2
+      - name: Проверка production-настроек
+        env:
+          DJANGO_ENV: production
+          DJANGO_SECRET_KEY: ci-only-${{ github.run_id }}-long-random-value-for-deploy-check-0123456789
+          APP_ORIGIN: https://equistart.example
+          DJANGO_ALLOWED_HOSTS: equistart.example
+          SECURE_HSTS_SECONDS: "31536000"
+        run: python manage.py check --deploy --fail-level WARNING

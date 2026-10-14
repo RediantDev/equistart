@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Календарь соревнований — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="h1">Календарь соревнований</h1>
+    <p class="muted">Опубликованные турниры, приём заявок, стартовые протоколы и результаты.</p>
+  </div>
+</div>
+
+<form class="search" role="search" method="get">
+  <label class="visually-hidden" for="q">Поиск по названию</label>
+  <input id="q" name="q" type="search" placeholder="Название соревнования" value="{{ request.GET.q }}">
+  <button class="btn btn--primary" type="submit">Найти</button>
+</form>
+
+{% if tournaments %}
+  {# Список турниров — этап 1 #}
+{% else %}
+  <div class="empty card">
+    <h2 class="h3">Опубликованных соревнований пока нет</h2>
+    <p class="muted">Когда организаторы опубликуют турниры, они появятся здесь.</p>
+  </div>
+{% endif %}
+{% endblock %}
