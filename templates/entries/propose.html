@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Замена в заявке — EquiStart{% endblock %}
+{% block content %}
+<section class="auth"><div class="card auth__card auth__card--wide">
+  <a class="back" href="{% url 'entries:application' e.application_id %}">← Заявка №{{ e.application_id }}</a>
+  <h1 class="h1">Предложить замену</h1>
+  <p class="muted">Сейчас: <strong>{{ e.athlete_snapshot.name }}</strong> на <strong>{{ e.horse_snapshot.name }}</strong> · {{ e.program_name }} · {{ e.class_name }}. До решения судьи действуют прежние сведения; после принятия допуск нужно будет подтвердить заново.</p>
+  <form method="post" class="form">{% csrf_token %}
+    <div class="field"><label class="field__label" for="a">Спортсмен</label><select id="a" name="athlete">{% for a in athletes %}<option value="{{ a.pk }}"{% if a.pk == e.athlete_id %} selected{% endif %}>{{ a.full_name }}</option>{% endfor %}</select></div>
+    <div class="field"><label class="field__label" for="h">Лошадь</label><select id="h" name="horse">{% for h in horses %}<option value="{{ h.pk }}"{% if h.pk == e.horse_id %} selected{% endif %}>{{ h.name }} · {{ h.summary }}</option>{% endfor %}</select></div>
+    <div class="field"><label class="field__label" for="c">Программа и зачёт</label><select id="c" name="tclass">{% for group, items in class_groups %}<optgroup label="{{ group }}">{% for v, label in items %}<option value="{{ v }}"{% if v == e.tclass_id %} selected{% endif %}>{{ label }}</option>{% endfor %}</optgroup>{% endfor %}</select></div>
+    <button class="btn btn--primary btn--block">Отправить предложение</button>
+  </form>
+</div></section>
+{% endblock %}

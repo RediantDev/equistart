@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Заявки — {{ t.pub_title|default:t.title }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'tournaments:step' t.pk 5 %}">← {{ t.title }}</a>
+    <h1 class="h1">Заявки турнира</h1>
+    <div class="chips">{% for label, n, color in counts %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>
+  </div>
+  {% if t.publication == "published" %}<a class="btn btn--ghost" href="{% url 'entries:apply' t.pk %}?late=1">+ Добавить участника</a>{% endif %}
+</div>
+<form method="get" class="filters__body" style="margin: 0 0 var(--space-4);">
+  <div class="field"><label class="field__label" for="q">Поиск</label><input id="q" name="q" type="search" value="{{ f.q }}" placeholder="Спортсмен, лошадь, контакт"></div>
+  <div class="field"><label class="field__label" for="program">Программа</label><select id="program" name="program"><option value="">Все</option>{% for p in programs %}<option value="{{ p.pk }}"{% if f.program == p.pk|stringformat:"s" %} selected{% endif %}>{{ p.day|date:"d.m" }} · {{ p.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label class="field__label" for="decision">Решение</label><select id="decision" name="decision"><option value="">Любое</option>{% for v, l in decisions %}<option value="{{ v }}"{% if v == f.decision %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="field"><label class="field__label" for="admission">Допуск</label><select id="admission" name="admission"><option value="">Любой</option>{% for v, l in admissions %}<option value="{{ v }}"{% if v == f.admission %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="filters__actions"><button class="btn btn--dark btn--sm">Показать</button></div>
+</form>
+{% if entries %}
+<form method="post" action="{% url 'entries:decide' t.pk %}">
+  {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+  <div class="bulk-bar">
+    <span class="label">Выбранные:</span>
+    <select name="action" aria-label="Действие" style="width: auto;">{% for v, l in actions.items %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
+    <button class="btn btn--dark btn--sm">Продолжить…</button>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th><span class="visually-hidden">Выбор</span></th><th>Спортсмен / лошадь</th><th>Программа и зачёт</th><th>Состояние</th><th>Заявка</th></tr></thead>
+      <tbody>
+      {% for e in entries %}
+        <tr{% if not e.is_active %} class="is-muted"{% endif %}>
+          <td><input type="checkbox" name="entry" value="{{ e.pk }}" aria-label="Выбрать {{ e.athlete_snapshot.name }}"{% if e.decision == "cancelled" %} disabled{% endif %}><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}"></td>
+          <td><strong>{{ e.athlete_snapshot.name }}</strong><span class="table__sub">{{ e.athlete_snapshot.birth_date|isodate|default:"дата рождения не указана" }} · {{ e.athlete_snapshot.rank }} · {{ e.athlete_snapshot.club }}</span><span class="table__sub">{{ e.horse_snapshot.name }} · {{ e.horse_snapshot.birth_year }} · {{ e.horse_snapshot.sex }}</span></td>
+          <td>{{ e.program_name }}<span class="table__sub">{{ e.day|date:"j E" }} · {{ e.class_name }} · {{ e.fee_kopecks|rub }}</span></td>
+          <td>{% include "entries/_entry_chips.html" %}</td>
+          <td><a href="{% url 'entries:application' e.application_id %}">№{{ e.application_id }}</a><span class="table__sub">{{ e.application.contact_name }}</span><span class="table__sub num">{{ e.application.contact_phone|phone }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+{% else %}
+  <div class="card empty"><h2 class="h3">Заявок нет</h2><p class="muted">Когда участники подадут заявки, они появятся здесь.</p></div>
+{% endif %}
+{% endblock %}

@@ -22,8 +22,13 @@
     </div>
   </div>
   <div class="hero-card__side">
+    {% if open %}
+      {% if user.is_authenticated %}<a class="btn btn--primary btn--block" href="{% url 'entries:apply' t.pk %}">Подать заявку</a>
+      {% else %}<a class="btn btn--primary btn--block" href="{% url 'accounts:login' %}?next={% url 'entries:apply' t.pk %}">Войти и подать заявку</a>{% endif %}
+    {% endif %}
     {% if s.has_regulation %}<a class="btn btn--dark btn--block" href="{% url 'tournaments:public_regulation' t.pk %}" target="_blank" rel="noopener">Положение (PDF)</a>{% endif %}
     {% if can_manage %}<a class="btn btn--ghost btn--block" href="{% url 'tournaments:step' t.pk 5 %}">Управление турниром</a>{% endif %}
+    {% if can_judge %}<a class="btn btn--ghost btn--block" href="{% url 'entries:manage' t.pk %}">Заявки турнира</a>{% endif %}
     <p class="table__sub" style="margin: 0;">Проводит: {{ s.organizer_name }}.</p>
   </div>
 </section>

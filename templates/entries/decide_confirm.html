@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ label }} — EquiStart{% endblock %}
+{% block content %}
+<section class="auth"><div class="card auth__card auth__card--wide">
+  <h1 class="h1">{{ label }}: {{ entries|length }}</h1>
+  <p class="muted">Проверьте состав. Действие применится к каждой строке отдельно; результат по каждой будет показан.</p>
+  <form method="post" action="{% url 'entries:decide' t.pk %}" class="form">
+    {% csrf_token %}<input type="hidden" name="confirm" value="1"><input type="hidden" name="action" value="{{ action }}"><input type="hidden" name="next" value="{{ next }}">
+    <ul class="list">{% for e in entries %}
+      <li class="list__row"><input type="hidden" name="entry" value="{{ e.pk }}"><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}"><span style="flex: 1;"><strong>{{ e.athlete_snapshot.name }}</strong> на {{ e.horse_snapshot.name }}<span class="table__sub">{{ e.program_name }} · {{ e.class_name }}</span></span>{% include "entries/_entry_chips.html" %}</li>
+    {% endfor %}</ul>
+    {% if action == "reject" or action == "cancel" %}
+      <div class="field"><label class="field__label" for="reason">Причина — увидит подавший заявку, публично не показывается</label><textarea id="reason" name="reason" rows="3" required></textarea></div>
+    {% endif %}
+    <div class="form-actions"><a class="btn btn--ghost" href="{{ next|default:'/' }}">Назад</a><button class="btn btn--primary">{{ label }}</button></div>
+  </form>
+</div></section>
+{% endblock %}

@@ -11,6 +11,8 @@ urlpatterns = [
     path("manage/", admin.site.urls),
     path("moderation/", include(moderation_patterns)),
     path("", include("apps.tournaments.urls")),
+    path("", include("apps.profiles.urls")),
+    path("", include("apps.entries.urls")),
     path("", include("apps.accounts.urls")),
     path("", include("apps.core.urls")),
 ]

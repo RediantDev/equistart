@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
+from django.db.models.deletion import ProtectedError
 from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -255,6 +256,9 @@ def program_delete(request, pk, item_id):
     except Conflict:
         messages.error(request, CONFLICT_MSG)
         return redirect("tournaments:step", pk=pk, step=2)
+    except ProtectedError:
+        messages.error(request, "На эту программу уже поданы заявки — удалить её нельзя. Отмените заявки или измените программу.")
+        return redirect("tournaments:step", pk=pk, step=2)
     messages.success(request, f"Программа «{name}» удалена вместе с её зачётами.")
     return redirect("tournaments:step", pk=pk, step=2)
 
@@ -330,6 +334,9 @@ def class_delete(request, pk, program_id, class_id):
             audit(request.user, "class.delete", t, name=name)
     except Conflict:
         messages.error(request, CONFLICT_MSG)
+        return redirect("tournaments:step", pk=pk, step=3)
+    except ProtectedError:
+        messages.error(request, "В этот зачёт уже поданы заявки — удалить его нельзя.")
         return redirect("tournaments:step", pk=pk, step=3)
     messages.success(request, f"Зачёт «{name}» удалён.")
     return redirect("tournaments:step", pk=pk, step=3)
@@ -626,6 +633,7 @@ def public_detail(request, pk):
             "t": t, "s": s, "days": day_list, "deadline": deadline, "days_left": days_left,
             "open": t.public_entries_open(), "card": _card(t),
             "can_manage": request.user.is_authenticated and services.can_manage(request.user, t),
+            "can_judge": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "judge"}),
         },
     )
 

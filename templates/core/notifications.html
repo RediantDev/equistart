@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Уведомления — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1 class="h1">Уведомления</h1>
+    <nav class="segmented" aria-label="Фильтр" style="margin-top: var(--space-2);">
+      <a class="segmented__item{% if show == 'unread' %} is-active{% endif %}" href="?show=unread" style="text-decoration: none;">Непрочитанные</a>
+      <a class="segmented__item{% if show == 'all' %} is-active{% endif %}" href="?show=all" style="text-decoration: none;">Все</a>
+    </nav>
+  </div>
+  {% if UNREAD_NOTIFICATIONS %}<form method="post" action="{% url 'core:notifications_read_all' %}">{% csrf_token %}<button class="btn btn--ghost btn--sm">Прочитать все</button></form>{% endif %}
+</div>
+{% if items %}
+  <div class="list-cards">{% for n in items %}
+    <form method="post" action="{% url 'core:notification_open' n.pk %}">{% csrf_token %}
+      <button class="notice{% if not n.read_at %} is-unread{% endif %}" type="submit">
+        <span class="notice__text">{{ n.text }}</span>
+        <span class="table__sub">{{ n.created_at|date:"j E, H:i" }}</span>
+      </button>
+    </form>
+  {% endfor %}</div>
+  <p class="muted" style="margin-top: var(--space-3); font-size: 14px;">«Прочитать все» только отмечает уведомления прочитанными — предложения и решения остаются ждать вашего ответа.</p>
+{% else %}
+  <div class="card empty"><h2 class="h3">{% if show == "unread" %}Непрочитанных нет{% else %}Уведомлений пока нет{% endif %}</h2><p class="muted">Здесь появляются решения по заявкам, приглашения и изменения турниров.</p></div>
+{% endif %}
+{% endblock %}

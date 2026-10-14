@@ -71,6 +71,8 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.accounts",
     "apps.tournaments",
+    "apps.profiles",
+    "apps.entries",
 ]
 
 MIDDLEWARE = [

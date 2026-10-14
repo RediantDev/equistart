@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ a.full_name }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'profiles:athletes' %}">← Спортсмены</a>
+    <h1 class="h1">{{ a.full_name }}</h1>
+    <p class="muted">{{ a.summary|default:"Дополнительные сведения не заполнены" }}</p>
+  </div>
+  {% if manage %}<a class="btn btn--ghost" href="{% url 'profiles:athlete_edit' a.pk %}">Изменить</a>{% endif %}
+</div>
+<div class="wizard-grid">
+  <div class="wizard-main">
+    <section class="card">
+      <h2 class="h3">Сведения</h2>
+      <dl class="facts">
+        <dt>Дата рождения</dt><dd>{{ a.birth_date|date:"d.m.Y"|default:"—" }}</dd>
+        <dt>Разряд / звание</dt><dd>{{ a.get_rank_display|default:"—" }}</dd>
+        <dt>Клуб</dt><dd>{{ a.club|default:"—" }}</dd>
+        <dt>Регион</dt><dd>{{ a.region|default:"—" }}</dd>
+        <dt>Номер ФКСР</dt><dd>{{ a.fksr_number|default:"—" }}</dd>
+        <dt>Управляет</dt><dd>{{ a.manager.full_name }}</dd>
+        <dt>Аккаунт спортсмена</dt><dd>{% if a.linked_user %}связан{% else %}не связан{% endif %}</dd>
+      </dl>
+    </section>
+    {% if manage %}
+    <section class="card">
+      <h2 class="h3">Кто может подавать заявки</h2>
+      {% if delegates %}
+        <ul class="list">{% for d in delegates %}<li class="list__row"><span style="flex: 1;">{{ d.user.full_name }}</span><form method="post" action="{% url 'profiles:athlete_action' a.pk 'undelegate' %}">{% csrf_token %}<input type="hidden" name="delegate" value="{{ d.pk }}"><button class="btn btn--danger btn--sm">Отозвать</button></form></li>{% endfor %}</ul>
+      {% else %}<p class="muted">Только вы{% if a.linked_user %} и сам спортсмен{% endif %}.</p>{% endif %}
+      <form method="post" action="{% url 'profiles:athlete_action' a.pk 'delegate' %}" class="inline-row">
+        {% csrf_token %}<label class="visually-hidden" for="dphone">Телефон тренера</label>
+        <input id="dphone" name="phone" type="tel" placeholder="Телефон тренера или менеджера">
+        <button class="btn btn--dark">Разрешить</button>
+      </form>
+    </section>
+    {% endif %}
+  </div>
+  {% if manage %}
+  <aside class="wizard-aside">
+    {% if offers %}
+      <section class="card"><h2 class="h3">Ожидают ответа</h2>
+        <ul class="list">{% for o in offers %}<li class="list__row"><span style="flex: 1;">{{ o.get_kind_display }}<span class="table__sub">{{ o.phone }}</span></span><form method="post" action="{% url 'profiles:athlete_action' a.pk 'cancel_offer' %}">{% csrf_token %}<input type="hidden" name="offer" value="{{ o.pk }}"><button class="btn btn--ghost btn--sm">Отменить</button></form></li>{% endfor %}</ul>
+      </section>
+    {% endif %}
+    {% if not a.linked_user %}
+    <details class="card"><summary class="h3">Связать с аккаунтом спортсмена</summary>
+      <p class="muted">Спортсмен со своим аккаунтом увидит свои выступления и сможет подавать заявки за себя. Управлять записью продолжаете вы.</p>
+      <form method="post" action="{% url 'profiles:athlete_action' a.pk 'link' %}" class="form">{% csrf_token %}<input name="phone" type="tel" placeholder="Телефон спортсмена" aria-label="Телефон спортсмена"><button class="btn btn--dark">Отправить предложение</button></form>
+    </details>
+    {% endif %}
+    <details class="card"><summary class="h3">Передать управление</summary>
+      <p class="muted">После принятия вы потеряете право редактировать запись. Прежние заявки сохранятся.</p>
+      <form method="post" action="{% url 'profiles:athlete_action' a.pk 'transfer' %}" class="form">{% csrf_token %}<input name="phone" type="tel" placeholder="Телефон нового управляющего" aria-label="Телефон нового управляющего"><button class="btn btn--dark">Предложить передачу</button></form>
+    </details>
+  </aside>
+  {% endif %}
+</div>
+{% endblock %}

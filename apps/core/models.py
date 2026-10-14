@@ -56,3 +56,30 @@ def audit(actor, action: str, obj, **data) -> AuditLog:
         target_id=obj.pk,
         data=data,
     )
+
+
+class Notification(models.Model):
+    """Уведомление на сайте. «Требует действия» вычисляется из состояния объекта, а не хранится навсегда."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
+    text = models.CharField(max_length=300)
+    url = models.CharField(max_length=300, blank=True)
+    kind = models.CharField(max_length=40, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["user", "read_at"])]
+
+
+def notify(users, text: str, url: str = "", kind: str = ""):
+    """Ставит уведомление каждому пользователю (в той же транзакции, что и действие)."""
+    seen = set()
+    objs = []
+    for u in users:
+        if u is None or u.pk in seen:
+            continue
+        seen.add(u.pk)
+        objs.append(Notification(user=u, text=text[:300], url=url, kind=kind))
+    Notification.objects.bulk_create(objs)

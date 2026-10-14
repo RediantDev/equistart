@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{% if horse %}{{ horse.name }}{% else %}Новая лошадь{% endif %} — EquiStart{% endblock %}
+{% block content %}
+<section class="auth">
+  <div class="card auth__card auth__card--wide">
+    <a class="back" href="{% if horse %}{% url 'profiles:horse' horse.pk %}{% else %}{% url 'profiles:horses' %}{% endif %}">← Назад</a>
+    <h1 class="h1">{% if horse %}Изменить лошадь{% else %}Новая лошадь{% endif %}</h1>
+    {% if similar %}
+      <div class="alert alert--warning" role="alert">
+        В сервисе уже есть лошади с такой кличкой. Возможно, это она — тогда выберите её в заявке через поиск, а не создавайте дубль.
+        <ul class="list" style="margin-top: var(--space-2);">{% for s in similar %}<li class="list__row"><strong>{{ s.name }}</strong><span class="table__sub">{{ s.summary }}{% if s.fksr_number %} · ФКСР {{ s.fksr_number }}{% endif %}</span></li>{% endfor %}</ul>
+      </div>
+    {% endif %}
+    <form method="post" novalidate class="form">
+      {% csrf_token %}
+      {% if similar %}<input type="hidden" name="confirm_similar" value="1">{% endif %}
+      <div class="grid-2">
+        {% include "partials/field.html" with field=form.name %}
+        {% include "partials/field.html" with field=form.birth_year %}
+      </div>
+      <div class="grid-3">
+        {% include "partials/field.html" with field=form.color %}
+        {% include "partials/field.html" with field=form.sex %}
+        {% include "partials/field.html" with field=form.breed %}
+      </div>
+      {% include "partials/field.html" with field=form.fksr_number %}
+      <details{% if form.sire.value or form.birthplace.value or form.owner_name.value %} open{% endif %}>
+        <summary class="label" style="cursor: pointer;">Дополнительно: отец, место рождения, владелец</summary>
+        <div class="form" style="margin-top: var(--space-3);">
+          <div class="grid-2">
+            {% include "partials/field.html" with field=form.sire %}
+            {% include "partials/field.html" with field=form.birthplace %}
+          </div>
+          {% include "partials/field.html" with field=form.owner_name %}
+        </div>
+      </details>
+      <button type="submit" class="btn btn--primary btn--block">{% if similar %}Это другая лошадь — сохранить{% else %}Сохранить{% endif %}</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

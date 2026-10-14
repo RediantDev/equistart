@@ -160,7 +160,7 @@ class CabinetTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.current_mode, "coach")
         resp = self.client.get(reverse("accounts:cabinet"))
-        self.assertContains(resp, "Спортсмены, которых вы ведёте")
+        self.assertContains(resp, "Кого вы ведёте")
 
     def test_cannot_switch_to_foreign_mode(self):
         for mode in ["organizer", "moderator", "admin"]:

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Лошади — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
+    <h1 class="h1">Мои лошади</h1>
+    <p class="muted">Лошади, профилями которых вы управляете. Чужую лошадь можно выбрать в заявке через поиск.</p>
+  </div>
+  <div class="form-actions">
+    <a class="btn btn--ghost" href="{% url 'profiles:horse_search' %}">Найти лошадь</a>
+    <a class="btn btn--primary" href="{% url 'profiles:horse_new' %}">+ Добавить лошадь</a>
+  </div>
+</div>
+{% if horses %}
+  <div class="list-cards">
+    {% for h in horses %}
+      <article class="row-card">
+        <div style="flex: 1; min-width: 0;">
+          <a class="h3 row-card__title" href="{% url 'profiles:horse' h.pk %}">{{ h.name }}</a>
+          <div class="table__sub">{{ h.summary }}{% if h.fksr_number %} · ФКСР {{ h.fksr_number }}{% endif %}</div>
+        </div>
+        {% url 'profiles:horse_edit' h.pk as href %}{% include "partials/edit_icon.html" with label="Изменить лошадь" %}
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card empty"><h2 class="h3">Лошадей пока нет</h2><p class="muted">Добавьте лошадь: кличка, год рождения, масть, пол и порода.</p></div>
+{% endif %}
+{% endblock %}

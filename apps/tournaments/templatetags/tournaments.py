@@ -59,3 +59,10 @@ def daterange(start, end):
     if start.year == end.year:
         return f"{start.day} {MONTHS_GEN[start.month - 1]} — {end.day} {MONTHS_GEN[end.month - 1]} {end.year}"
     return f"{isodate(start)} — {isodate(end)}"
+
+
+@register.filter
+def phone(value):
+    from apps.accounts.phone import format_phone
+
+    return format_phone(value) if value else ""

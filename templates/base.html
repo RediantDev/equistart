@@ -26,6 +26,10 @@
       </nav>
       <div class="topbar__actions">
         {% if user.is_authenticated %}
+          <a class="bell" href="{% url 'core:notifications' %}" aria-label="Уведомления{% if UNREAD_NOTIFICATIONS %}: непрочитанных {{ UNREAD_NOTIFICATIONS }}{% endif %}">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2zM10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            {% if UNREAD_NOTIFICATIONS %}<span class="bell__count">{{ UNREAD_NOTIFICATIONS }}</span>{% endif %}
+          </a>
           <span class="topbar__user" title="{{ user.full_name }}">{{ user.short_name }}</span>
           <form method="post" action="{% url 'accounts:logout' %}">
             {% csrf_token %}

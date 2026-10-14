@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Заявка — {{ s.title }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'tournaments:public' t.pk %}">← {{ s.title }}</a>
+    <h1 class="h1">{% if late %}Добавить участников (судья){% else %}Заявка на соревнование{% endif %}</h1>
+    <p class="muted">{% daterange s.starts_on s.ends_on %} · {{ s.venue.name }}. {% if late %}Позиции сразу считаются принятыми; допуск ставится отдельно.{% else %}Можно добавить одного или нескольких спортсменов — заявка станет групповой.{% endif %}</p>
+  </div>
+</div>
+
+{% if errors %}
+  <div class="alert alert--error" role="alert" style="margin-bottom: var(--space-4);">
+    <strong>Проверьте:</strong>
+    <ul style="margin: 6px 0 0; padding-left: 1.2em;">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+
+<div class="wizard-grid">
+  <div class="wizard-main">
+    <section class="card">
+      <div class="section-head"><h2 class="h3" style="margin: 0;">Выступления в заявке</h2><span class="chip">{{ lines|length }}</span></div>
+      {% if lines %}
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Спортсмен</th><th>Лошадь</th><th>Программа и зачёт</th><th class="num">Взнос</th><th><span class="visually-hidden">Убрать</span></th></tr></thead>
+            <tbody>
+              {% for i, l in lines %}
+                <tr>
+                  <td><strong>{{ l.athlete.public_name }}</strong><span class="table__sub">{{ l.athlete.summary }}</span>{% for a, h in l.partners %}<span class="table__sub">+ {{ a.public_name }} / {{ h.name }}</span>{% endfor %}</td>
+                  <td>{{ l.horse.name }}<span class="table__sub">{{ l.horse.summary }}</span></td>
+                  <td>{{ l.tclass.program.name }}<span class="table__sub">{{ l.tclass.program.day|date:"j E" }} · {{ l.tclass.name }}</span></td>
+                  <td class="num"><strong>{{ l.tclass.fee_kopecks|rub }}</strong></td>
+                  <td><form method="post">{% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="index" value="{{ i }}"><button class="btn btn--ghost btn--sm" name="action" value="remove">Убрать</button></form></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot><tr><td colspan="3"><strong>Итого стартовые взносы</strong><span class="table__sub">Денники и услуги — отдельными позициями после подачи.</span></td><td class="num"><strong>{{ total|rub }}</strong></td><td></td></tr></tfoot>
+          </table>
+        </div>
+      {% else %}
+        <p class="muted">Пока пусто. Добавьте первое выступление ниже.</p>
+      {% endif %}
+    </section>
+
+    <section class="card" id="add">
+      <h2 class="h3">Добавить выступление</h2>
+      {% if not athletes %}
+        <div class="alert alert--warning">Сначала <a href="{% url 'profiles:athlete_new' %}">добавьте спортсмена</a>{% if user.is_athlete %} или <a href="{% url 'profiles:athlete_new' %}?me=1">создайте свой профиль спортсмена</a>{% endif %}.</div>
+      {% else %}
+      <form method="post" class="form" novalidate>
+        {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}">
+        <div class="grid-2">
+          <div class="field"><label class="field__label" for="athlete">Спортсмен</label>
+            <select id="athlete" name="athlete"><option value="">— выберите —</option>{% for a in athletes %}<option value="{{ a.pk }}"{% if add.athlete == a.pk|stringformat:"s" %} selected{% endif %}>{{ a.full_name }}{% if a.birth_year %} ({{ a.birth_year }}){% endif %}</option>{% endfor %}</select>
+            <p class="field__help"><a href="{% url 'profiles:athlete_new' %}">+ новый спортсмен</a> — регистрация ему не нужна.</p></div>
+          <div class="field"><label class="field__label" for="horse">Лошадь</label>
+            <select id="horse" name="horse"><option value="">— выберите —</option>{% for h in horses %}<option value="{{ h.pk }}"{% if add.horse == h.pk|stringformat:"s" %} selected{% endif %}>{{ h.name }} · {{ h.summary }}</option>{% endfor %}</select>
+            <p class="field__help"><a href="{% url 'profiles:horse_search' %}?next={{ request.get_full_path|urlencode }}">Найти лошадь в сервисе</a> или <a href="{% url 'profiles:horse_new' %}">добавить свою</a>.</p></div>
+        </div>
+        <div class="field"><label class="field__label" for="tclass">Программа и зачёт</label>
+          <select id="tclass" name="tclass"><option value="">— выберите —</option>{% for group, items in class_groups %}<optgroup label="{{ group }}">{% for v, label in items %}<option value="{{ v }}"{% if add.tclass == v|stringformat:"s" %} selected{% endif %}>{{ label }}</option>{% endfor %}</optgroup>{% endfor %}</select>
+          <p class="field__help">Цена появится в списке выступлений после добавления.</p></div>
+        <details{% if add.partner_athlete_1 %} open{% endif %}>
+          <summary class="label" style="cursor: pointer;">Парный или групповой зачёт — добавить партнёров</summary>
+          <div class="form" style="margin-top: var(--space-3);">
+            {% for i in partner_range %}
+              <div class="grid-2">
+                <div class="field"><label class="field__label" for="pa{{ i }}">Партнёр {{ i }} — спортсмен</label><select id="pa{{ i }}" name="partner_athlete_{{ i }}"><option value="">—</option>{% for a in athletes %}<option value="{{ a.pk }}">{{ a.full_name }}</option>{% endfor %}</select></div>
+                <div class="field"><label class="field__label" for="ph{{ i }}">Партнёр {{ i }} — лошадь</label><select id="ph{{ i }}" name="partner_horse_{{ i }}"><option value="">—</option>{% for h in horses %}<option value="{{ h.pk }}">{{ h.name }}</option>{% endfor %}</select></div>
+              </div>
+            {% endfor %}
+          </div>
+        </details>
+        <div class="form-actions"><button class="btn btn--dark" name="action" value="add">+ Добавить выступление</button></div>
+      </form>
+      {% endif %}
+    </section>
+  </div>
+
+  <aside class="wizard-aside">
+    <section class="card">
+      <h2 class="h3">Отправка</h2>
+      <form method="post" class="form" style="margin-top: var(--space-3);">
+        {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="key" value="{{ key }}">
+        <div class="field"><label class="field__label" for="cn">Контактное лицо</label><input id="cn" name="contact_name" type="text" value="{{ user.full_name }}"></div>
+        <div class="field"><label class="field__label" for="cp">Телефон для связи</label><input id="cp" name="contact_phone" type="tel" value="{{ user.phone_display }}"><p class="field__help">Виден только организатору и судьям турнира.</p></div>
+        <div class="field"><label class="field__label" for="cm">Комментарий <span class="field__optional">необязательно</span></label><textarea id="cm" name="comment" rows="3"></textarea></div>
+        <p class="field__help">Публично в протоколах будут: фамилия и имя, год рождения, разряд, клуб; кличка, год, пол, масть, порода лошади.</p>
+        <button class="btn btn--primary btn--block" name="action" value="submit"{% if not lines %} disabled{% endif %}>Отправить заявку · {{ total|rub }}</button>
+      </form>
+    </section>
+  </aside>
+</div>
+{% endblock %}

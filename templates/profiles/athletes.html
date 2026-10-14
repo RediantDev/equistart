@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Спортсмены — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
+    <h1 class="h1">Спортсмены</h1>
+    <p class="muted">Те, кем вы управляете, кто разрешил вам подавать заявки, и ваш собственный профиль.</p>
+  </div>
+  <div class="form-actions">
+    {% if user.is_athlete %}<a class="btn btn--ghost" href="{% url 'profiles:athlete_new' %}?me=1">Мой профиль спортсмена</a>{% endif %}
+    <a class="btn btn--primary" href="{% url 'profiles:athlete_new' %}">+ Добавить спортсмена</a>
+  </div>
+</div>
+{% if rows %}
+  <div class="list-cards">
+    {% for r in rows %}
+      <article class="row-card">
+        <div style="flex: 1; min-width: 0;">
+          <a class="h3 row-card__title" href="{% url 'profiles:athlete' r.a.pk %}">{{ r.a.full_name }}</a>
+          <div class="table__sub">{{ r.a.summary|default:"Дополнительные сведения не заполнены" }}</div>
+        </div>
+        <div class="chips">
+          {% if r.own %}<span class="tag tag--lemon">Это вы</span>{% endif %}
+          {% if not r.manage %}<span class="tag tag--lilac">Можно подавать заявки</span>{% endif %}
+          {% if r.a.linked_user_id and not r.own %}<span class="tag tag--sky">Связан с аккаунтом</span>{% endif %}
+        </div>
+        {% if r.manage %}{% url 'profiles:athlete_edit' r.a.pk as href %}{% include "partials/edit_icon.html" with label="Изменить спортсмена" %}{% endif %}
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card empty"><h2 class="h3">Спортсменов пока нет</h2><p class="muted">Добавьте спортсмена — регистрация и телефон ему не нужны.</p></div>
+{% endif %}
+{% endblock %}

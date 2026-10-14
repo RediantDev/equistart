@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Поиск лошади — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head"><div>
+  <a class="back" href="{% if next %}{{ next }}{% else %}{% url 'profiles:horses' %}{% endif %}">← Назад</a>
+  <h1 class="h1">Поиск лошади</h1>
+  <p class="muted">По кличке или по точному номеру ФКСР / внутреннему коду. Выбор лошади не даёт права редактировать её профиль и смотреть документы.</p>
+</div></div>
+<form method="get" class="search" role="search">
+  <input type="hidden" name="next" value="{{ next }}">
+  <label class="visually-hidden" for="hq">Поиск</label>
+  <input id="hq" name="q" type="search" value="{{ q }}" placeholder="Кличка или номер">
+  <select name="mode" aria-label="Режим поиска" style="width: auto;"><option value="name"{% if mode == "name" %} selected{% endif %}>По кличке</option><option value="code"{% if mode == "code" %} selected{% endif %}>Номер ФКСР / код</option></select>
+  <button class="btn btn--primary">Найти</button>
+</form>
+{% if q %}
+  {% if results %}
+    <div class="list-cards">{% for h in results %}
+      <article class="row-card"><div style="flex: 1; min-width: 0;"><span class="h3">{{ h.name }}</span><div class="table__sub">{{ h.summary }}{% if h.fksr_number %} · ФКСР {{ h.fksr_number }}{% endif %}</div></div>
+      {% if next %}<form method="post" action="{{ next }}">{% csrf_token %}<input type="hidden" name="horse" value="{{ h.pk }}"><button class="btn btn--dark btn--sm" name="pick_horse" value="1">Выбрать</button></form>{% endif %}</article>
+    {% endfor %}</div>
+  {% else %}<div class="card empty"><h2 class="h3">Ничего не найдено</h2><p class="muted">Проверьте кличку или номер. Если лошади нет в сервисе — добавьте её.</p></div>{% endif %}
+{% endif %}
+{% endblock %}

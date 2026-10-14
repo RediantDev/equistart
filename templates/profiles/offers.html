@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Предложения — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head"><div><a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a><h1 class="h1">Предложения для вас</h1></div></div>
+{% if incoming %}
+  <div class="list-cards">{% for o in incoming %}
+    <article class="row-card">
+      <div style="flex: 1; min-width: 0;"><div class="h3">{{ o.get_kind_display }}</div>
+        <div class="table__sub">{% if o.athlete %}{{ o.athlete.full_name }}{% else %}{{ o.horse.name }} · {{ o.horse.summary }}{% endif %} · от {{ o.created_by.short_name }}</div></div>
+      <form method="post" action="{% url 'profiles:offer_respond' o.pk %}" style="display: flex; gap: var(--space-2);">{% csrf_token %}
+        <button name="decision" value="decline" class="btn btn--ghost btn--sm">Отклонить</button>
+        <button name="decision" value="accept" class="btn btn--primary btn--sm">Принять</button></form>
+    </article>{% endfor %}</div>
+{% else %}<div class="card empty"><h2 class="h3">Новых предложений нет</h2><p class="muted">Здесь появляются предложения связать профиль спортсмена с вашим аккаунтом и передать вам управление спортсменом или лошадью.</p></div>{% endif %}
+{% endblock %}
