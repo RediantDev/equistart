@@ -3,6 +3,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -92,3 +93,47 @@ def add_role(request):
         messages.success(request, "Роль добавлена.")
         return redirect("accounts:cabinet")
     return render(request, "accounts/add_role.html", {"form": form})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def verify_phone(request):
+    from . import verification
+
+    nxt = request.GET.get("next") or request.POST.get("next") or ""
+    nxt = nxt if nxt.startswith("/") and not nxt.startswith("//") else reverse("accounts:cabinet")
+    if request.user.phone_verified:
+        return redirect(nxt)
+    sent = request.session.get("phone_code_sent", False)
+    if request.method == "POST":
+        try:
+            if request.POST.get("action") == "send":
+                verification.send_code(request.user)
+                request.session["phone_code_sent"] = True
+                messages.success(request, f"Код отправлен на {request.user.phone_display}.")
+                return redirect(reverse("accounts:verify_phone") + "?next=" + nxt)
+            verification.check_code(request.user, request.POST.get("code", ""))
+            request.session.pop("phone_code_sent", None)
+            messages.success(request, "Телефон подтверждён.")
+            return redirect(nxt)
+        except ValueError as e:
+            messages.error(request, str(e))
+    return render(request, "accounts/verify_phone.html", {"sent": sent, "next": nxt, "wait": verification.seconds_until_resend(request.user)})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def change_password(request):
+    from django.contrib.auth import update_session_auth_hash
+    from django.contrib.auth.forms import PasswordChangeForm
+
+    from apps.core.models import audit
+
+    form = PasswordChangeForm(request.user, request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        user = form.save()
+        update_session_auth_hash(request, user)
+        audit(user, "user.password_change", user)
+        messages.success(request, "Пароль изменён.")
+        return redirect("accounts:cabinet")
+    return render(request, "accounts/password.html", {"form": form})

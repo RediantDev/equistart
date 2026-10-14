@@ -374,3 +374,19 @@ input.input-lg { font-size: 22px; font-weight: 700; min-height: 54px; font-varia
 .occ__cell.is-full { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 .summary-box { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: var(--radius-md); padding: 12px 14px; }
 a.chip, a.tag { text-decoration: none; }
+
+/* Печать протоколов и результатов (RES-04) */
+@media print {
+  body { background: #fff; color: #000; font-size: 11pt; }
+  .topbar, .footer, .back, .no-print, .hero-card__side, .messages, .skip-link, .btn { display: none !important; }
+  .page { padding: 0; max-width: none; }
+  .card, .table-wrap { box-shadow: none; border: 0; }
+  .hero-card.print-compact .summary__grid, .hero-card.print-compact .chips { display: none; }
+  .table { font-size: 10pt; }
+  .table th, .table td { padding: 4px 6px; border-bottom: 1px solid #999; }
+  .table thead { display: table-header-group; }
+  .table tr { break-inside: avoid; }
+  .section-head { break-after: avoid; margin: 12pt 0 4pt; }
+  .chip { border: 1px solid #000; background: none !important; color: #000 !important; }
+  a { color: #000; text-decoration: none; }
+}

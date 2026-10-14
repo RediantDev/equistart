@@ -4,7 +4,7 @@
 {% block content %}
 <a class="back" href="{% url 'core:calendar' %}">← Календарь</a>
 
-<section class="card hero-card">
+<section class="card hero-card{% if tab %} print-compact{% endif %}">
   <div class="hero-card__main">
     <div class="chips">
       {% if t.publication == "cancelled" %}<span class="chip chip--danger">Соревнование отменено</span>
@@ -36,7 +36,7 @@
   </div>
 </section>
 
-<nav class="tabs" aria-label="Разделы турнира">
+<nav class="tabs no-print" aria-label="Разделы турнира">
   <a class="tabs__item{% if not tab %} is-active{% endif %}" href="?">Программа</a>
   <a class="tabs__item{% if tab == 'starts' %} is-active{% endif %}" href="?tab=starts">Стартовые</a>
   <a class="tabs__item{% if tab == 'results' %} is-active{% endif %}" href="?tab=results">Результаты</a>
@@ -45,7 +45,7 @@
 {% if tab == "starts" %}
 <section class="stack">
   {% for b in starts %}
-    <div class="section-head"><h2 class="h3">{{ b.p.name }}<span class="table__sub">{{ b.p.day|date:"j E" }} · версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}</span></h2><a class="btn btn--ghost btn--sm" href="{% url 'conduct:startlist_xlsx' t.pk b.p.pk %}">Excel</a></div>
+    <div class="section-head"><h2 class="h3">{{ b.p.name }}<span class="table__sub">{{ b.p.day|date:"j E" }} · версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}</span></h2><div class="chips no-print"><a class="btn btn--ghost btn--sm" href="{% url 'conduct:startlist_xlsx' t.pk b.p.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button></div></div>
     <div class="table-wrap"><table class="table">
       <thead><tr><th class="num">№</th><th class="num">Время</th><th>Всадник</th><th>Лошадь</th><th>Зачёт</th></tr></thead>
       <tbody>{% for r in b.rows %}<tr{% if r.mark %} class="is-muted"{% endif %}>
@@ -59,7 +59,7 @@
 {% elif tab == "results" %}
 <section class="stack">
   {% for b in results %}
-    <div class="section-head"><h2 class="h3">{{ b.p.name }} · {{ b.c.name }}<span class="table__sub">версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}{% if b.pub.version > 1 %} · исправлено{% endif %}</span></h2><a class="btn btn--ghost btn--sm" href="{% url 'conduct:results_xlsx' t.pk b.c.pk %}">Excel</a></div>
+    <div class="section-head"><h2 class="h3">{{ b.p.name }} · {{ b.c.name }}<span class="table__sub">версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}{% if b.pub.version > 1 %} · исправлено{% endif %}</span></h2><div class="chips no-print"><a class="btn btn--ghost btn--sm" href="{% url 'conduct:results_xlsx' t.pk b.c.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button></div></div>
     <div class="table-wrap"><table class="table">
       <thead><tr><th class="num">Место</th><th>Всадник</th><th>Лошадь</th>{% for f in b.pub.fields %}<th class="num">{{ f }}</th>{% endfor %}</tr></thead>
       <tbody>{% for r in b.rows %}<tr>

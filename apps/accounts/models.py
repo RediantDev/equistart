@@ -151,3 +151,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         """Добавляет самостоятельно выбираемую категорию. Модератора добавить нельзя."""
         cat = Category(category)  # ValueError для неизвестной категории, включая moderator
         setattr(self, CATEGORY_FIELDS[cat], True)
+
+
+class PhoneCode(models.Model):
+    """Код подтверждения телефона. Хранится только хеш."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="phone_codes")
+    code_hash = models.CharField(max_length=64)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    used_at = models.DateTimeField(null=True, blank=True)

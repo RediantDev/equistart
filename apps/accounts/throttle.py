@@ -7,9 +7,24 @@ from django.conf import settings
 from django.core.cache import cache
 
 
+def _trusted(remote: str) -> bool:
+    """TRUSTED_PROXY_IPS: адреса или сети (172.16.0.0/12 для docker-сети nginx)."""
+    try:
+        ip = ipaddress.ip_address(remote)
+    except ValueError:
+        return False
+    for item in settings.TRUSTED_PROXY_IPS:
+        try:
+            if ip in ipaddress.ip_network(item, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def client_ip(request) -> str:
     remote = request.META.get("REMOTE_ADDR", "")
-    if remote in settings.TRUSTED_PROXY_IPS:
+    if _trusted(remote):
         forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
         if forwarded:
             candidate = forwarded.split(",")[-1].strip()

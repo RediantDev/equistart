@@ -26,7 +26,7 @@
 - Окончательная проверка — GitHub Actions (`.github/workflows/ci.yml`).
 
 ## Этапы (ТЗ раздел 16)
-0 — основа (готово) · 1 — аккаунты и турниры (готово: мастер, модерация, календарь, команда) · 2 — следующий · 2 — спортсмены, лошади, заявки · 3 — протоколы и результаты · 4 — деньги · 5 — денники и услуги · 6 — пилот.
+0–5 готовы (основа · аккаунты и турниры · спортсмены, лошади, заявки · протоколы и результаты · деньги · денники и услуги). 6 — пилот: код готов (подтверждение телефона по СМС, печать протоколов, nginx, копии, `docs/DEPLOY.md`); осталось развернуть на российском хостинге и провести реальный турнир.
 
 ## Дизайн
 - Значения — `design/tokens.json` → `python design/build_tokens.py` → `static/css/tokens.css`. Компоненты — `static/css/app.css`. Правила — `design/README.md`.
@@ -34,9 +34,16 @@
 - Макеты экранов: https://claude.ai/artifact/9vALzjx2Anf1riqWsy1mAG (календарь, турнир, мастер, заявка, судья и протокол на телефоне).
 
 ## Ближайшие задачи
-1. Этап 2: спортсмены (один управляющий, разрешение тренеру, связь с аккаунтом, согласие на публикацию), лошади (ФКСР уникален, передача, документы лошади), индивидуальные и групповые заявки, решения и допуск по позициям, предложения изменений, отмена.
+1. Получить ответы по `docs/QUESTIONS.md` и внести их в ТЗ (раздел 19).
+2. Развернуть стенд по `docs/DEPLOY.md` (хостинг и домен выбирает заказчик), включить подтверждение телефона.
+3. Пилотный турнир; правки по обратной связи.
 
-## Устройство этапа 1
-- `apps/tournaments`: `models.py` (Venue, Tournament с рабочей копией и снимком публикации, ProgramItem, TournamentClass, TeamMember), `services.py` (права, готовность, submit/approve/return/cancel), `views.py` (мастер, команда, календарь, публичная страница), `moderation.py`.
-- Публика видит только `Tournament.snapshot` и `pub_*`; правка рабочей копии не меняет опубликованное до одобрения.
+## Устройство
+- `apps/tournaments`: Venue, Tournament (рабочая копия + снимок публикации `snapshot`/`pub_*`), ProgramItem, TournamentClass, TeamMember; `services.py` — права (`roles_of`, `can_manage`), submit/approve/return/cancel.
+- `apps/profiles`: Athlete (один управляющий, делегаты, связь с аккаунтом), Horse (управляет только создатель), документы лошади, Offer.
+- `apps/entries`: Application (идемпотентность), Entry (решение, допуск, отмена — отдельные поля), ChangeProposal. Связь с деньгами — `money_hook` → `apps/finance/hooks.py`.
+- `apps/conduct`: StartSlot, StartListPublication, Result, ResultPublication. В порядок — принятые+допущенные+`stables.stable_dependency_ok`. Публика видит только опубликованные версии.
+- `apps/finance`: Charge (суммы считаются из журналов: Adjustment, Allocation→Payment, Refund), касса для ролей organizer/cashier. Отмена турнира → `tournament_cancelled`.
+- `apps/stables`: StableCategory, Booking (вместимость под `select_for_update` категории), Service, ServiceOrder, Delivery.
+- `apps/accounts`: телефон-логин, `verification.py` + `sms.py` (console/smsru), `PhoneVerificationMiddleware`, команды `set_moderator`, `set_password`.
 - Юридические тексты — `templates/legal/`; реквизиты оператора — настройки `OPERATOR_*`.

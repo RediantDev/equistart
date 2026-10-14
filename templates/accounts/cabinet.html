@@ -4,7 +4,7 @@
 <div class="page-head">
   <div>
     <h1 class="h1">Кабинет</h1>
-    <p class="muted">{{ user.full_name }} · {{ user.phone_display }}</p>
+    <p class="muted">{{ user.full_name }} · {{ user.phone_display }} · <a href="{% url 'accounts:password' %}">Сменить пароль</a></p>
   </div>
   <div class="mode-bar">
     {% if modes|length > 1 %}

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Подтверждение телефона — EquiStart{% endblock %}
+{% block content %}
+<div class="auth">
+  <section class="card auth__card">
+    <h1 class="h2">Подтвердите телефон</h1>
+    <p class="muted">По закону вход на сайты в России привязан к номеру телефона. Подтвердить нужно один раз: пришлём код на <strong>{{ user.phone_display }}</strong>.</p>
+    {% if sent %}
+      <form method="post" class="form">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+        <div class="field"><label class="field__label" for="code">Код из СМС</label><input id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required class="input-lg" autofocus></div>
+        <button class="btn btn--primary btn--block">Подтвердить</button>
+      </form>
+    {% endif %}
+    <form method="post" class="form" style="margin-top: var(--space-3);">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}"><input type="hidden" name="action" value="send">
+      <button class="btn {% if sent %}btn--ghost{% else %}btn--primary{% endif %} btn--block"{% if wait %} disabled{% endif %}>{% if sent %}Отправить код ещё раз{% if wait %} (через {{ wait }} с){% endif %}{% else %}Получить код{% endif %}</button>
+    </form>
+    <form method="post" action="{% url 'accounts:logout' %}" style="margin-top: var(--space-3);">{% csrf_token %}<button class="btn btn--ghost btn--sm">Выйти</button></form>
+  </section>
+</div>
+{% endblock %}

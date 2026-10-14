@@ -86,6 +86,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "apps.accounts.middleware.PhoneVerificationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -149,6 +150,9 @@ else:
 # Требование 149-ФЗ: подтверждение телефона обязательно до открытого запуска.
 # На закрытом тестовом стенде может быть выключено.
 PHONE_VERIFICATION_REQUIRED = env_bool("PHONE_VERIFICATION_REQUIRED", default=False)
+# console — код в журнал сервера; smsru — шлюз SMS.ru
+SMS_BACKEND = os.environ.get("SMS_BACKEND", "console")
+SMSRU_API_ID = os.environ.get("SMSRU_API_ID", "")
 
 # Ограничения попыток входа
 LOGIN_MAX_FAILURES_PER_PHONE = 5
