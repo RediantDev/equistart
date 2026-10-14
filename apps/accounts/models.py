@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
-from .phone import format_phone, normalize_phone
+from .phone import PHONE_DB_REGEX, format_phone, normalize_phone
 
 
 class Category(models.TextChoices):
@@ -62,9 +62,9 @@ class UserManager(BaseUserManager):
 class User(AbstractBaseUser, PermissionsMixin):
     phone = models.CharField(
         "телефон",
-        max_length=12,
+        max_length=13,
         unique=True,
-        help_text="Логин. Хранится в виде +79XXXXXXXXX.",
+        help_text="Логин. Мобильный номер России, Казахстана или Беларуси в формате +7… / +375….",
     )
     phone_verified_at = models.DateTimeField("телефон подтверждён", null=True, blank=True)
 
@@ -100,7 +100,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name_plural = "пользователи"
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(phone__regex=r"^\+79\d{9}$"),
+                condition=models.Q(phone__regex=PHONE_DB_REGEX),
                 name="user_phone_normalized",
             ),
         ]
