@@ -27,6 +27,8 @@ jobs:
           python-version: "3.13"
           cache: pip
       - run: pip install -r requirements.txt
+      - name: tokens.css соответствует design/tokens.json
+        run: python design/build_tokens.py && git diff --exit-code static/css/tokens.css
       - name: Проверка конфигурации
         run: python manage.py check
       - name: Нет незаписанных миграций
