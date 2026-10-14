@@ -18,9 +18,10 @@
         <span>EquiStart</span>
       </a>
       <nav class="topnav" aria-label="Основная навигация">
-        <a href="{% url 'core:calendar' %}" class="topnav__link{% if request.resolver_match.url_name == 'calendar' %} is-active{% endif %}">Календарь</a>
+        <a href="{% url 'core:calendar' %}" class="topnav__link topnav__link--home{% if request.resolver_match.url_name == 'calendar' %} is-active{% endif %}">Календарь</a>
         {% if user.is_authenticated %}
-          <a href="{% url 'accounts:cabinet' %}" class="topnav__link{% if request.resolver_match.app_name == 'accounts' %} is-active{% endif %}">Кабинет</a>
+          <a href="{% url 'accounts:cabinet' %}" class="topnav__link{% if request.resolver_match.app_name == 'accounts' or request.resolver_match.url_name in 'mine,create,step,team,invitations' %} is-active{% endif %}">Кабинет</a>
+          {% if user.is_moderator %}<a href="{% url 'moderation:queue' %}" class="topnav__link{% if request.resolver_match.app_name == 'moderation' %} is-active{% endif %}">Модерация</a>{% endif %}
         {% endif %}
       </nav>
       <div class="topbar__actions">

@@ -1,0 +1,86 @@
+{% extends "tournaments/_wizard.html" %}
+{% block step %}
+<div class="wizard-grid">
+  <div class="wizard-main">
+    {% if orphans %}
+      <section class="card" style="border-color: var(--danger);">
+        <h2 class="h3">Нужно выбрать новый день</h2>
+        <p class="muted">Даты соревнования изменились, и эти программы оказались вне них. Откройте программу и выберите день.</p>
+        <ul class="list">
+          {% for p in orphans %}
+            <li class="list__row"><span><strong>{{ p.name }}</strong><span class="table__sub">было {{ p.day|date:"d.m.Y" }}</span></span><a class="btn btn--ghost btn--sm" href="{% url 'tournaments:program_edit' t.pk p.pk %}">Выбрать день</a></li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% for d in by_day %}
+      <section class="card">
+        <div class="section-head">
+          <h2 class="h2">{{ d.day|date:"l, j E" }}</h2>
+          <span class="chip">{{ d.programs|length }} в программе</span>
+        </div>
+        {% if d.programs %}
+          <ul class="list">
+            {% for p in d.programs %}
+              <li class="list__row" id="program-{{ p.pk }}">
+                <span class="prog-row__time">{{ p.start_time|time:"H:i"|default:"—" }}</span>
+                <span class="prog-row__body">
+                  <strong>{{ p.name }}</strong>
+                  <span class="table__sub">{{ p.program_type_name }} · результат: {{ p.result_field_names|join:", " }}{% if p.limit %} · лимит {{ p.limit }}{% endif %} · зачётов: {{ p.classes.all|length }}</span>
+                </span>
+                <span class="tag tag--{{ p.discipline_color }}">{{ p.get_discipline_display }}</span>
+                {% if not t.is_locked %}
+                  <span class="prog-row__actions">
+                  <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:program_edit' t.pk p.pk %}#program-form">Изменить</a>
+                  <form method="post" action="{% url 'tournaments:program_delete' t.pk p.pk %}">
+                    {% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}">
+                    <button type="submit" class="btn btn--danger btn--sm" aria-label="Удалить {{ p.name }}">Удалить</button>
+                  </form>
+                  </span>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="muted">В этот день программы пока нет.</p>
+        {% endif %}
+      </section>
+    {% endfor %}
+
+    {% if not t.is_locked %}
+    <section class="card" id="program-form">
+      <h2 class="h3">{% if editing %}Изменить «{{ editing.name }}»{% else %}Добавить программу{% endif %}</h2>
+      <form method="post" novalidate class="form" action="{% if editing %}{% url 'tournaments:program_save' t.pk editing.pk %}{% else %}{% url 'tournaments:program_add' t.pk %}{% endif %}">
+        {% csrf_token %}
+        <input type="hidden" name="revision" value="{{ t.revision }}">
+        {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
+        <div class="grid-3">
+          {% if form.day.is_hidden %}{{ form.day }}{% else %}{% include "partials/field.html" with field=form.day %}{% endif %}
+          {% include "partials/field.html" with field=form.start_time %}
+          {% include "partials/field.html" with field=form.discipline %}
+        </div>
+        <div class="grid-2">
+          {% include "partials/field.html" with field=form.name %}
+          {% include "partials/field.html" with field=form.program_type %}
+        </div>
+        <div class="grid-3">{% include "partials/field.html" with field=form.limit %}</div>
+        <p class="field__help">Поля результата подставятся по виду программы: например, «На чистоту и резвость» — штрафные очки и время.</p>
+        <div class="form-actions">
+          {% if editing %}<a class="btn btn--ghost" href="{% url 'tournaments:step' t.pk 2 %}">Отмена</a>{% endif %}
+          <button type="submit" class="btn btn--dark">{% if editing %}Сохранить программу{% else %}+ Добавить программу{% endif %}</button>
+        </div>
+      </form>
+    </section>
+    {% endif %}
+
+    <div class="form-actions">
+      <a class="btn btn--ghost" href="{% url 'tournaments:step' t.pk 1 %}">← Основные сведения</a>
+      <a class="btn btn--primary" href="{% url 'tournaments:step' t.pk 3 %}">Далее: зачёты и цены</a>
+    </div>
+  </div>
+  <aside class="wizard-aside">
+    <div class="alert">Даты: {{ t.starts_on|date:"j E" }}{% if t.is_multiday %} — {{ t.ends_on|date:"j E Y" }}{% else %} {{ t.starts_on|date:"Y" }}{% endif %}. Время указывается по месту проведения.</div>
+  </aside>
+</div>
+{% endblock %}

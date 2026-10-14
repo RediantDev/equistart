@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Приглашения — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
+    <h1 class="h1">Приглашения в команды турниров</h1>
+  </div>
+</div>
+{% if pending %}
+  <div class="list-cards">
+    {% for m in pending %}
+      <article class="row-card">
+        <div style="flex: 1; min-width: 0;">
+          <div class="h3">{{ m.tournament.title }}</div>
+          <div class="table__sub">{% if m.tournament.starts_on %}{{ m.tournament.starts_on|isodate }} · {% endif %}приглашает {{ m.invited_by.short_name }}</div>
+        </div>
+        <span class="tag tag--lilac">{{ m.get_role_display }}</span>
+        <form method="post" action="{% url 'tournaments:invitation_respond' m.pk %}" style="display: flex; gap: var(--space-2);">
+          {% csrf_token %}
+          <button type="submit" name="decision" value="decline" class="btn btn--ghost btn--sm">Отклонить</button>
+          <button type="submit" name="decision" value="accept" class="btn btn--primary btn--sm">Принять</button>
+        </form>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card empty"><h2 class="h3">Новых приглашений нет</h2><p class="muted">Когда организатор пригласит вас по номеру {{ user.phone_display }}, приглашение появится здесь.</p></div>
+{% endif %}
+{% endblock %}

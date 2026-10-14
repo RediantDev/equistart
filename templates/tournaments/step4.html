@@ -1,0 +1,33 @@
+{% extends "tournaments/_wizard.html" %}
+{% block step %}
+<form method="post" enctype="multipart/form-data" novalidate class="card form" style="margin-top: 0;">
+  {% csrf_token %}
+  <input type="hidden" name="revision" value="{{ t.revision }}">
+  {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
+
+  <div class="form__group">
+    <h2 class="h3">Положение о соревновании</h2>
+    {% if t.regulation %}
+      <p>Загружено: <a href="{% url 'tournaments:regulation_working' t.pk %}" target="_blank" rel="noopener">открыть положение (PDF)</a>. Чтобы заменить, выберите новый файл.</p>
+    {% endif %}
+    <div class="field{% if form.regulation.errors %} field--error{% endif %}">
+      <label class="field__label" for="{{ form.regulation.id_for_label }}">{% if t.regulation %}Новый файл{% else %}Файл положения{% endif %}</label>
+      <input type="file" name="regulation" id="{{ form.regulation.id_for_label }}" accept="application/pdf">
+      <p class="field__help">{{ form.regulation.help_text }}</p>
+      {% for error in form.regulation.errors %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ error }}</p>{% endfor %}
+    </div>
+  </div>
+
+  <div class="form__group" style="border-bottom: 0; padding-bottom: 0;">
+    <h2 class="h3">Сроки и условия</h2>
+    <div class="grid-2">{% include "partials/field.html" with field=form.entry_deadline %}</div>
+    {% include "partials/field.html" with field=form.cancel_terms %}
+  </div>
+
+  <div class="form-actions">
+    <a class="btn btn--ghost" href="{% url 'tournaments:step' t.pk 3 %}">← Зачёты и цены</a>
+    <button type="submit" name="save" class="btn btn--ghost"{% if t.is_locked %} disabled{% endif %}>Сохранить</button>
+    <button type="submit" name="next" class="btn btn--primary"{% if t.is_locked %} disabled{% endif %}>Далее: проверка</button>
+  </div>
+</form>
+{% endblock %}

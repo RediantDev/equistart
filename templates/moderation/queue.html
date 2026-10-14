@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Модерация — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="h1">Модерация турниров</h1>
+    <p class="muted">Проверьте положение, даты, место, программу, цены и условия. Решение относится к конкретной версии.</p>
+  </div>
+</div>
+
+<section class="stack">
+  <h2 class="h2">Ждут проверки <span class="tag tag--lemon">{{ waiting|length }}</span></h2>
+  {% if waiting %}
+    <div class="list-cards">
+      {% for t in waiting %}
+        <article class="row-card">
+          <div style="flex: 1; min-width: 0;">
+            <a class="h3 row-card__title" href="{% url 'moderation:detail' t.pk %}">{{ t.title }}</a>
+            <div class="table__sub">{{ t.starts_on|isodate }} · {{ t.venue.name }}, {{ t.venue.settlement }} · {{ t.owner.full_name }}</div>
+          </div>
+          <div class="chips">
+            {% if t.is_published %}<span class="chip chip--info">Изменение опубликованного</span>{% else %}<span class="chip">Новый</span>{% endif %}
+            {% if t.venue and not t.venue.confirmed %}<span class="chip chip--warning">Новое место</span>{% endif %}
+            <span class="table__sub">отправлен {{ t.submitted_at|date:"j E, H:i" }}</span>
+          </div>
+          <a class="btn btn--primary btn--sm" href="{% url 'moderation:detail' t.pk %}">Проверить</a>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card empty"><h2 class="h3">Очередь пуста</h2><p class="muted">Новые турниры на проверку появятся здесь.</p></div>
+  {% endif %}
+
+  {% if recent %}
+    <h2 class="h2" style="margin-top: var(--space-6);">Недавние решения</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Турнир</th><th>Решение</th><th>Модератор</th><th>Когда</th></tr></thead>
+        <tbody>
+          {% for t in recent %}
+            <tr><td><a href="{% url 'moderation:detail' t.pk %}">{{ t.title }}</a></td><td>{% if t.status == "returned" %}<span class="chip chip--danger">Возвращён</span>{% else %}<span class="chip chip--success">Опубликован</span>{% endif %}</td><td>{{ t.reviewed_by.short_name }}</td><td>{{ t.reviewed_at|date:"d.m.Y H:i" }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

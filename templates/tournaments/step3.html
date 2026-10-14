@@ -1,0 +1,78 @@
+{% extends "tournaments/_wizard.html" %}
+{% load tournaments %}
+{% block step %}
+<div class="wizard-main">
+  <p class="muted">В каждой программе — один или несколько зачётов со своими условиями и стартовым взносом. Цена показывается отдельно от названия.</p>
+  {% for p in programs %}
+    <section class="card" id="program-{{ p.pk }}">
+      <div class="section-head">
+        <div>
+          <h2 class="h3" style="margin: 0;">{{ p.name }}</h2>
+          <span class="table__sub">{{ p.day|date:"j E" }}{% if p.start_time %}, {{ p.start_time|time:"H:i" }}{% endif %} · {{ p.program_type_name }}</span>
+        </div>
+        <span class="tag tag--{{ p.discipline_color }}">{{ p.get_discipline_display }}</span>
+      </div>
+
+      {% if p.classes.all %}
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Зачёт</th><th>Состав</th><th>Условия</th><th class="num">Лимит</th><th class="num">Взнос</th>{% if not t.is_locked %}<th><span class="visually-hidden">Действия</span></th>{% endif %}</tr></thead>
+            <tbody>
+              {% for c in p.classes.all %}
+                <tr>
+                  <td><strong>{{ c.name }}</strong></td>
+                  <td>{{ c.get_composition_display }}</td>
+                  <td>{{ c.conditions|default:"—" }}</td>
+                  <td class="num">{{ c.limit|default:"—" }}</td>
+                  <td class="num">{{ c.fee_kopecks|rub }}</td>
+                  {% if not t.is_locked %}
+                  <td style="white-space: nowrap; text-align: right;">
+                    <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:class_edit' t.pk p.pk c.pk %}#program-{{ p.pk }}">Изменить</a>
+                    <form method="post" action="{% url 'tournaments:class_delete' t.pk p.pk c.pk %}" style="display: inline;">
+                      {% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}">
+                      <button type="submit" class="btn btn--danger btn--sm" aria-label="Удалить зачёт {{ c.name }}">Удалить</button>
+                    </form>
+                  </td>
+                  {% endif %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="alert alert--warning">Добавьте хотя бы один зачёт — без него на программу нельзя подать заявку.</div>
+      {% endif %}
+
+      {% if not t.is_locked %}
+      <details class="inline-form"{% if p.form.is_bound or editing and editing.program_id == p.pk %} open{% endif %}>
+        <summary class="btn btn--dark btn--sm">{% if editing and editing.program_id == p.pk %}Изменить «{{ editing.name }}»{% else %}+ Добавить зачёт{% endif %}</summary>
+        <form method="post" novalidate class="form" action="{% if editing and editing.program_id == p.pk %}{% url 'tournaments:class_save' t.pk p.pk editing.pk %}{% else %}{% url 'tournaments:class_add' t.pk p.pk %}{% endif %}">
+          {% csrf_token %}
+          <input type="hidden" name="revision" value="{{ t.revision }}">
+          <div class="grid-3">
+            {% include "partials/field.html" with field=p.form.name %}
+            {% include "partials/field.html" with field=p.form.fee %}
+            {% include "partials/field.html" with field=p.form.composition %}
+          </div>
+          <div class="grid-3">
+            {% include "partials/field.html" with field=p.form.min_age %}
+            {% include "partials/field.html" with field=p.form.max_age %}
+            {% include "partials/field.html" with field=p.form.limit %}
+          </div>
+          {% include "partials/field.html" with field=p.form.rank_requirement %}
+          <div class="form-actions">
+            {% if editing and editing.program_id == p.pk %}<a class="btn btn--ghost" href="{% url 'tournaments:step' t.pk 3 %}">Отмена</a>{% endif %}
+            <button type="submit" class="btn btn--dark">Сохранить зачёт</button>
+          </div>
+        </form>
+      </details>
+      {% endif %}
+    </section>
+  {% endfor %}
+
+  <div class="form-actions">
+    <a class="btn btn--ghost" href="{% url 'tournaments:step' t.pk 2 %}">← Программа</a>
+    <a class="btn btn--primary" href="{% url 'tournaments:step' t.pk 4 %}">Далее: положение и условия</a>
+  </div>
+</div>
+{% endblock %}

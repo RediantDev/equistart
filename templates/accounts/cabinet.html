@@ -23,6 +23,9 @@
   </div>
 </div>
 
+{% if invitations_count %}
+  <div class="alert alert--warning" style="margin-bottom: var(--space-4);">Вас пригласили в команду турнира: {{ invitations_count }}. <a href="{% url 'tournaments:invitations' %}">Посмотреть приглашения</a></div>
+{% endif %}
 <div class="tiles">
   {% if mode == "athlete" %}
     {% include "accounts/_tile.html" with title="Мои заявки" tag="Заявки" color="sky" text="Здесь будут ваши заявки и решения по ним." %}
@@ -33,12 +36,13 @@
     {% include "accounts/_tile.html" with title="Спортсмены" tag="Команда" color="lilac" text="Спортсмены, которых вы ведёте." %}
     {% include "accounts/_tile.html" with title="Лошади" tag="Лошади" color="mint" text="Лошади, которыми вы управляете." %}
   {% elif mode == "organizer" %}
-    {% include "accounts/_tile.html" with title="Мои соревнования" tag="Турниры" color="peach" text="Черновики, турниры на проверке и опубликованные." %}
-    {% include "accounts/_tile.html" with title="Приглашения в команду" tag="Команда" color="pink" text="Турниры, где вам выдали роль." %}
+    <a class="tile tile--link" href="{% url 'tournaments:mine' %}"><span class="tag tag--peach" style="align-self: flex-start; margin-bottom: 6px;">Турниры</span><h2 class="h3">Мои соревнования</h2><p class="muted">Черновики, турниры на проверке и опубликованные.</p></a>
+    <a class="tile tile--link" href="{% url 'tournaments:create' %}"><span class="tag tag--lemon" style="align-self: flex-start; margin-bottom: 6px;">Новое</span><h2 class="h3">Создать соревнование</h2><p class="muted">Пять шагов: сведения, программа, зачёты, положение, проверка.</p></a>
   {% elif mode == "moderator" %}
-    <a class="tile tile--link" href="{% url 'admin:index' %}">
-      <h2 class="h3">Панель модерации</h2>
-      <p class="muted">Проверка турниров и обращений.</p>
+    <a class="tile tile--link" href="{% url 'moderation:queue' %}">
+      <span class="tag tag--lemon" style="align-self: flex-start; margin-bottom: 6px;">Модерация</span>
+      <h2 class="h3">Турниры на проверке</h2>
+      <p class="muted">Проверка положений, дат, программы и цен перед публикацией.</p>
     </a>
   {% endif %}
 </div>

@@ -48,11 +48,19 @@ def logout_view(request):
 
 @login_required
 def cabinet(request):
+    from apps.tournaments.models import TeamMember
+
     user = request.user
+    invitations_count = TeamMember.objects.filter(phone=user.phone, state=TeamMember.State.PENDING).count()
     return render(
         request,
         "accounts/cabinet.html",
-        {"mode": user.active_mode(), "modes": user.available_modes(), "can_add_role": bool(user.missing_categories())},
+        {
+            "mode": user.active_mode(),
+            "modes": user.available_modes(),
+            "can_add_role": bool(user.missing_categories()),
+            "invitations_count": invitations_count,
+        },
     )
 
 

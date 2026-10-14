@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Команда — {{ t.title }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% if manage %}{% url 'tournaments:step' t.pk 5 %}{% else %}{% url 'tournaments:mine' %}{% endif %}">← {{ t.title }}</a>
+    <h1 class="h1">Команда турнира</h1>
+    <p class="muted">Роли выдаются по номеру телефона. Права появляются, когда человек примет приглашение в своём кабинете.</p>
+  </div>
+</div>
+
+<div class="wizard-grid">
+  <div class="wizard-main">
+    <section class="card">
+      <h2 class="h3">Участники команды</h2>
+      <ul class="list">
+        <li class="list__row"><span style="flex: 1;"><strong>{{ t.owner.full_name }}</strong><span class="table__sub">создатель турнира</span></span><span class="tag tag--lemon">Организатор</span></li>
+        {% for m in members %}
+          <li class="list__row">
+            <span style="flex: 1; min-width: 0;"><strong>{% if m.user %}{{ m.user.full_name }}{% else %}{{ m.phone }}{% endif %}</strong>{% if manage %}<span class="table__sub">{{ m.phone }}</span>{% endif %}</span>
+            <span class="tag tag--lilac">{{ m.get_role_display }}</span>
+            {% if m.state == "pending" %}<span class="chip chip--warning">Ждёт принятия</span>{% else %}<span class="chip chip--success">Принято</span>{% endif %}
+            {% if manage %}
+              <form method="post" action="{% url 'tournaments:team_revoke' t.pk m.pk %}">{% csrf_token %}<button type="submit" class="btn btn--danger btn--sm">Отозвать</button></form>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  </div>
+  {% if manage %}
+  <aside class="wizard-aside">
+    <section class="card">
+      <h2 class="h3">Пригласить</h2>
+      <form method="post" novalidate class="form" style="margin-top: var(--space-3);">
+        {% csrf_token %}
+        {% include "partials/field.html" with field=form.phone %}
+        {% include "partials/field.html" with field=form.role %}
+        <button type="submit" class="btn btn--dark btn--block">Отправить приглашение</button>
+      </form>
+      <ul class="role-help">
+        <li><strong>Организатор</strong> — всё по турниру.</li>
+        <li><strong>Судья</strong> — заявки, допуск, порядок, результаты.</li>
+        <li><strong>Конюшня и услуги</strong> — денники и услуги.</li>
+        <li><strong>Касса</strong> — оплаты, долги, возвраты.</li>
+      </ul>
+    </section>
+  </aside>
+  {% endif %}
+</div>
+{% endblock %}

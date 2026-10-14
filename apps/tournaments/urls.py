@@ -1,0 +1,37 @@
+from django.urls import path
+
+from . import moderation, views
+
+app_name = "tournaments"
+
+urlpatterns = [
+    path("t/<int:pk>/", views.public_detail, name="public"),
+    path("t/<int:pk>/regulation.pdf", views.public_regulation, name="public_regulation"),
+    path("organizer/", views.my_tournaments, name="mine"),
+    path("organizer/new/", views.create, name="create"),
+    path("organizer/t/<int:pk>/step/<int:step>/", views.step, name="step"),
+    path("organizer/t/<int:pk>/programs/add/", views.program_save, name="program_add"),
+    path("organizer/t/<int:pk>/programs/<int:item_id>/", views.program_edit, name="program_edit"),
+    path("organizer/t/<int:pk>/programs/<int:item_id>/save/", views.program_save, name="program_save"),
+    path("organizer/t/<int:pk>/programs/<int:item_id>/delete/", views.program_delete, name="program_delete"),
+    path("organizer/t/<int:pk>/programs/<int:program_id>/classes/add/", views.class_save, name="class_add"),
+    path("organizer/t/<int:pk>/programs/<int:program_id>/classes/<int:class_id>/", views.class_edit, name="class_edit"),
+    path("organizer/t/<int:pk>/programs/<int:program_id>/classes/<int:class_id>/save/", views.class_save, name="class_save"),
+    path("organizer/t/<int:pk>/programs/<int:program_id>/classes/<int:class_id>/delete/", views.class_delete, name="class_delete"),
+    path("organizer/t/<int:pk>/delete/", views.delete, name="delete"),
+    path("organizer/t/<int:pk>/cancel/", views.cancel, name="cancel"),
+    path("organizer/t/<int:pk>/regulation.pdf", views.regulation_working, name="regulation_working"),
+    path("organizer/t/<int:pk>/team/", views.team, name="team"),
+    path("organizer/t/<int:pk>/team/<int:member_id>/revoke/", views.team_revoke, name="team_revoke"),
+    path("cabinet/invitations/", views.invitations, name="invitations"),
+    path("cabinet/invitations/<int:member_id>/", views.invitation_respond, name="invitation_respond"),
+]
+
+moderation_patterns = (
+    [
+        path("", moderation.queue, name="queue"),
+        path("t/<int:pk>/", moderation.detail, name="detail"),
+        path("t/<int:pk>/decide/", moderation.decide, name="decide"),
+    ],
+    "moderation",
+)

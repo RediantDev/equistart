@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Проверка: {{ t.title }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'moderation:queue' %}">← Очередь модерации</a>
+    <h1 class="h1">{{ t.title }}</h1>
+    <div class="chips">
+      {% if t.status == "review" %}<span class="chip chip--warning">На проверке</span>{% elif t.status == "returned" %}<span class="chip chip--danger">Возвращён</span>{% elif t.status == "approved" %}<span class="chip chip--success">Опубликован</span>{% else %}<span class="chip">Черновик организатора</span>{% endif %}
+      {% if t.is_published %}<span class="chip chip--info">Изменение опубликованного турнира</span>{% endif %}
+      <span class="tag">Организатор: {{ t.owner.full_name }} · {{ t.owner.phone_display }}</span>
+    </div>
+  </div>
+</div>
+
+<div class="wizard-grid">
+  <div class="wizard-main">
+    <section class="card">
+      <div class="section-head">
+        <h2 class="h3" style="margin: 0;">Сведения для публикации</h2>
+        {% if t.regulation %}<a class="btn btn--dark btn--sm" href="{% url 'tournaments:regulation_working' t.pk %}" target="_blank" rel="noopener">Открыть положение (PDF)</a>{% else %}<span class="chip chip--danger">Положение не загружено</span>{% endif %}
+      </div>
+      {% if preview %}{% include "tournaments/_preview.html" %}{% endif %}
+    </section>
+    {% if problems %}
+      <section class="card" style="border-color: var(--danger);">
+        <h2 class="h3">Не заполнено</h2>
+        <ul>{% for p in problems %}<li>{{ p.text }}</li>{% endfor %}</ul>
+      </section>
+    {% endif %}
+    {% if history %}
+      <details class="card"><summary class="h3">История</summary>
+        <ul class="list">{% for h in history %}<li class="list__row"><span class="num muted" style="min-width: 120px;">{{ h.created_at|date:"d.m.Y H:i" }}</span><span style="flex: 1;">{{ h.label }}{% if h.data.comment %}: «{{ h.data.comment }}»{% endif %}</span><span class="muted">{{ h.actor.short_name|default:"" }}</span></li>{% endfor %}</ul>
+      </details>
+    {% endif %}
+  </div>
+
+  <aside class="wizard-aside">
+    {% if t.status == "review" %}
+      <section class="card">
+        <h2 class="h3">Решение</h2>
+        <form method="post" action="{% url 'moderation:decide' t.pk %}" class="form" style="margin-top: var(--space-3);">
+          {% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}">
+          {% if t.venue and not t.venue.confirmed %}
+            <label class="check"><input type="checkbox" name="confirm_venue" value="1" checked><span>Подтвердить новое место «{{ t.venue.name }}» ({{ t.venue.region_name }}, {{ t.venue.settlement }}) — оно появится в списке у других организаторов</span></label>
+          {% endif %}
+          <button type="submit" name="decision" value="approve" class="btn btn--primary btn--block"{% if problems %} disabled{% endif %}>Опубликовать</button>
+          <div class="field" style="margin-top: var(--space-3);">
+            <label class="field__label" for="comment">Замечания для организатора</label>
+            <textarea id="comment" name="comment" rows="4" placeholder="Что нужно исправить"></textarea>
+          </div>
+          <button type="submit" name="decision" value="return" class="btn btn--danger btn--block">Вернуть с замечаниями</button>
+        </form>
+      </section>
+    {% else %}
+      <div class="alert">Решение принимается, когда организатор отправит турнир на проверку.</div>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{% if t %}{{ t.title }}{% else %}Новое соревнование{% endif %} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'tournaments:mine' %}">← Мои соревнования</a>
+    <h1 class="h1">{% if t %}{{ t.title }}{% else %}Новое соревнование{% endif %}</h1>
+    {% if t %}
+      <div class="chips">
+        {% if t.status == "review" %}<span class="chip chip--warning">На проверке у модератора</span>
+        {% elif t.status == "returned" %}<span class="chip chip--danger">Нужны исправления</span>
+        {% elif t.status == "approved" %}<span class="chip chip--success">Опубликован</span>
+        {% elif t.is_published %}<span class="chip chip--warning">Есть неопубликованные изменения</span>
+        {% else %}<span class="chip">Черновик</span>{% endif %}
+        {% if t.publication == "cancelled" %}<span class="chip chip--danger">Отменён</span>{% endif %}
+        {% if t.is_published %}<a class="tag tag--lemon" href="{% url 'tournaments:public' t.pk %}">Страница в календаре</a>{% endif %}
+        <a class="tag" href="{% url 'tournaments:team' t.pk %}">Команда турнира</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if t.status == "returned" and t.moderation_comment %}
+  <div class="alert alert--error" role="alert" style="margin-bottom: var(--space-4);"><strong>Замечания модератора:</strong> {{ t.moderation_comment|linebreaksbr }}</div>
+{% endif %}
+{% if t.is_locked %}
+  <div class="alert alert--warning" style="margin-bottom: var(--space-4);">Турнир на проверке у модератора. Редактирование откроется после решения.</div>
+{% elif t.is_published and t.status != "approved" %}
+  <div class="alert alert--warning" style="margin-bottom: var(--space-4);">Участники видят прежнюю опубликованную версию. Изменения появятся в календаре после проверки модератором.</div>
+{% endif %}
+
+<ol class="stepper" aria-label="Шаги">
+  {% for s in steps %}
+    <li class="stepper__item{% if s.current %} is-current{% elif s.done %} is-done{% endif %}"{% if s.current %} aria-current="step"{% endif %}>
+      {% if t and s.reachable and not s.current %}<a href="{% url 'tournaments:step' t.pk s.n %}">{% endif %}
+        <span class="caption">Шаг {{ s.n }}{% if s.done and not s.current %} · готово{% endif %}</span>
+        <span class="label">{{ s.name }}</span>
+      {% if t and s.reachable and not s.current %}</a>{% endif %}
+    </li>
+  {% endfor %}
+</ol>
+
+{% block step %}{% endblock %}
+{% endblock %}

@@ -1,11 +1,13 @@
 from django.urls import path
 
+from apps.tournaments.views import calendar
+
 from . import views
 
 app_name = "core"
 
 urlpatterns = [
-    path("", views.calendar, name="calendar"),
+    path("", calendar, name="calendar"),
     path("privacy/", views.privacy, name="privacy"),
     path("consent/", views.consent, name="consent"),
     path("publication-consent/", views.publication_consent, name="publication_consent"),

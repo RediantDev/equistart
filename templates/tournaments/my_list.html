@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Мои соревнования — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
+    <h1 class="h1">Мои соревнования</h1>
+    <p class="muted">Созданные вами и те, где вам выдали роль в команде.</p>
+  </div>
+  {% if user.is_organizer %}<a class="btn btn--primary" href="{% url 'tournaments:create' %}">+ Создать соревнование</a>{% endif %}
+</div>
+
+{% if rows %}
+  <div class="list-cards">
+    {% for r in rows %}
+      {% with t=r.t %}
+      <article class="row-card">
+        <div style="min-width: 0; flex: 1;">
+          <a class="h3 row-card__title" href="{% if 'organizer' in r.roles %}{% url 'tournaments:step' t.pk 5 %}{% else %}{% url 'tournaments:team' t.pk %}{% endif %}">{{ t.title|default:"Без названия" }}</a>
+          <div class="table__sub">{% if t.starts_on %}{% daterange t.starts_on t.ends_on %}{% else %}Даты не указаны{% endif %}{% if t.venue %} · {{ t.venue.name }}, {{ t.venue.settlement }}{% endif %}</div>
+        </div>
+        <div class="chips">
+          {% if t.publication == "cancelled" %}<span class="chip chip--danger">Отменён</span>
+          {% elif t.status == "review" %}<span class="chip chip--warning">На проверке</span>
+          {% elif t.status == "returned" %}<span class="chip chip--danger">Нужны исправления</span>
+          {% elif t.status == "approved" %}<span class="chip chip--success">Опубликован</span>
+          {% elif t.is_published %}<span class="chip chip--warning">Опубликован · есть изменения</span>
+          {% else %}<span class="chip">Черновик</span>{% endif %}
+          {% for role in r.roles %}{% if role != "organizer" or t.owner_id != user.pk %}<span class="tag tag--lilac">{% if role == "organizer" %}Организатор{% elif role == "judge" %}Судья{% elif role == "stable" %}Конюшня и услуги{% else %}Касса{% endif %}</span>{% endif %}{% endfor %}
+        </div>
+      </article>
+      {% endwith %}
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card empty">
+    <h2 class="h3">Соревнований пока нет</h2>
+    <p class="muted">Создайте первое: заполните основные сведения, программу и зачёты, загрузите положение и отправьте на проверку.</p>
+    {% if user.is_organizer %}<p style="margin-top: var(--space-4);"><a class="btn btn--primary" href="{% url 'tournaments:create' %}">Создать соревнование</a></p>{% endif %}
+  </div>
+{% endif %}
+{% endblock %}

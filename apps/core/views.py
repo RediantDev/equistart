@@ -4,11 +4,6 @@ from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 
 
-def calendar(request):
-    # Турниры появятся на этапе 1; пока календарь показывает пустое состояние.
-    return render(request, "core/calendar.html", {"tournaments": []})
-
-
 def privacy(request):
     return render(request, "legal/privacy.html", {"doc": "privacy"})
 
