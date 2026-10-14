@@ -10,7 +10,7 @@
   {% elif field.field.widget.input_type == 'checkbox' %}
     <label class="check">
       {{ field }}
-      <span>{{ field.label }}{% if consent_link %} (<a href="{% url 'core:privacy' %}" target="_blank" rel="noopener">политика</a>){% endif %}</span>
+      <span>{{ field.label }}{% if consent_link %} на условиях <a href="{% url 'core:consent' %}" target="_blank" rel="noopener">согласия</a> и <a href="{% url 'core:privacy' %}" target="_blank" rel="noopener">политики</a>{% endif %}</span>
     </label>
   {% else %}
     <label class="field__label" for="{{ field.id_for_label }}">{{ field.label }}{% if not field.field.required %} <span class="field__optional">необязательно</span>{% endif %}</label>

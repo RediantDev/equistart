@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<article class="card prose legal">
+  <nav class="chips" aria-label="Документы" style="margin-bottom: var(--space-5);">
+    <a class="tag{% if doc == 'privacy' %} tag--lemon{% endif %}" href="{% url 'core:privacy' %}">Политика</a>
+    <a class="tag{% if doc == 'consent' %} tag--lemon{% endif %}" href="{% url 'core:consent' %}">Согласие на обработку</a>
+    <a class="tag{% if doc == 'publication' %} tag--lemon{% endif %}" href="{% url 'core:publication_consent' %}">Согласие на публикацию</a>
+  </nav>
+  {% block legal %}{% endblock %}
+  <p class="muted" style="margin-top: var(--space-6);">Редакция от {{ LEGAL_DOCS_VERSION }}.</p>
+</article>
+{% endblock %}

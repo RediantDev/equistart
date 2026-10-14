@@ -199,3 +199,20 @@ SITE_NAME = "EquiStart"
 # В разработке WhiteNoise отдаёт файлы прямо из static/ без collectstatic.
 WHITENOISE_USE_FINDERS = not IS_PRODUCTION
 WHITENOISE_AUTOREFRESH = not IS_PRODUCTION
+
+# Оператор персональных данных (реквизиты ИП заказчика). Заполняются в .env до запуска.
+OPERATOR = {
+    "name": (os.environ.get("OPERATOR_NAME") or "[ИП Фамилия Имя Отчество]"),
+    "inn": (os.environ.get("OPERATOR_INN") or "[ИНН]"),
+    "ogrnip": (os.environ.get("OPERATOR_OGRNIP") or "[ОГРНИП]"),
+    "address": (os.environ.get("OPERATOR_ADDRESS") or "[адрес для корреспонденции]"),
+    "email": (os.environ.get("OPERATOR_EMAIL") or "[email для обращений по персональным данным]"),
+    "site": (os.environ.get("OPERATOR_SITE") or APP_ORIGIN),
+}
+LEGAL_DOCS_VERSION = "2026-10-14"
+
+# Загруженные файлы (положения турниров, документы лошадей). Не раздаются напрямую —
+# только через view с проверкой прав. В production — S3-совместимое хранилище в РФ.
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT") or BASE_DIR / "media")
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2_621_440
+DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024

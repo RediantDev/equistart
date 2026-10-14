@@ -8,9 +8,12 @@ class HealthTests(TestCase):
 
 
 class PagesTests(TestCase):
-    def test_privacy_page(self):
-        resp = self.client.get("/privacy/")
-        self.assertContains(resp, "Политика обработки персональных данных")
+    def test_legal_pages(self):
+        self.assertContains(self.client.get("/privacy/"), "Политика обработки персональных данных")
+        self.assertContains(self.client.get("/consent/"), "Согласие на обработку персональных данных")
+        resp = self.client.get("/publication-consent/")
+        self.assertContains(resp, "разрешённых для распространения")
+        self.assertContains(resp, "Не публикуются")
 
     def test_security_headers(self):
         resp = self.client.get("/")

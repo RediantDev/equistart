@@ -10,7 +10,15 @@ def calendar(request):
 
 
 def privacy(request):
-    return render(request, "core/privacy.html")
+    return render(request, "legal/privacy.html", {"doc": "privacy"})
+
+
+def consent(request):
+    return render(request, "legal/consent.html", {"doc": "consent"})
+
+
+def publication_consent(request):
+    return render(request, "legal/publication_consent.html", {"doc": "publication"})
 
 
 @never_cache

@@ -7,7 +7,7 @@ from . import throttle
 from .models import Category, User
 from .phone import normalize_phone
 
-PD_CONSENT_VERSION = "2026-10-draft"
+PD_CONSENT_VERSION = "2026-10-14"
 
 
 class PhoneField(forms.CharField):
