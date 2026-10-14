@@ -186,7 +186,11 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
-if IS_PRODUCTION:
+# Тестовый стенд без HTTPS (по IP-адресу): HTTPS_ENABLED=false. Только для тестовых данных.
+HTTPS_ENABLED = env_bool("HTTPS_ENABLED", default=True)
+if IS_PRODUCTION and not HTTPS_ENABLED:
+    SILENCED_SYSTEM_CHECKS = ["security.W004", "security.W008", "security.W012", "security.W016"]
+if IS_PRODUCTION and HTTPS_ENABLED:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=True)
@@ -196,6 +200,9 @@ if IS_PRODUCTION:
     SECURE_HSTS_PRELOAD = False
     # Включение в HSTS preload-список — решение владельца домена, принимается отдельно.
     SILENCED_SYSTEM_CHECKS = ["security.W021"]
+
+# Плашка «тестовый стенд» вверху каждой страницы (пусто — без плашки)
+STAND_BANNER = os.environ.get("STAND_BANNER", "")
 
 LOGGING = {
     "version": 1,

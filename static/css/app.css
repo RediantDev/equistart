@@ -390,3 +390,4 @@ a.chip, a.tag { text-decoration: none; }
   .chip { border: 1px solid #000; background: none !important; color: #000 !important; }
   a { color: #000; text-decoration: none; }
 }
+.stand-banner { background: var(--ink); color: var(--accent); text-align: center; font-size: 13px; font-weight: 700; padding: 6px 16px; }

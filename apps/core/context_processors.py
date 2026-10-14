@@ -13,4 +13,5 @@ def site(request):
         "OPERATOR": settings.OPERATOR,
         "LEGAL_DOCS_VERSION": settings.LEGAL_DOCS_VERSION,
         "UNREAD_NOTIFICATIONS": unread,
+        "STAND_BANNER": settings.STAND_BANNER,
     }

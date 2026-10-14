@@ -11,6 +11,7 @@
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   <a class="skip-link" href="#main">Перейти к содержимому</a>
+  {% if STAND_BANNER %}<div class="stand-banner" role="note">{{ STAND_BANNER }}</div>{% endif %}
   <header class="topbar">
     <div class="topbar__inner">
       <a class="brand" href="{% url 'core:calendar' %}" aria-label="EquiStart — календарь">
