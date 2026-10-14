@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Проведение — {{ t.title }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% if manage %}{% url 'tournaments:step' t.pk 5 %}{% else %}{% url 'tournaments:public' t.pk %}{% endif %}">← {{ t.title }}</a>
+    <h1 class="h1">Проведение</h1>
+    <div class="chips"><a class="tag tag--sky" href="{% url 'entries:manage' t.pk %}">Заявки</a><a class="tag" href="{% url 'tournaments:public' t.pk %}">Публичная страница</a>{% if t.publication == "finished" %}<span class="chip">Турнир завершён</span>{% endif %}</div>
+  </div>
+</div>
+<div class="wizard-grid">
+  <div class="wizard-main">
+    <div class="list-cards">
+      {% for r in programs %}
+        <article class="row-card">
+          <span class="prog-row__time">{{ r.p.start_time|time:"H:i"|default:"—" }}</span>
+          <div style="flex: 1 1 260px; min-width: 0;">
+            <a class="h3 row-card__title" href="{% url 'conduct:program' t.pk r.p.pk %}">{{ r.p.name }}</a>
+            <div class="table__sub">{{ r.p.day|date:"j E" }} · принято {{ r.accepted }} · готовы к старту {{ r.ready }} · в порядке {{ r.slots }}</div>
+          </div>
+          <div class="chips">{% if r.published %}<span class="chip chip--info">Протокол v{{ r.published.version }}</span>{% else %}<span class="chip">Протокол не опубликован</span>{% endif %}</div>
+          <a class="btn btn--ghost btn--sm" href="{% url 'conduct:live' t.pk r.p.pk %}">Экран судьи</a>
+        </article>
+      {% empty %}<div class="card empty"><h2 class="h3">В турнире нет программ</h2></div>{% endfor %}
+    </div>
+  </div>
+  <aside class="wizard-aside">
+    <section class="card">
+      <h2 class="h3">Интервалы</h2>
+      <form method="post" action="{% url 'conduct:settings' t.pk %}" class="form" style="margin-top: var(--space-3);">{% csrf_token %}
+        <div class="field"><label class="field__label" for="mr">Минимум между стартами одной лошади или всадника, мин</label><input id="mr" name="min_rest_minutes" type="number" min="0" value="{{ t.min_rest_minutes }}"><p class="field__help">0 — не проверять. Нарушения покажем как конфликты; судья может оставить исключение с причиной.</p></div>
+        <button class="btn btn--dark btn--sm">Сохранить</button>
+      </form>
+    </section>
+    {% if manage and t.publication == "published" %}
+      <details class="card danger-zone"><summary class="h3">Завершить турнир</summary>
+        {% if warnings %}<div class="alert alert--warning" style="margin-top: var(--space-3);"><strong>Не закрыто:</strong><ul style="margin: 6px 0 0; padding-left: 1.2em;">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul></div>{% else %}<p class="muted">Всё закрыто.</p>{% endif %}
+        <form method="post" action="{% url 'conduct:finish' t.pk %}" class="form">{% csrf_token %}<input type="hidden" name="confirm" value="1"><p class="muted">Опубликованные протоколы и результаты останутся в архиве. Долги и возвраты можно закрывать и после завершения.</p><button class="btn btn--danger">Завершить турнир</button></form>
+      </details>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

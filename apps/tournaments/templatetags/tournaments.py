@@ -66,3 +66,17 @@ def phone(value):
     from apps.accounts.phone import format_phone
 
     return format_phone(value) if value else ""
+
+
+@register.filter
+def num(v):
+    """Числа результатов: 4.0 → «4», 61.25 → «61,25». Пусто → «—»."""
+    if v is None or v == "":
+        return "—"
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return v
+    if f == int(f):
+        return str(int(f))
+    return f"{f:.2f}".rstrip("0").replace(".", ",")

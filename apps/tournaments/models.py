@@ -94,6 +94,11 @@ class Tournament(models.Model):
     pub_deadline = models.DateField(null=True, blank=True)
     pub_timezone = models.CharField(max_length=64, blank=True)
     cancelled_reason = models.TextField(blank=True)
+    min_rest_minutes = models.PositiveSmallIntegerField(
+        "минимальный интервал между стартами одной лошади или всадника, мин", default=0,
+        help_text="0 — не проверять. Значение задаёт организатор; правила дисциплин — после утверждения матрицы.",
+    )
+    finished_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -165,6 +170,7 @@ class ProgramItem(models.Model):
     result_fields = models.JSONField("поля результата", default=list)
     limit = models.PositiveIntegerField("лимит участников", null=True, blank=True)
     position = models.PositiveIntegerField(default=0)
+    slot_minutes = models.PositiveSmallIntegerField("интервал между стартами, мин", default=2)
 
     def __str__(self):
         return self.name

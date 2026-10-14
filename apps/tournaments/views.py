@@ -634,8 +634,43 @@ def public_detail(request, pk):
             "open": t.public_entries_open(), "card": _card(t),
             "can_manage": request.user.is_authenticated and services.can_manage(request.user, t),
             "can_judge": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "judge"}),
+            **_public_tabs(request, t),
         },
     )
+
+
+def _public_tabs(request, t):
+    """Вкладки «Стартовые» и «Результаты»: только опубликованные версии (ТЗ, разделы 10–11)."""
+    from apps.conduct.models import ResultPublication, StartListPublication
+    from apps.entries.models import Entry
+
+    tab = request.GET.get("tab", "")
+    if tab not in ("starts", "results"):
+        tab = ""
+    starts, results = [], []
+    if tab == "starts":
+        pubs = {}
+        for pub in StartListPublication.objects.filter(program__tournament=t).select_related("program").order_by("program_id", "-version"):
+            pubs.setdefault(pub.program_id, pub)
+        ids = [r["entry"] for pub in pubs.values() for r in pub.rows]
+        inactive = {e.pk for e in Entry.objects.filter(pk__in=ids) if not e.is_active}
+        for p in t.programs.all():
+            pub = pubs.get(p.pk)
+            if pub:
+                rows = [dict(r, mark={"withdrawn": "Снят", "no_show": "Не явился"}.get(r.get("status")) or ("Снят" if r["entry"] in inactive else "")) for r in pub.rows]
+                starts.append({"p": p, "pub": pub, "rows": rows})
+    elif tab == "results":
+        pubs = {}
+        for pub in ResultPublication.objects.filter(tclass__program__tournament=t).select_related("tclass__program").order_by("tclass_id", "-version"):
+            pubs.setdefault(pub.tclass_id, pub)
+        for p in t.programs.prefetch_related("classes"):
+            for c in p.classes.all():
+                pub = pubs.get(c.pk)
+                if pub:
+                    keys = p.result_fields
+                    rows = [dict(r, cells=[r["values"].get(k) for k in keys]) for r in pub.rows]
+                    results.append({"p": p, "c": c, "pub": pub, "rows": rows})
+    return {"tab": tab, "starts": starts, "results": results}
 
 
 def public_regulation(request, pk):

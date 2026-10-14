@@ -8,7 +8,7 @@
     <h1 class="h1">Заявки турнира</h1>
     <div class="chips">{% for label, n, color in counts %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>
   </div>
-  {% if t.publication == "published" %}<a class="btn btn--ghost" href="{% url 'entries:apply' t.pk %}?late=1">+ Добавить участника</a>{% endif %}
+  <div class="form-actions"><a class="btn btn--dark" href="{% url 'conduct:overview' t.pk %}">Проведение</a>{% if t.publication == "published" %}<a class="btn btn--ghost" href="{% url 'entries:apply' t.pk %}?late=1">+ Добавить участника</a>{% endif %}</div>
 </div>
 <form method="get" class="filters__body" style="margin: 0 0 var(--space-4);">
   <div class="field"><label class="field__label" for="q">Поиск</label><input id="q" name="q" type="search" value="{{ f.q }}" placeholder="Спортсмен, лошадь, контакт"></div>

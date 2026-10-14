@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Судья · {{ p.name }} — EquiStart{% endblock %}
+{% block content %}
+<div class="live">
+  <div class="live__head">
+    <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← Порядок и результаты</a>
+    <h1 class="h3" style="margin: 0;">{{ p.name }}</h1>
+    <div class="table__sub">{{ p.day|date:"j E" }} · прошли {{ done }} из {{ total }}</div>
+  </div>
+  {% if current %}
+    <section class="live__current">
+      <div class="live__meta"><span class="caption" style="color: var(--accent);">{% if current.status == "started" %}НА ПОЛЕ{% else %}СЛЕДУЮЩИЙ{% endif %} · № {{ current.position }}{% if current.start_time %} · {{ current.start_time|time:"H:i" }}{% endif %}</span></div>
+      <div class="live__name">{{ current.entry.athlete_snapshot.name }}</div>
+      <div class="live__horse">{{ current.entry.horse_snapshot.name }} · {{ current.entry.horse_snapshot.birth_year }} · {{ current.entry.horse_snapshot.sex }} · {{ current.entry.class_name }}</div>
+      {% for c in current_conflicts %}<div class="alert alert--warning" style="font-size: 14px;">{{ c }}</div>{% endfor %}
+      <form method="post" action="{% url 'conduct:live_save' t.pk p.pk %}" class="live__form">{% csrf_token %}
+        <input type="hidden" name="slot" value="{{ current.pk }}">
+        <div class="live__grid">
+          {% for f, l in fields %}<label class="field"><span class="field__label">{{ l }}</span><input type="text" name="v_{{ f }}" inputmode="decimal" autocomplete="off" value="{{ current_result.values|get:f|default_if_none:'' }}" class="live__input"></label>{% endfor %}
+          <label class="field"><span class="field__label">Место</span><input name="place" type="number" min="1" value="{{ current_result.place|default_if_none:'' }}" class="live__input"></label>
+          <label class="field"><span class="field__label">Статус</span><select name="status">{% for v, l in statuses %}<option value="{{ v }}"{% if current_result.status == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
+        </div>
+        <input type="hidden" name="next_start" value="1">
+        <button class="btn btn--primary btn--block">Сохранить и следующий</button>
+      </form>
+      {% if current.status == "waiting" %}
+        <form method="post" action="{% url 'conduct:action' t.pk p.pk 'status' %}" class="live__extra">{% csrf_token %}<input type="hidden" name="slot" value="{{ current.pk }}"><input type="hidden" name="next" value="{% url 'conduct:live' t.pk p.pk %}">
+          <button class="btn btn--ghost btn--sm" name="status" value="started">На поле</button><button class="btn btn--ghost btn--sm" name="status" value="no_show">Не явился</button><button class="btn btn--ghost btn--sm" name="status" value="withdrawn">Снят</button></form>
+      {% endif %}
+    </section>
+  {% else %}
+    <div class="card empty"><h2 class="h3">Все выступления завершены</h2><p class="muted">Проверьте места и опубликуйте результаты по зачётам.</p><a class="btn btn--primary" href="{% url 'conduct:program' t.pk p.pk %}">К результатам</a></div>
+  {% endif %}
+  {% if upcoming %}
+    <div class="caption muted" style="margin-top: var(--space-4);">ДАЛЕЕ</div>
+    <div class="list-cards" style="margin-top: var(--space-2);">{% for s in upcoming %}
+      <div class="row-card" style="padding: 12px 14px;"><span class="numeric">{{ s.position }}</span><span style="flex: 1; min-width: 0;">{{ s.entry.athlete_snapshot.name }}<span class="table__sub">{{ s.entry.horse_snapshot.name }}{% if s.start_time %} · {{ s.start_time|time:"H:i" }}{% endif %}</span></span></div>
+    {% endfor %}</div>
+  {% endif %}
+</div>
+{% endblock %}

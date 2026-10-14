@@ -28,11 +28,46 @@
     {% endif %}
     {% if s.has_regulation %}<a class="btn btn--dark btn--block" href="{% url 'tournaments:public_regulation' t.pk %}" target="_blank" rel="noopener">Положение (PDF)</a>{% endif %}
     {% if can_manage %}<a class="btn btn--ghost btn--block" href="{% url 'tournaments:step' t.pk 5 %}">Управление турниром</a>{% endif %}
-    {% if can_judge %}<a class="btn btn--ghost btn--block" href="{% url 'entries:manage' t.pk %}">Заявки турнира</a>{% endif %}
+    {% if can_judge %}<a class="btn btn--ghost btn--block" href="{% url 'entries:manage' t.pk %}">Заявки турнира</a><a class="btn btn--ghost btn--block" href="{% url 'conduct:overview' t.pk %}">Проведение</a>{% endif %}
     <p class="table__sub" style="margin: 0;">Проводит: {{ s.organizer_name }}.</p>
   </div>
 </section>
 
+<nav class="tabs" aria-label="Разделы турнира">
+  <a class="tabs__item{% if not tab %} is-active{% endif %}" href="?">Программа</a>
+  <a class="tabs__item{% if tab == 'starts' %} is-active{% endif %}" href="?tab=starts">Стартовые</a>
+  <a class="tabs__item{% if tab == 'results' %} is-active{% endif %}" href="?tab=results">Результаты</a>
+</nav>
+
+{% if tab == "starts" %}
+<section class="stack">
+  {% for b in starts %}
+    <div class="section-head"><h2 class="h3">{{ b.p.name }}<span class="table__sub">{{ b.p.day|date:"j E" }} · версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}</span></h2><a class="btn btn--ghost btn--sm" href="{% url 'conduct:startlist_xlsx' t.pk b.p.pk %}">Excel</a></div>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th class="num">№</th><th class="num">Время</th><th>Всадник</th><th>Лошадь</th><th>Зачёт</th></tr></thead>
+      <tbody>{% for r in b.rows %}<tr{% if r.mark %} class="is-muted"{% endif %}>
+        <td class="num">{{ r.position }}</td><td class="num">{{ r.time|default:"—" }}</td>
+        <td><strong>{{ r.athlete.name }}</strong><span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.rank %} · {{ r.athlete.rank }}{% endif %}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>{% for pt in r.partners %}<span class="table__sub">+ {{ pt.name }} / {{ pt.horse }}</span>{% endfor %}{% if r.mark %}<span class="chip chip--danger">{{ r.mark }}</span>{% endif %}</td>
+        <td>{{ r.horse.name }}<span class="table__sub">{{ r.horse.birth_year|default:"" }} {{ r.horse.sex|default:"" }} {{ r.horse.color|default:"" }}{% if r.horse.breed %} · {{ r.horse.breed }}{% endif %}</span></td>
+        <td>{{ r.class }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  {% empty %}<div class="card empty"><h2 class="h3">Стартовые протоколы ещё не опубликованы</h2><p class="muted">Судья публикует порядок перед началом программы.</p></div>{% endfor %}
+</section>
+{% elif tab == "results" %}
+<section class="stack">
+  {% for b in results %}
+    <div class="section-head"><h2 class="h3">{{ b.p.name }} · {{ b.c.name }}<span class="table__sub">версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}{% if b.pub.version > 1 %} · исправлено{% endif %}</span></h2><a class="btn btn--ghost btn--sm" href="{% url 'conduct:results_xlsx' t.pk b.c.pk %}">Excel</a></div>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th class="num">Место</th><th>Всадник</th><th>Лошадь</th>{% for f in b.pub.fields %}<th class="num">{{ f }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for r in b.rows %}<tr>
+        <td class="num"><strong>{{ r.place|default:"—" }}</strong></td>
+        <td><strong>{{ r.athlete.name }}</strong><span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>{% for pt in r.partners %}<span class="table__sub">+ {{ pt.name }} / {{ pt.horse }}</span>{% endfor %}{% if r.status %}<span class="chip">{{ r.status }}</span>{% endif %}</td>
+        <td>{{ r.horse.name }}</td>
+        {% for v in r.cells %}<td class="num">{{ v|num }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table></div>
+  {% empty %}<div class="card empty"><h2 class="h3">Результаты ещё не опубликованы</h2></div>{% endfor %}
+</section>
+{% else %}
 <section class="stack">
   <h2 class="h2">Программа и цены</h2>
   {% for d in days %}
@@ -69,4 +104,5 @@
   {% if s.cancel_terms %}<div class="alert"><strong>Условия отмены и возврата:</strong> {{ s.cancel_terms|linebreaksbr }} <span class="muted">Условия задаёт организатор.</span></div>{% endif %}
   <p class="muted" style="font-size: 14px;">Опубликовано {{ t.published_at|date:"j E Y" }}. Сведения проверены модератором EquiStart. Проверка сервиса не является утверждением федерацией.</p>
 </section>
+{% endif %}
 {% endblock %}
