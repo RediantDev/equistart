@@ -20,11 +20,13 @@ class AthleteForm(forms.ModelForm):
 
     class Meta:
         model = Athlete
-        fields = ["last_name", "first_name", "middle_name", "birth_date", "rank", "fksr_number", "club", "region", "coach_contact"]
+        fields = ["last_name", "first_name", "middle_name", "birth_date", "rank", "fksr_number", "fei_id", "club", "region", "coach_contact"]
         widgets = {"birth_date": DATE}
         help_texts = {
             "birth_date": "Нужна для зачётов с возрастными условиями. Публично показывается только год.",
             "rank": "Нужен для зачётов с требованием разряда.",
+            "fksr_number": "Необязательно. Один номер — один спортсмен в сервисе.",
+            "fei_id": "Необязательно. Для спортсменов с регистрацией FEI.",
         }
 
     def __init__(self, *args, **kwargs):
@@ -39,6 +41,20 @@ class AthleteForm(forms.ModelForm):
             raise ValidationError("Проверьте дату рождения.")
         return d
 
+    def _unique(self, field, label):
+        n = normalize_fksr(self.cleaned_data.get(field, ""))
+        if n:
+            dup = Athlete.objects.filter(**{field: n}, archived=False).exclude(pk=self.instance.pk).first()
+            if dup:
+                raise ValidationError(f"Спортсмен с {label} {n} уже есть в сервисе ({dup.public_name}). Попросите его управляющего дать вам разрешение на заявки или напишите модератору.")
+        return n
+
+    def clean_fksr_number(self):
+        return self._unique("fksr_number", "номером ФКСР")
+
+    def clean_fei_id(self):
+        return self._unique("fei_id", "FEI ID")
+
     def clean(self):
         c = super().clean()
         if not c.get("consent") and not (self.instance.pk and self.instance.consent_confirmed_at):
@@ -49,8 +65,9 @@ class AthleteForm(forms.ModelForm):
 class HorseForm(forms.ModelForm):
     class Meta:
         model = Horse
-        fields = ["name", "birth_year", "color", "sex", "breed", "fksr_number", "sire", "birthplace", "owner_name"]
-        help_texts = {"fksr_number": "Необязательно. Если номер уже есть в сервисе, мы предложим найденный профиль."}
+        fields = ["name", "birth_year", "color", "sex", "breed", "fksr_number", "fei_id", "sire", "birthplace", "owner_name"]
+        help_texts = {"fksr_number": "Необязательно. Если номер уже есть в сервисе, мы предложим найденный профиль.",
+                      "fei_id": "Необязательно. Один номер — одна лошадь в сервисе."}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -71,6 +88,15 @@ class HorseForm(forms.ModelForm):
             if dup:
                 self.duplicate = dup
                 raise ValidationError(f"Лошадь с номером ФКСР {n} уже есть в сервисе: {dup.name} ({dup.summary()}). Выберите её в заявке или напишите модератору.")
+        return n
+
+    def clean_fei_id(self):
+        n = normalize_fksr(self.cleaned_data.get("fei_id", ""))
+        if n:
+            dup = Horse.objects.filter(fei_id=n, archived=False).exclude(pk=self.instance.pk).first()
+            if dup:
+                self.duplicate = dup
+                raise ValidationError(f"Лошадь с FEI ID {n} уже есть в сервисе: {dup.name} ({dup.summary()}). Выберите её в заявке или напишите модератору.")
         return n
 
 

@@ -24,6 +24,7 @@
         {% include "partials/field.html" with field=form.breed %}
       </div>
       {% include "partials/field.html" with field=form.fksr_number %}
+      {% include "partials/field.html" with field=form.fei_id %}
       <details{% if form.sire.value or form.birthplace.value or form.owner_name.value %} open{% endif %}>
         <summary class="label" style="cursor: pointer;">Дополнительно: отец, место рождения, владелец</summary>
         <div class="form" style="margin-top: var(--space-3);">

@@ -19,6 +19,7 @@
         <dt>Пол</dt><dd>{{ h.get_sex_display }}</dd>
         <dt>Порода</dt><dd>{{ h.breed }}</dd>
         <dt>Номер ФКСР</dt><dd>{{ h.fksr_number|default:"—" }}</dd>
+        <dt>FEI ID</dt><dd>{{ h.fei_id|default:"—" }}</dd>
         <dt>Внутренний код</dt><dd class="num">{{ h.code }}</dd>
         {% if manage %}
           <dt>Отец</dt><dd>{{ h.sire|default:"—" }}</dd>

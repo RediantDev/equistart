@@ -383,3 +383,38 @@ class LinkedAthleteTests(Base):
         self.a1.save()
         app = services.submit(self.kid, self.t.pk, [services.Line(self.a1, self.h1, self.c_kids)], "self")
         self.assertEqual(app.submitted_by, self.kid)
+
+
+class UniqueNumbersTests(Base):
+    """Решение 14.10.2026: дублей нет, если совпадают номера ФКСР или FEI."""
+
+    def test_athlete_fksr_and_fei_unique(self):
+        self.a1.fksr_number, self.a1.fei_id = "rus 001", "10012345"
+        self.a1.save()
+        self.client.force_login(self.other)
+        base = {"last_name": "Новая", "first_name": "Запись", "consent": "on"}
+        r = self.client.post(reverse("profiles:athlete_new"), {**base, "fksr_number": "RUS-001"})
+        self.assertContains(r, "уже есть в сервисе")
+        r = self.client.post(reverse("profiles:athlete_new"), {**base, "fei_id": "10012345"})
+        self.assertContains(r, "уже есть в сервисе")
+        self.assertFalse(Athlete.objects.filter(last_name="Новая").exists())
+        self.client.post(reverse("profiles:athlete_new"), {**base, "fksr_number": "RUS-002", "fei_id": "10099999"})
+        self.assertTrue(Athlete.objects.filter(last_name="Новая", fksr_number="RUS002").exists())
+
+    def test_horse_fei_unique(self):
+        self.h1.fei_id = "104AB12"
+        self.h1.save()
+        self.client.force_login(self.other)
+        data = {"name": "Другая", "birth_year": 2015, "color": "grey", "sex": "mare", "breed": "x", "fei_id": "104ab12"}
+        r = self.client.post(reverse("profiles:horse_new"), data)
+        self.assertContains(r, "FEI ID 104AB12 уже есть")
+        self.assertFalse(Horse.objects.filter(name="Другая").exists())
+
+    def test_db_constraint(self):
+        from django.db import IntegrityError, transaction
+
+        self.a1.fksr_number = "X1"
+        self.a1.save()
+        self.a2.fksr_number = "x-1"
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self.a2.save()

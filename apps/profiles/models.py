@@ -51,6 +51,7 @@ class Athlete(models.Model):
     birth_date = models.DateField("дата рождения", null=True, blank=True)
     rank = models.CharField("разряд / звание", max_length=8, choices=RANKS, blank=True)
     fksr_number = models.CharField("номер ФКСР", max_length=40, blank=True)
+    fei_id = models.CharField("FEI ID", max_length=20, blank=True)
     club = models.CharField("клуб", max_length=200, blank=True)
     region = models.CharField("регион", max_length=120, blank=True)
     coach_contact = models.CharField("контакт тренера", max_length=200, blank=True)
@@ -68,9 +69,19 @@ class Athlete(models.Model):
         verbose_name = "спортсмен"
         verbose_name_plural = "спортсмены"
         ordering = ["last_name", "first_name"]
+        # Дублей нет: номер ФКСР и FEI ID уникальны среди действующих записей (решение заказчика 14.10.2026).
+        constraints = [
+            models.UniqueConstraint(fields=["fksr_number"], condition=~models.Q(fksr_number="") & models.Q(archived=False), name="athlete_fksr_unique_active"),
+            models.UniqueConstraint(fields=["fei_id"], condition=~models.Q(fei_id="") & models.Q(archived=False), name="athlete_fei_unique_active"),
+        ]
 
     def __str__(self):
         return self.full_name
+
+    def save(self, *args, **kwargs):
+        self.fksr_number = normalize_fksr(self.fksr_number)
+        self.fei_id = normalize_fksr(self.fei_id)
+        super().save(*args, **kwargs)
 
     @property
     def full_name(self):
@@ -98,7 +109,7 @@ class Athlete(models.Model):
 
     def private_snapshot(self):
         d = self.public_snapshot()
-        d.update({"full_name": self.full_name, "birth_date": self.birth_date.isoformat() if self.birth_date else None, "fksr": self.fksr_number})
+        d.update({"full_name": self.full_name, "birth_date": self.birth_date.isoformat() if self.birth_date else None, "fksr": self.fksr_number, "fei": self.fei_id})
         return d
 
 
@@ -121,6 +132,7 @@ class Horse(models.Model):
     sex = models.CharField("пол", max_length=10, choices=SEXES)
     breed = models.CharField("порода", max_length=100)
     fksr_number = models.CharField("номер ФКСР", max_length=40, blank=True)
+    fei_id = models.CharField("FEI ID / паспорт FEI", max_length=20, blank=True)
     code = models.CharField("внутренний код", max_length=12, unique=True, default=new_horse_code, editable=False)
     sire = models.CharField("отец", max_length=100, blank=True)
     birthplace = models.CharField("место рождения", max_length=200, blank=True)
@@ -137,7 +149,8 @@ class Horse(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["fksr_number"], condition=~models.Q(fksr_number="") & models.Q(archived=False), name="horse_fksr_unique_active"
-            )
+            ),
+            models.UniqueConstraint(fields=["fei_id"], condition=~models.Q(fei_id="") & models.Q(archived=False), name="horse_fei_unique_active"),
         ]
 
     def __str__(self):
@@ -145,6 +158,7 @@ class Horse(models.Model):
 
     def save(self, *args, **kwargs):
         self.fksr_number = normalize_fksr(self.fksr_number)
+        self.fei_id = normalize_fksr(self.fei_id)
         super().save(*args, **kwargs)
 
     def summary(self):

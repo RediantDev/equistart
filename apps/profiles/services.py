@@ -68,7 +68,7 @@ def search_horses(query: str, mode: str):
         from .models import normalize_fksr
 
         norm = normalize_fksr(q)
-        return qs.filter(Q(fksr_number=norm) | Q(code=q.upper()))[:20]
+        return qs.filter(Q(fksr_number=norm) | Q(fei_id=norm) | Q(code=q.upper()))[:20]
     return qs.filter(name__icontains=q).order_by("name", "birth_year")[:30]
 
 

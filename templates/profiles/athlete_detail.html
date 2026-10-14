@@ -19,6 +19,7 @@
         <dt>Клуб</dt><dd>{{ a.club|default:"—" }}</dd>
         <dt>Регион</dt><dd>{{ a.region|default:"—" }}</dd>
         <dt>Номер ФКСР</dt><dd>{{ a.fksr_number|default:"—" }}</dd>
+        <dt>FEI ID</dt><dd>{{ a.fei_id|default:"—" }}</dd>
         <dt>Управляет</dt><dd>{{ a.manager.full_name }}</dd>
         <dt>Аккаунт спортсмена</dt><dd>{% if a.linked_user %}связан{% else %}не связан{% endif %}</dd>
       </dl>
