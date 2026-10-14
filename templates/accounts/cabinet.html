@@ -25,16 +25,16 @@
 
 <div class="tiles">
   {% if mode == "athlete" %}
-    {% include "accounts/_tile.html" with title="Мои заявки" text="Здесь будут ваши заявки и решения по ним." %}
-    {% include "accounts/_tile.html" with title="Мои лошади" text="Профили лошадей, на которых вы выступаете." %}
-    {% include "accounts/_tile.html" with title="Профиль спортсмена" text="Разряд, клуб, номер ФКСР." %}
+    {% include "accounts/_tile.html" with title="Мои заявки" tag="Заявки" color="sky" text="Здесь будут ваши заявки и решения по ним." %}
+    {% include "accounts/_tile.html" with title="Мои лошади" tag="Лошади" color="mint" text="Профили лошадей, на которых вы выступаете." %}
+    {% include "accounts/_tile.html" with title="Профиль спортсмена" tag="Профиль" color="lilac" text="Разряд, клуб, номер ФКСР." %}
   {% elif mode == "coach" %}
-    {% include "accounts/_tile.html" with title="Заявки" text="Индивидуальные и групповые заявки ваших спортсменов." %}
-    {% include "accounts/_tile.html" with title="Спортсмены" text="Спортсмены, которых вы ведёте." %}
-    {% include "accounts/_tile.html" with title="Лошади" text="Лошади, которыми вы управляете." %}
+    {% include "accounts/_tile.html" with title="Заявки" tag="Заявки" color="sky" text="Индивидуальные и групповые заявки ваших спортсменов." %}
+    {% include "accounts/_tile.html" with title="Спортсмены" tag="Команда" color="lilac" text="Спортсмены, которых вы ведёте." %}
+    {% include "accounts/_tile.html" with title="Лошади" tag="Лошади" color="mint" text="Лошади, которыми вы управляете." %}
   {% elif mode == "organizer" %}
-    {% include "accounts/_tile.html" with title="Мои соревнования" text="Черновики, турниры на проверке и опубликованные." %}
-    {% include "accounts/_tile.html" with title="Приглашения в команду" text="Турниры, где вам выдали роль." %}
+    {% include "accounts/_tile.html" with title="Мои соревнования" tag="Турниры" color="peach" text="Черновики, турниры на проверке и опубликованные." %}
+    {% include "accounts/_tile.html" with title="Приглашения в команду" tag="Команда" color="pink" text="Турниры, где вам выдали роль." %}
   {% elif mode == "moderator" %}
     <a class="tile tile--link" href="{% url 'admin:index' %}">
       <h2 class="h3">Панель модерации</h2>

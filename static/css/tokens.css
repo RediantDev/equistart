@@ -9,28 +9,39 @@
 }
 
 :root, [data-theme="light"] {
-  --bg: #f4f5f1;
+  --bg: #f7f6f1;
   --surface: #ffffff;
-  --surface-2: #eef1ec;
-  --border: #dfe4dc;
-  --control-border: #7f8b83;
-  --text: #17231d;
-  --text-muted: #5d6b63;
-  --accent: #1e4d3a;
-  --accent-hover: #163b2c;
-  --accent-soft: #e3eee7;
-  --on-accent: #ffffff;
-  --focus: #2f7d5c;
-  --success: #1f7a4a;
-  --success-soft: #e5f4ec;
-  --danger: #b42318;
-  --danger-soft: #fdeceb;
-  --warning: #7a4f00;
-  --warning-soft: #fbf0d6;
-  --info: #24527d;
-  --info-soft: #e8eff6;
-  --neutral-soft: #eceeea;
-  --shadow-card: 0 1px 2px rgba(23,35,29,0.06), 0 1px 1px rgba(23,35,29,0.04);
+  --surface-2: #efeee8;
+  --border: #e6e4dc;
+  --control-border: #8a8983;
+  --text: #141414;
+  --text-muted: #5e5d57;
+  --accent: #ffcf1f;
+  --accent-hover: #f5bf00;
+  --accent-soft: #fff3c4;
+  --on-accent: #141414;
+  --ink: #141414;
+  --focus: #2457ff;
+  --success: #11703f;
+  --success-soft: #d9f4e4;
+  --danger: #c21f2a;
+  --danger-soft: #ffe1e1;
+  --warning: #9a4300;
+  --warning-soft: #ffe6cc;
+  --info: #1f4fc4;
+  --info-soft: #dde8ff;
+  --neutral-soft: #efeee8;
+  --sky: #1f4fc4;
+  --sky-soft: #dde8ff;
+  --mint: #11703f;
+  --mint-soft: #d9f4e4;
+  --lilac: #5a33b8;
+  --lilac-soft: #ebe3ff;
+  --peach: #a8431a;
+  --peach-soft: #ffe2d3;
+  --pink: #a3245a;
+  --pink-soft: #ffe0ec;
+  --shadow-card: 0 1px 2px rgba(20,20,20,0.04), 0 4px 16px rgba(20,20,20,0.05);
 }
 
 :root {
@@ -42,20 +53,20 @@
   --space-6: 24px;
   --space-8: 32px;
   --space-12: 48px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
   --radius-pill: 999px;
   --container: 1120px;
-  --control-height: 44px;
+  --control-height: 48px;
   --font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
-.h1 { font-family: var(--font-sans); font-size: 28px; line-height: 35px; font-weight: 650; letter-spacing: -0.01em; }
-.h2 { font-family: var(--font-sans); font-size: 22px; line-height: 28px; font-weight: 650; }
-.h3 { font-family: var(--font-sans); font-size: 17px; line-height: 24px; font-weight: 600; }
+.h1 { font-family: var(--font-sans); font-size: 32px; line-height: 38px; font-weight: 800; letter-spacing: -0.02em; }
+.h2 { font-family: var(--font-sans); font-size: 24px; line-height: 30px; font-weight: 750; }
+.h3 { font-family: var(--font-sans); font-size: 18px; line-height: 24px; font-weight: 700; }
 .body { font-family: var(--font-sans); font-size: 16px; line-height: 24px; font-weight: 400; }
 .body-sm { font-family: var(--font-sans); font-size: 14px; line-height: 20px; font-weight: 400; }
-.label { font-family: var(--font-sans); font-size: 14px; line-height: 20px; font-weight: 600; }
-.caption { font-family: var(--font-sans); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.04em; }
-.numeric { font-family: var(--font-sans); font-size: 15px; line-height: 20px; font-weight: 600; }
+.label { font-family: var(--font-sans); font-size: 14px; line-height: 20px; font-weight: 650; }
+.caption { font-family: var(--font-sans); font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: 0.04em; }
+.numeric { font-family: var(--font-sans); font-size: 15px; line-height: 20px; font-weight: 700; }

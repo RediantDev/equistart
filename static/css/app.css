@@ -15,8 +15,8 @@ body {
   font-size: 16px;
   line-height: 1.5;
 }
-a { color: var(--accent); }
-a:hover { color: var(--accent-hover); }
+a { color: var(--text); text-decoration-color: var(--accent-hover); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+a:hover { color: var(--text); text-decoration-color: var(--text); }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
 
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -33,12 +33,12 @@ a:hover { color: var(--accent-hover); }
 /* Шапка */
 .topbar { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
 .topbar__inner { max-width: var(--container); margin: 0 auto; padding: 10px var(--space-4); display: flex; align-items: center; gap: var(--space-4); }
-.brand { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 750; color: var(--accent); text-decoration: none; font-size: 18px; letter-spacing: -0.01em; }
-.brand__mark { width: 26px; height: 26px; }
+.brand { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 800; color: var(--text); text-decoration: none; font-size: 19px; letter-spacing: -0.02em; }
+.brand__mark { width: 30px; height: 30px; flex-shrink: 0; display: inline-grid; place-items: center; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-size: 17px; font-weight: 800; letter-spacing: 0; }
 .topnav { display: flex; gap: var(--space-1); }
-.topnav__link { padding: 6px 10px; border-radius: var(--radius-sm); color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 15px; }
+.topnav__link { padding: 7px 14px; border-radius: var(--radius-pill); color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 15px; }
 .topnav__link:hover { background: var(--surface-2); color: var(--text); }
-.topnav__link.is-active { color: var(--accent); background: var(--accent-soft); }
+.topnav__link.is-active { color: var(--on-accent); background: var(--accent); }
 .topbar__actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); }
 .topbar__actions form { margin: 0; }
 .topbar__user { color: var(--text-muted); font-size: 14px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -54,7 +54,7 @@ a:hover { color: var(--accent-hover); }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }
 .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; display: flex; flex-direction: column; gap: var(--space-1); }
 .tile--link { text-decoration: none; color: inherit; }
-.tile--link:hover { border-color: var(--accent); }
+.tile--link:hover { border-color: var(--text); }
 .tile__empty { margin: var(--space-3) 0 0; font-size: 14px; color: var(--text-muted); }
 .empty { text-align: center; padding: 40px var(--space-6); }
 .prose { max-width: 760px; }
@@ -64,25 +64,27 @@ a:hover { color: var(--accent-hover); }
 /* Кнопки */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: var(--control-height); padding: 0 18px; border-radius: var(--radius-sm);
+  min-height: var(--control-height); padding: 0 22px; border-radius: var(--radius-pill);
   border: 1px solid transparent; font: inherit; font-weight: 650; text-decoration: none;
   cursor: pointer; transition: background-color .15s, border-color .15s, color .15s; white-space: nowrap;
 }
-.btn--sm { min-height: 36px; padding: 0 var(--space-3); font-size: 14px; }
+.btn--sm { min-height: 38px; padding: 0 var(--space-4); font-size: 14px; }
 .btn--block { width: 100%; }
 .btn--primary { background: var(--accent); color: var(--on-accent); }
 .btn--primary:hover { background: var(--accent-hover); color: var(--on-accent); }
-.btn--ghost { background: var(--surface); color: var(--accent); border-color: var(--control-border); }
-.btn--ghost:hover { background: var(--accent-soft); color: var(--accent-hover); }
+.btn--dark { background: var(--ink); color: var(--surface); }
+.btn--dark:hover { background: var(--text-muted); color: var(--surface); }
+.btn--ghost { background: var(--surface); color: var(--text); border-color: var(--control-border); }
+.btn--ghost:hover { background: var(--surface-2); color: var(--text); border-color: var(--text); }
 .btn--danger { background: var(--surface); color: var(--danger); border-color: var(--danger); }
 .btn--danger:hover { background: var(--danger-soft); }
 .btn[disabled], .btn.htmx-request { opacity: .55; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
 
 /* Бейджи и чипы статусов. Статус всегда подписан словом — цвет только помогает. */
-.badge { display: inline-flex; align-items: center; padding: var(--space-1) 10px; border-radius: var(--radius-pill); background: var(--accent-soft); color: var(--accent); font-size: 14px; font-weight: 650; }
+.badge { display: inline-flex; align-items: center; padding: var(--space-1) 12px; border-radius: var(--radius-pill); background: var(--accent); color: var(--on-accent); font-size: 14px; font-weight: 650; }
 .chip {
-  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: var(--radius-pill);
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: var(--radius-pill);
   font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .02em; white-space: nowrap;
   background: var(--neutral-soft); color: var(--text-muted);
 }
@@ -93,11 +95,20 @@ a:hover { color: var(--accent-hover); }
 .chip--info { background: var(--info-soft); color: var(--info); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
+/* Цветные метки категорий: дисциплины, разделы кабинета. Не статусы. */
+.tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: var(--radius-pill); font-size: 13px; line-height: 18px; font-weight: 700; white-space: nowrap; background: var(--surface-2); color: var(--text); }
+.tag--sky { background: var(--sky-soft); color: var(--sky); }
+.tag--mint { background: var(--mint-soft); color: var(--mint); }
+.tag--lilac { background: var(--lilac-soft); color: var(--lilac); }
+.tag--peach { background: var(--peach-soft); color: var(--peach); }
+.tag--pink { background: var(--pink-soft); color: var(--pink); }
+.tag--lemon { background: var(--accent-soft); color: var(--text); }
+
 /* Переключатель режима */
 .mode-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.segmented { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 3px; margin: 0; flex-wrap: wrap; }
-.segmented__item { border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 650; color: var(--text-muted); padding: 7px var(--space-3); border-radius: 6px; cursor: pointer; min-height: 36px; }
-.segmented__item.is-active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow-card); }
+.segmented { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 4px; margin: 0; flex-wrap: wrap; }
+.segmented__item { border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 650; color: var(--text-muted); padding: 7px var(--space-4); border-radius: var(--radius-pill); cursor: pointer; min-height: 38px; }
+.segmented__item.is-active { background: var(--ink); color: var(--surface); }
 
 /* Формы */
 .form { display: flex; flex-direction: column; gap: var(--space-4); margin-top: var(--space-5); }
@@ -118,9 +129,9 @@ input:focus, select:focus, textarea:focus { outline: 3px solid var(--focus); out
 .choices { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .choices legend { margin-bottom: var(--space-2); }
 .choice, .check { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-.choice { padding: 10px var(--space-3); border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); }
-.choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
-.choice input, .check input { width: 18px; height: 18px; accent-color: var(--accent); flex-shrink: 0; margin: 0; }
+.choice { padding: 12px var(--space-4); border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--surface); font-weight: 600; }
+.choice:has(input:checked) { border-color: var(--text); background: var(--accent-soft); }
+.choice input, .check input { width: 20px; height: 20px; accent-color: var(--ink); flex-shrink: 0; margin: 0; }
 .check { align-items: flex-start; }
 .check input { margin-top: 3px; }
 .grid-2, .grid-3 { display: grid; gap: var(--space-3); }
@@ -135,7 +146,7 @@ input:focus, select:focus, textarea:focus { outline: 3px solid var(--focus); out
 
 /* Сообщения */
 .messages { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); }
-.alert { padding: var(--space-3) 14px; border-radius: var(--radius-sm); background: var(--info-soft); color: var(--info); font-weight: 500; }
+.alert { padding: 14px var(--space-4); border-radius: var(--radius-md); background: var(--info-soft); color: var(--info); font-weight: 500; }
 .alert--success { background: var(--success-soft); color: var(--success); }
 .alert--error { background: var(--danger-soft); color: var(--danger); }
 .alert--warning { background: var(--warning-soft); color: var(--warning); }
@@ -157,7 +168,7 @@ input:focus, select:focus, textarea:focus { outline: 3px solid var(--focus); out
 .back { display: inline-block; margin-bottom: var(--space-3); font-size: 14px; text-decoration: none; }
 
 @media (max-width: 480px) {
-  .h1 { font-size: 22px; line-height: 28px; }
+  .h1 { font-size: 26px; line-height: 31px; }
   .card { padding: 18px; border-radius: var(--radius-md); }
   .topbar__inner { gap: var(--space-2); }
   .topbar__user { display: none; }

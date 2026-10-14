@@ -1,4 +1,5 @@
 <section class="tile">
+  {% if tag %}<span class="tag tag--{{ color|default:'lemon' }}" style="align-self: flex-start; margin-bottom: 6px;">{{ tag }}</span>{% endif %}
   <h2 class="h3">{{ title }}</h2>
   <p class="muted">{{ text }}</p>
   <p class="tile__empty">Пока пусто</p>
