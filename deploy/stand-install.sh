@@ -1,3 +1,7 @@
+#!/bin/sh
+# Обёртка для полей cloud-init, которые принимают только "#!/bin/sh" (Timeweb Cloud):
+# записывает установщик во временный файл, запускает его через bash и удаляет (вместе с токеном).
+cat > /root/equistart-install.sh <<'EQUISTART_SCRIPT'
 #!/bin/bash
 # Тестовый стенд EquiStart на чистом сервере Ubuntu 24.04 — одним сценарием.
 # Вставляется целиком в поле «cloud-init» при создании сервера в Timeweb Cloud (или запускается от root).
@@ -98,3 +102,6 @@ systemctl reload nginx
 sleep 3
 curl -fsS http://127.0.0.1/health/ready && echo
 echo "== Готово: откройте http://${IP}"
+EQUISTART_SCRIPT
+bash /root/equistart-install.sh
+rm -f /root/equistart-install.sh
