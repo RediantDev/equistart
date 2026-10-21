@@ -6,7 +6,7 @@
     <h1 class="h1">Календарь соревнований</h1>
     <p class="muted">Опубликованные турниры, приём заявок, стартовые протоколы и результаты.</p>
   </div>
-  {% if user.is_authenticated and user.is_organizer %}<a class="btn btn--ghost" href="{% url 'tournaments:create' %}">+ Создать соревнование</a>{% endif %}
+  {% if user.is_authenticated and user.can_create_tournament %}<a class="btn btn--ghost" href="{% url 'tournaments:create' %}">+ Создать соревнование</a>{% endif %}
 </div>
 
 <form method="get" role="search" class="calendar-filters">

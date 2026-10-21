@@ -1,7 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -49,36 +48,79 @@ def logout_view(request):
 
 @login_required
 def cabinet(request):
+    """UI-07: «Главная» — разделы по ролям пользователя, без переключателя режимов."""
+    import datetime
+
+    from django.db.models import Q
+    from django.utils import timezone
+
+    from apps.entries.models import ChangeProposal, Entry
     from apps.profiles.models import Athlete, Offer
-    from apps.tournaments.models import TeamMember
+    from apps.tournaments.models import TeamMember, Tournament
 
     user = request.user
-    invitations_count = TeamMember.objects.filter(phone=user.phone, state=TeamMember.State.PENDING).count()
-    offers_count = Offer.objects.filter(phone=user.phone, state=Offer.State.PENDING).count()
-    own_athlete = Athlete.objects.filter(linked_user=user).first()
+    today = timezone.localdate()
+    team = TeamMember.objects.filter(user=user, state=TeamMember.State.ACCEPTED)
+    judged_ids = set(team.filter(role__in=[TeamMember.Role.JUDGE, TeamMember.Role.ORGANIZER]).values_list("tournament_id", flat=True))
+    judged_ids |= set(Tournament.objects.filter(owner=user).values_list("pk", flat=True))
+    stable_ids = set(team.filter(role__in=[TeamMember.Role.STABLE, TeamMember.Role.ORGANIZER]).values_list("tournament_id", flat=True))
+    stable_ids |= set(Tournament.objects.filter(owner=user).values_list("pk", flat=True))
+    live = Q(publication=Tournament.Publication.PUBLISHED)
+    judging_today = list(
+        Tournament.objects.filter(live, pk__in=judged_ids, pub_starts_on__lte=today + datetime.timedelta(days=1), pub_ends_on__gte=today)
+        .order_by("pub_starts_on")
+    )
+
+    actions = []
+    n = TeamMember.objects.filter(phone=user.phone, state=TeamMember.State.PENDING).count()
+    if n:
+        actions.append(("Приглашения в команду турнира", n, "tournaments:invitations"))
+    n = Offer.objects.filter(phone=user.phone, state=Offer.State.PENDING).count()
+    if n:
+        actions.append(("Предложения: связь с профилем или передача управления", n, "profiles:offers"))
+    if judged_ids:
+        pending = Entry.objects.filter(tournament__in=judged_ids, tournament__publication=Tournament.Publication.PUBLISHED, decision=Entry.Decision.PENDING)
+        for t_id, title in pending.values_list("tournament_id", "tournament__pub_title").distinct():
+            cnt = pending.filter(tournament_id=t_id).count()
+            actions.append((f"Заявки на рассмотрении: {title}", cnt, ("entries:manage", t_id)))
+        props = ChangeProposal.objects.filter(entry__tournament__in=judged_ids, state=ChangeProposal.State.PENDING).count()
+        if props:
+            actions.append(("Предложения изменения в заявках", props, None))
+    if stable_ids:
+        from apps.stables.models import Booking
+
+        for t_id, title in (Booking.objects.filter(tournament__in=stable_ids, state=Booking.State.PENDING)
+                            .values_list("tournament_id", "tournament__pub_title").distinct()):
+            cnt = Booking.objects.filter(tournament_id=t_id, state=Booking.State.PENDING).count()
+            actions.append((f"Брони денников ждут подтверждения: {title}", cnt, ("stables:manage", t_id)))
+    if user.is_moderator:
+        n = Tournament.objects.filter(status=Tournament.Status.REVIEW).count()
+        if n:
+            actions.append(("Турниры на проверке", n, "moderation:queue"))
+
+    rows = []
+    for label, count, target in actions:
+        if isinstance(target, tuple):
+            url = reverse(target[0], args=[target[1]])
+        elif target:
+            url = reverse(target)
+        else:
+            url = ""
+        rows.append({"label": label, "count": count, "url": url})
+
     return render(
         request,
         "accounts/cabinet.html",
         {
-            "mode": user.active_mode(),
-            "modes": user.available_modes(),
+            "labels": user.category_labels(),
             "can_add_role": bool(user.missing_categories()),
-            "invitations_count": invitations_count,
-            "offers_count": offers_count,
-            "own_athlete": own_athlete,
+            "actions": rows,
+            "judging_today": judging_today,
+            "has_team_roles": bool(judged_ids or stable_ids),
+            "own_athlete": Athlete.objects.filter(linked_user=user).first(),
+            "today": today,
         },
     )
-
-
-@login_required
-@require_POST
-def switch_mode(request):
-    mode = request.POST.get("mode", "")
-    if mode not in {m for m, _ in request.user.available_modes()}:
-        return HttpResponseBadRequest("Недоступный режим")
-    request.user.current_mode = mode
-    request.user.save(update_fields=["current_mode"])
-    return redirect("accounts:cabinet")
 
 
 @login_required

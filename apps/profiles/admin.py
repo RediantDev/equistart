@@ -5,7 +5,7 @@ from .models import Athlete, Horse, HorseDocument, Offer
 
 @admin.register(Athlete)
 class AthleteAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "birth_date", "rank", "club", "manager", "linked_user")
+    list_display = ("full_name", "birth_date", "rank_jumping", "rank_dressage", "club", "manager", "linked_user")
     search_fields = ("last_name", "first_name", "fksr_number", "club")
 
 

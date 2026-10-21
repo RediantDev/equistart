@@ -18,9 +18,15 @@ RANKS = [
     ("kms", "КМС"),
     ("ms", "МС"),
     ("msmk", "МСМК"),
-    ("zms", "ЗМС"),
 ]
-RANK_SHORT = {"none": "б/р", "3y": "III юн.", "2y": "II юн.", "1y": "I юн.", "3": "III", "2": "II", "1": "I", "kms": "КМС", "ms": "МС", "msmk": "МСМК", "zms": "ЗМС"}
+RANK_SHORT = {"none": "б/р", "3y": "III юн.", "2y": "II юн.", "1y": "I юн.", "3": "III", "2": "II", "1": "I", "kms": "КМС", "ms": "МС", "msmk": "МСМК"}
+# Шкала ЕВСК по возрастанию: для условий зачёта «не ниже …» и «не выполнявшие … и выше».
+RANK_ORDER = {code: i for i, (code, _) in enumerate(RANKS)}
+DISCIPLINE_RANK_FIELD = {"jumping": "rank_jumping", "dressage": "rank_dressage"}
+
+
+def rank_at_least(rank: str, minimum: str) -> bool:
+    return RANK_ORDER.get(rank or "none", 0) >= RANK_ORDER.get(minimum, 0)
 
 COLORS = [
     ("bay", "гнедая"), ("dark_bay", "тёмно-гнедая"), ("light_bay", "светло-гнедая"), ("chestnut", "рыжая"),
@@ -49,12 +55,13 @@ class Athlete(models.Model):
     first_name = models.CharField("имя", max_length=100)
     middle_name = models.CharField("отчество", max_length=100, blank=True)
     birth_date = models.DateField("дата рождения", null=True, blank=True)
-    rank = models.CharField("разряд / звание", max_length=8, choices=RANKS, blank=True)
+    rank_jumping = models.CharField("разряд / звание — конкур", max_length=8, choices=RANKS, blank=True)
+    rank_dressage = models.CharField("разряд / звание — выездка", max_length=8, choices=RANKS, blank=True)
     fksr_number = models.CharField("номер ФКСР", max_length=40, blank=True)
     fei_id = models.CharField("FEI ID", max_length=20, blank=True)
     club = models.CharField("клуб", max_length=200, blank=True)
     region = models.CharField("регион", max_length=120, blank=True)
-    coach_contact = models.CharField("контакт тренера", max_length=200, blank=True)
+    coach_name = models.CharField("тренер (ФИО)", max_length=200, blank=True, help_text="Только подпись в протоколе, прав доступа не даёт.")
 
     manager = models.ForeignKey(User, on_delete=models.PROTECT, related_name="managed_athletes", verbose_name="управляющий")
     linked_user = models.ForeignKey(
@@ -95,20 +102,36 @@ class Athlete(models.Model):
     def birth_year(self):
         return self.birth_date.year if self.birth_date else None
 
+    def rank_for(self, discipline: str | None) -> str:
+        """Код разряда по дисциплине (конкур или выездка); для прочих — лучший из двух."""
+        field = DISCIPLINE_RANK_FIELD.get(discipline or "")
+        if field:
+            return getattr(self, field) or ""
+        return max((self.rank_jumping, self.rank_dressage), key=lambda r: RANK_ORDER.get(r or "none", 0)) or ""
+
+    def rank_short_for(self, discipline: str | None) -> str:
+        return RANK_SHORT.get(self.rank_for(discipline), "")
+
     @property
     def rank_short(self):
-        return RANK_SHORT.get(self.rank, "")
+        parts = []
+        if self.rank_jumping:
+            parts.append(f"конкур {RANK_SHORT[self.rank_jumping]}")
+        if self.rank_dressage:
+            parts.append(f"выездка {RANK_SHORT[self.rank_dressage]}")
+        return ", ".join(parts)
 
     def summary(self):
         parts = [str(self.birth_year) if self.birth_year else "", self.rank_short, self.club]
         return " · ".join(p for p in parts if p)
 
-    def public_snapshot(self):
-        """Сведения для протоколов: без отчества, полной даты рождения и контактов."""
-        return {"name": self.public_name, "birth_year": self.birth_year, "rank": self.rank_short, "club": self.club, "region": self.region}
+    def public_snapshot(self, discipline: str | None = None):
+        """Сведения для протоколов: без отчества, полной даты рождения и контактов. Разряд — по дисциплине."""
+        return {"name": self.public_name, "birth_year": self.birth_year, "rank": self.rank_short_for(discipline), "club": self.club,
+                "region": self.region, "coach": self.coach_name}
 
-    def private_snapshot(self):
-        d = self.public_snapshot()
+    def private_snapshot(self, discipline: str | None = None):
+        d = self.public_snapshot(discipline)
         d.update({"full_name": self.full_name, "birth_date": self.birth_date.isoformat() if self.birth_date else None, "fksr": self.fksr_number, "fei": self.fei_id})
         return d
 
@@ -137,6 +160,8 @@ class Horse(models.Model):
     sire = models.CharField("отец", max_length=100, blank=True)
     birthplace = models.CharField("место рождения", max_length=200, blank=True)
     owner_name = models.CharField("владелец", max_length=200, blank=True, help_text="Не публикуется. Не является проверкой права собственности.")
+    is_pony = models.BooleanField("пони (рост в холке до 150 см)", default=False)
+    height_cm = models.PositiveSmallIntegerField("рост в холке, см", null=True, blank=True, help_text="Нужен для зачётов с условием по росту (пони).")
     manager = models.ForeignKey(User, on_delete=models.PROTECT, related_name="managed_horses", verbose_name="управляющий")
     archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

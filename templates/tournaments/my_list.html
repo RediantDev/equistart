@@ -8,7 +8,7 @@
     <h1 class="h1">Мои соревнования</h1>
     <p class="muted">Созданные вами и те, где вам выдали роль в команде.</p>
   </div>
-  {% if user.is_organizer %}<a class="btn btn--primary" href="{% url 'tournaments:create' %}">+ Создать соревнование</a>{% endif %}
+  {% if user.can_create_tournament %}<a class="btn btn--primary" href="{% url 'tournaments:create' %}">+ Создать соревнование</a>{% endif %}
 </div>
 
 {% if rows %}
@@ -42,7 +42,7 @@
   <div class="card empty">
     <h2 class="h3">Соревнований пока нет</h2>
     <p class="muted">Создайте первое: заполните основные сведения, программу и зачёты, загрузите положение и отправьте на проверку.</p>
-    {% if user.is_organizer %}<p style="margin-top: var(--space-4);"><a class="btn btn--primary" href="{% url 'tournaments:create' %}">Создать соревнование</a></p>{% endif %}
+    {% if user.can_create_tournament %}<p style="margin-top: var(--space-4);"><a class="btn btn--primary" href="{% url 'tournaments:create' %}">Создать соревнование</a></p>{% endif %}
   </div>
 {% endif %}
 {% endblock %}

@@ -81,7 +81,7 @@ def check_line(user, tournament, line: Line, late=False, allowed_athletes=None) 
                 errors.append(f"«{a.public_name}»: для зачёта «{c.name}» нужна дата рождения.")
             elif (c.min_age and age < c.min_age) or (c.max_age and age > c.max_age):
                 errors.append(f"«{a.public_name}» ({age} лет в {tournament.pub_starts_on.year} г.) не проходит по возрасту в зачёт «{c.name}» ({c.conditions}).")
-        if c.rank_requirement and not a.rank:
+        if c.rank_requirement and not a.rank_for(c.program.discipline):
             errors.append(f"«{a.public_name}»: для зачёта «{c.name}» нужен разряд ({c.rank_requirement}).")
     if c.composition == TournamentClass.Composition.SINGLE and line.partners:
         errors.append("Зачёт одиночный — партнёры не нужны.")
@@ -166,8 +166,8 @@ def submit(user, tournament_id, lines: list[Line], key: str, contact_name="", co
     for l in lines:
         e = Entry.objects.create(
             application=app, tournament=t, program=l.tclass.program, tclass=l.tclass, athlete=l.athlete, horse=l.horse,
-            athlete_snapshot=l.athlete.private_snapshot(), horse_snapshot=l.horse.public_snapshot(),
-            partners_snapshot=[{"athlete": a.private_snapshot(), "horse": hh.public_snapshot()} for a, hh in l.partners],
+            athlete_snapshot=l.athlete.private_snapshot(l.tclass.program.discipline), horse_snapshot=l.horse.public_snapshot(),
+            partners_snapshot=[{"athlete": a.private_snapshot(l.tclass.program.discipline), "horse": hh.public_snapshot()} for a, hh in l.partners],
             program_name=l.tclass.program.name, class_name=l.tclass.name, day=l.tclass.program.day,
             decision=Entry.Decision.ACCEPTED if late else Entry.Decision.PENDING,
             decided_by=user if late else None, decided_at=timezone.now() if late else None,
@@ -345,7 +345,7 @@ def decide_proposal(user, proposal_id, accept: bool, reason: str = "") -> Change
         if errors:
             raise ValueError(errors[0])
         if p.athlete_id:
-            e.athlete, e.athlete_snapshot = p.athlete, p.athlete.private_snapshot()
+            e.athlete, e.athlete_snapshot = p.athlete, p.athlete.private_snapshot(new_class.program.discipline)
         if p.horse_id:
             e.horse, e.horse_snapshot = p.horse, p.horse.public_snapshot()
         if p.tclass_id:

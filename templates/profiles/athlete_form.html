@@ -15,7 +15,10 @@
       </div>
       <div class="grid-2">
         {% include "partials/field.html" with field=form.birth_date %}
-        {% include "partials/field.html" with field=form.rank %}
+      </div>
+      <div class="grid-2">
+        {% include "partials/field.html" with field=form.rank_jumping %}
+        {% include "partials/field.html" with field=form.rank_dressage %}
       </div>
       <div class="grid-2">
         {% include "partials/field.html" with field=form.club %}
@@ -24,10 +27,10 @@
       <div class="grid-2">
         {% include "partials/field.html" with field=form.fksr_number %}
         {% include "partials/field.html" with field=form.fei_id %}
-        {% include "partials/field.html" with field=form.coach_contact %}
+        {% include "partials/field.html" with field=form.coach_name %}
       </div>
       {% include "partials/field.html" with field=form.consent %}
-      <p class="field__help">Публикуются фамилия, имя, год рождения, разряд и клуб — по <a href="{% url 'core:publication_consent' %}" target="_blank" rel="noopener">согласию на публикацию</a>.</p>
+      <p class="field__help">Публикуются фамилия, имя, год рождения, разряд, клуб и тренер — по <a href="{% url 'core:publication_consent' %}" target="_blank" rel="noopener">согласию на публикацию</a>.</p>
       <button type="submit" class="btn btn--primary btn--block">Сохранить</button>
     </form>
   </div>

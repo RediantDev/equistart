@@ -155,25 +155,28 @@ class CabinetTests(TestCase):
         self.user = make_user(is_athlete=True, is_coach=True)
         self.client.force_login(self.user)
 
-    def test_mode_switch_persists(self):
-        self.client.post(reverse("accounts:switch_mode"), {"mode": "coach"})
-        self.user.refresh_from_db()
-        self.assertEqual(self.user.current_mode, "coach")
+    def test_home_shows_sections_for_all_roles(self):
         resp = self.client.get(reverse("accounts:cabinet"))
-        self.assertContains(resp, "Кого вы ведёте")
+        self.assertContains(resp, "Главная")
+        self.assertContains(resp, "Кого вы ведёте")  # тренер
+        self.assertContains(resp, "Куда вас заявил")  # спортсмен
+        self.assertNotContains(resp, "Создать соревнование")
+        self.assertNotContains(resp, "/cabinet/mode/")
 
-    def test_cannot_switch_to_foreign_mode(self):
-        for mode in ["organizer", "moderator", "admin"]:
-            with self.subTest(mode=mode):
-                resp = self.client.post(reverse("accounts:switch_mode"), {"mode": mode})
-                self.assertEqual(resp.status_code, 400)
+    def test_judge_and_club_can_create_tournament(self):
+        for cat in ("judge", "club"):
+            with self.subTest(cat=cat):
+                u = make_user(phone="+7999000" + ("1201" if cat == "judge" else "1202"), **{f"is_{cat}": True})
+                self.assertTrue(u.can_create_tournament)
+                self.client.force_login(u)
+                self.assertEqual(self.client.get(reverse("tournaments:create")).status_code, 200)
+        self.assertFalse(self.user.can_create_tournament)
 
     def test_add_role_keeps_profile(self):
         resp = self.client.post(reverse("accounts:add_role"), {"category": "organizer"})
         self.assertRedirects(resp, reverse("accounts:cabinet"))
         self.user.refresh_from_db()
         self.assertTrue(self.user.is_organizer and self.user.is_athlete and self.user.is_coach)
-        self.assertEqual(self.user.current_mode, "organizer")
         self.assertEqual(User.objects.count(), 1)
 
     def test_cannot_add_moderator_or_existing_role(self):
@@ -184,8 +187,8 @@ class CabinetTests(TestCase):
         self.user.refresh_from_db()
         self.assertFalse(self.user.is_moderator)
 
-    def test_moderator_mode_only_when_assigned(self):
-        self.assertNotIn("moderator", [m for m, _ in self.user.available_modes()])
+    def test_moderator_label_only_when_assigned(self):
+        self.assertNotIn("Модератор", self.user.category_labels())
         self.user.is_moderator = True
         self.user.save()
-        self.assertIn("moderator", [m for m, _ in self.user.available_modes()])
+        self.assertIn("Модератор", self.user.category_labels())

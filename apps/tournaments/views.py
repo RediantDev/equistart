@@ -89,8 +89,8 @@ def my_tournaments(request):
 @login_required
 @require_http_methods(["GET", "POST"])
 def create(request):
-    if not request.user.is_organizer:
-        messages.info(request, "Чтобы создавать соревнования, добавьте роль «Организатор».")
+    if not request.user.can_create_tournament:
+        messages.info(request, "Чтобы создавать соревнования, добавьте роль «Организатор», «Судья» или «Клуб».")
         return redirect("accounts:add_role")
     last = Tournament.objects.filter(owner=request.user).select_related("venue").order_by("-created_at").first()
     initial = {"organizer_name": last.organizer_name, "contact": last.contact, "venue": last.venue_id} if last else {}

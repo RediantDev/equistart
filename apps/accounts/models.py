@@ -8,11 +8,13 @@ from .phone import PHONE_DB_REGEX, format_phone, normalize_phone
 
 
 class Category(models.TextChoices):
-    """Категории аккаунта, которые пользователь выбирает сам (ТЗ v2, раздел 5.1)."""
+    """Категории аккаунта, которые пользователь выбирает сам (ТЗ 2.2, раздел 5.1)."""
 
     ATHLETE = "athlete", "Спортсмен"
-    COACH = "coach", "Тренер / менеджер"
+    COACH = "coach", "Тренер / представитель"
     ORGANIZER = "organizer", "Организатор"
+    JUDGE = "judge", "Судья"
+    CLUB = "club", "Клуб"
 
 
 # Модератор не является самостоятельно выбираемой категорией: назначается администратором.
@@ -22,7 +24,12 @@ CATEGORY_FIELDS = {
     Category.ATHLETE: "is_athlete",
     Category.COACH: "is_coach",
     Category.ORGANIZER: "is_organizer",
+    Category.JUDGE: "is_judge",
+    Category.CLUB: "is_club",
 }
+
+# Кто может создать турнир (TRN-01): организатор, судья (становится Организатором турнира) или клуб.
+CREATOR_CATEGORIES = (Category.ORGANIZER, Category.JUDGE, Category.CLUB)
 
 
 class UserManager(BaseUserManager):
@@ -74,14 +81,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField("email для связи", blank=True)
 
     is_athlete = models.BooleanField("спортсмен", default=False)
-    is_coach = models.BooleanField("тренер / менеджер", default=False)
+    is_coach = models.BooleanField("тренер / представитель", default=False)
     is_organizer = models.BooleanField("организатор", default=False)
+    is_judge = models.BooleanField("судья", default=False)
+    is_club = models.BooleanField("клуб", default=False)
     is_moderator = models.BooleanField(
         "модератор",
         default=False,
         help_text="Назначается только администратором. Даёт доступ к проверке турниров и обращений.",
     )
-    current_mode = models.CharField("текущий режим кабинета", max_length=20, blank=True)
 
     pd_consent_at = models.DateTimeField("согласие на обработку ПДн", null=True, blank=True)
     pd_consent_version = models.CharField("версия согласия", max_length=20, blank=True)
@@ -132,20 +140,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     def categories(self) -> list[str]:
         return [cat for cat, field in CATEGORY_FIELDS.items() if getattr(self, field)]
 
-    def available_modes(self) -> list[tuple[str, str]]:
-        modes = [(cat.value, cat.label) for cat in Category if getattr(self, CATEGORY_FIELDS[cat])]
+    def category_labels(self) -> list[str]:
+        labels = [cat.label for cat in Category if getattr(self, CATEGORY_FIELDS[cat])]
         if self.is_moderator:
-            modes.append((MODERATOR_MODE, "Модератор"))
-        return modes
+            labels.append("Модератор")
+        return labels
 
     def missing_categories(self) -> list[Category]:
         return [cat for cat in Category if not getattr(self, CATEGORY_FIELDS[cat])]
 
-    def active_mode(self) -> str | None:
-        modes = [m for m, _ in self.available_modes()]
-        if self.current_mode in modes:
-            return self.current_mode
-        return modes[0] if modes else None
+    @property
+    def can_create_tournament(self) -> bool:
+        return any(getattr(self, CATEGORY_FIELDS[c]) for c in CREATOR_CATEGORIES)
 
     def add_category(self, category: str) -> None:
         """Добавляет самостоятельно выбираемую категорию. Модератора добавить нельзя."""

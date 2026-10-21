@@ -47,15 +47,15 @@ class UserChangeAdminForm(forms.ModelForm):
 class UserAdmin(BaseUserAdmin):
     form = UserChangeAdminForm
     add_form = UserCreationAdminForm
-    list_display = ("phone", "full_name", "is_athlete", "is_coach", "is_organizer", "is_moderator", "is_active", "date_joined")
-    list_filter = ("is_athlete", "is_coach", "is_organizer", "is_moderator", "is_active", "is_staff")
+    list_display = ("phone", "full_name", "is_athlete", "is_coach", "is_organizer", "is_judge", "is_club", "is_moderator", "is_active", "date_joined")
+    list_filter = ("is_athlete", "is_coach", "is_organizer", "is_judge", "is_club", "is_moderator", "is_active", "is_staff")
     search_fields = ("phone", "last_name", "first_name", "email")
     ordering = ("-date_joined",)
     readonly_fields = ("date_joined", "last_login", "pd_consent_at", "pd_consent_version")
     fieldsets = (
         (None, {"fields": ("phone", "password", "phone_verified_at")}),
         ("Личные данные", {"fields": ("last_name", "first_name", "middle_name", "email")}),
-        ("Категории", {"fields": ("is_athlete", "is_coach", "is_organizer", "current_mode")}),
+        ("Категории", {"fields": ("is_athlete", "is_coach", "is_organizer", "is_judge", "is_club")}),
         ("Служебные права", {"fields": ("is_moderator", "is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
         ("Согласие и даты", {"fields": ("pd_consent_at", "pd_consent_version", "date_joined", "last_login")}),
     )

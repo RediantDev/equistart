@@ -20,6 +20,7 @@
         <dt>Порода</dt><dd>{{ h.breed }}</dd>
         <dt>Номер ФКСР</dt><dd>{{ h.fksr_number|default:"—" }}</dd>
         <dt>FEI ID</dt><dd>{{ h.fei_id|default:"—" }}</dd>
+        <dt>Пони / рост в холке</dt><dd>{% if h.is_pony %}пони{% else %}лошадь{% endif %}{% if h.height_cm %} · {{ h.height_cm }} см{% endif %}</dd>
         <dt>Внутренний код</dt><dd class="num">{{ h.code }}</dd>
         {% if manage %}
           <dt>Отец</dt><dd>{{ h.sire|default:"—" }}</dd>

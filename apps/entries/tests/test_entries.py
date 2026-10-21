@@ -47,7 +47,7 @@ class Base(TestCase):
         self.c_kids = self.p1.classes.get(name="Дети")
         self.c_open = self.p1.classes.get(name="Открытый")
         now = timezone.now()
-        self.a1 = Athlete.objects.create(last_name="Смирнова", first_name="Лиза", birth_date=datetime.date(self.start.year - 12, 5, 1), manager=self.coach, consent_confirmed_at=now, rank="2")
+        self.a1 = Athlete.objects.create(last_name="Смирнова", first_name="Лиза", birth_date=datetime.date(self.start.year - 12, 5, 1), manager=self.coach, consent_confirmed_at=now, rank_jumping="2", rank_dressage="2")
         self.a2 = Athlete.objects.create(last_name="Орлов", first_name="Дима", birth_date=datetime.date(1996, 1, 1), manager=self.coach, consent_confirmed_at=now)
         self.h1 = Horse.objects.create(name="Барон", birth_year=2014, color="bay", sex="gelding", breed="ганноверская", manager=self.coach)
         self.h2 = Horse.objects.create(name="Ладога", birth_year=2013, color="black", sex="mare", breed="тракененская", manager=self.other)

@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from . import throttle
-from .models import Category, User
+from .models import CATEGORY_FIELDS, Category, User
 from .phone import normalize_phone
 
 PD_CONSENT_VERSION = "2026-10-14"
@@ -96,7 +96,6 @@ class RegistrationForm(forms.Form):
         )
         for cat in data["categories"]:
             user.add_category(cat)
-        user.current_mode = data["categories"][0]
         user.set_password(data["password1"])
         user.save()
         return user
@@ -161,6 +160,5 @@ class AddRoleForm(forms.Form):
     def save(self):
         cat = self.cleaned_data["category"]
         self.user.add_category(cat)
-        self.user.current_mode = cat
-        self.user.save(update_fields=["is_athlete", "is_coach", "is_organizer", "current_mode"])
+        self.user.save(update_fields=list(CATEGORY_FIELDS.values()))
         return cat

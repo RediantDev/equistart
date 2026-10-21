@@ -20,18 +20,20 @@ class AthleteForm(forms.ModelForm):
 
     class Meta:
         model = Athlete
-        fields = ["last_name", "first_name", "middle_name", "birth_date", "rank", "fksr_number", "fei_id", "club", "region", "coach_contact"]
+        fields = ["last_name", "first_name", "middle_name", "birth_date", "rank_jumping", "rank_dressage", "fksr_number", "fei_id", "club", "region", "coach_name"]
         widgets = {"birth_date": DATE}
         help_texts = {
             "birth_date": "Нужна для зачётов с возрастными условиями. Публично показывается только год.",
-            "rank": "Нужен для зачётов с требованием разряда.",
+            "rank_jumping": "Нужен для зачётов конкура с требованием разряда.",
+            "rank_dressage": "Нужен для зачётов выездки с требованием разряда.",
             "fksr_number": "Необязательно. Один номер — один спортсмен в сервисе.",
             "fei_id": "Необязательно. Для спортсменов с регистрацией FEI.",
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["rank"].choices = [("", "— не указан —")] + list(self.fields["rank"].choices)[1:]
+        for f in ("rank_jumping", "rank_dressage"):
+            self.fields[f].choices = [("", "— не указан —")] + list(self.fields[f].choices)[1:]
         if self.instance.pk and self.instance.consent_confirmed_at:
             self.fields["consent"].initial = True
 
@@ -65,7 +67,7 @@ class AthleteForm(forms.ModelForm):
 class HorseForm(forms.ModelForm):
     class Meta:
         model = Horse
-        fields = ["name", "birth_year", "color", "sex", "breed", "fksr_number", "fei_id", "sire", "birthplace", "owner_name"]
+        fields = ["name", "birth_year", "color", "sex", "breed", "fksr_number", "fei_id", "sire", "birthplace", "owner_name", "is_pony", "height_cm"]
         help_texts = {"fksr_number": "Необязательно. Если номер уже есть в сервисе, мы предложим найденный профиль.",
                       "fei_id": "Необязательно. Один номер — одна лошадь в сервисе."}
 
@@ -89,6 +91,12 @@ class HorseForm(forms.ModelForm):
                 self.duplicate = dup
                 raise ValidationError(f"Лошадь с номером ФКСР {n} уже есть в сервисе: {dup.name} ({dup.summary()}). Выберите её в заявке или напишите модератору.")
         return n
+
+    def clean_height_cm(self):
+        h = self.cleaned_data.get("height_cm")
+        if h is not None and not 70 <= h <= 200:
+            raise ValidationError("Рост в холке — от 70 до 200 см.")
+        return h
 
     def clean_fei_id(self):
         n = normalize_fksr(self.cleaned_data.get("fei_id", ""))
