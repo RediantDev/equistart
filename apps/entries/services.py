@@ -1,4 +1,4 @@
-"""Правила заявок: подача, решения, допуск, изменения, отмена.
+"""Правила заявок: подача, решения, изменения, отмена.
 
 Каждая позиция заявки независима: отказ по одной не меняет остальные.
 """
@@ -201,9 +201,6 @@ def _recipients(entry):
 ACTIONS = {
     "accept": "Принять",
     "reject": "Отклонить",
-    "admit": "Допустить",
-    "not_admit": "Не допустить",
-    "accept_admit": "Принять и допустить",
     "cancel": "Отменить (судья)",
 }
 
@@ -233,7 +230,7 @@ def decide(user, tournament_id, items: list[tuple[int, str]], action: str, reaso
                 text = _apply_action(user, e, action, reason)
                 e.revision += 1
                 e.save()
-                audit(user, f"entry.{action}", e, reason=reason or "", decision=e.decision, admission=e.admission)
+                audit(user, f"entry.{action}", e, reason=reason or "", decision=e.decision)
                 notify(_recipients(e), f"«{t.pub_title}», {e.program_name}: {e.athlete_snapshot.get('name')} / {e.horse_snapshot.get('name')} — {text.lower()}",
                        reverse("entries:application", args=[e.application_id]), "decision")
             results.append(RowResult(entry_id, True, text))
@@ -248,15 +245,12 @@ def _apply_action(user, e, action, reason):
     now = timezone.now()
     if e.decision == Entry.Decision.CANCELLED:
         raise ValueError("позиция отменена — обычным решением её не восстановить")
-    if e.is_started and action in ("reject", "cancel", "not_admit"):
+    if e.is_started and action in ("reject", "cancel"):
         raise ValueError("выступление уже начато")
-    if action in ("accept", "accept_admit"):
-        if e.decision == Entry.Decision.ACCEPTED and action == "accept":
+    if action == "accept":
+        if e.decision == Entry.Decision.ACCEPTED:
             raise ValueError("уже принято")
         e.decision, e.decided_by, e.decided_at, e.decision_reason = Entry.Decision.ACCEPTED, user, now, ""
-        if action == "accept_admit":
-            e.admission, e.admission_by, e.admission_at = Entry.Admission.ADMITTED, user, now
-            return "Принято и допущено"
         return "Принято"
     if action == "reject":
         e.decision, e.decided_by, e.decided_at, e.decision_reason = Entry.Decision.REJECTED, user, now, reason.strip()
@@ -264,12 +258,6 @@ def _apply_action(user, e, action, reason):
     if action == "cancel":
         e.decision, e.cancelled_by, e.cancelled_at, e.cancel_reason = Entry.Decision.CANCELLED, user, now, reason.strip()
         return "Отменено судьёй"
-    if action in ("admit", "not_admit"):
-        if e.decision == Entry.Decision.REJECTED:
-            raise ValueError("позиция отклонена")
-        e.admission = Entry.Admission.ADMITTED if action == "admit" else Entry.Admission.NOT_ADMITTED
-        e.admission_by, e.admission_at = user, now
-        return "Допущен" if action == "admit" else "Не допущен"
     raise ValueError("Неизвестное действие")
 
 
@@ -363,7 +351,6 @@ def decide_proposal(user, proposal_id, accept: bool, reason: str = "") -> Change
         if p.tclass_id:
             e.tclass, e.program = new_class, new_class.program
             e.program_name, e.class_name, e.day = new_class.program.name, new_class.name, new_class.program.day
-        e.admission, e.admission_by, e.admission_at = Entry.Admission.UNCONFIRMED, None, None
         e.revision += 1
         e.save()
         p.state = ChangeProposal.State.ACCEPTED

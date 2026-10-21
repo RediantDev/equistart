@@ -6,7 +6,7 @@
   <div>
     <a class="back" href="{% url 'tournaments:public' t.pk %}">← {{ s.title }}</a>
     <h1 class="h1">{% if late %}Добавить участников (судья){% else %}Заявка на соревнование{% endif %}</h1>
-    <p class="muted">{% daterange s.starts_on s.ends_on %} · {{ s.venue.name }}. {% if late %}Позиции сразу считаются принятыми; допуск ставится отдельно.{% else %}Можно добавить одного или нескольких спортсменов — заявка станет групповой.{% endif %}</p>
+    <p class="muted">{% daterange s.starts_on s.ends_on %} · {{ s.venue.name }}. {% if late %}Позиции сразу считаются принятыми.{% else %}Можно добавить одного или нескольких спортсменов — заявка станет групповой.{% endif %}</p>
   </div>
 </div>
 

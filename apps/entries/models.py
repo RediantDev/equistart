@@ -36,18 +36,13 @@ class Application(models.Model):
 
 
 class Entry(models.Model):
-    """Выступление: спортсмен + лошадь + программа + ровно один зачёт. Решение, допуск и оплата — независимы."""
+    """Выступление: спортсмен + лошадь + программа + ровно один зачёт. Один статус выступления; бронь и услуги — отдельно."""
 
     class Decision(models.TextChoices):
         PENDING = "pending", "На рассмотрении"
         ACCEPTED = "accepted", "Принято"
         REJECTED = "rejected", "Отклонено"
         CANCELLED = "cancelled", "Отменено"
-
-    class Admission(models.TextChoices):
-        UNCONFIRMED = "unconfirmed", "Допуск не подтверждён"
-        ADMITTED = "admitted", "Допущен"
-        NOT_ADMITTED = "not_admitted", "Не допущен"
 
     application = models.ForeignKey(Application, on_delete=models.CASCADE, related_name="entries")
     tournament = models.ForeignKey("tournaments.Tournament", on_delete=models.PROTECT, related_name="entries")
@@ -68,9 +63,6 @@ class Entry(models.Model):
     decision_reason = models.TextField("причина (не публикуется)", blank=True)
     decided_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     decided_at = models.DateTimeField(null=True, blank=True)
-    admission = models.CharField(max_length=14, choices=Admission.choices, default=Admission.UNCONFIRMED)
-    admission_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
-    admission_at = models.DateTimeField(null=True, blank=True)
     cancel_reason = models.TextField(blank=True)
     cancelled_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     cancelled_at = models.DateTimeField(null=True, blank=True)

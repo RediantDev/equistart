@@ -31,7 +31,7 @@ class EndToEndTests(Base):
         # групповая заявка тренера
         app = self.submit(self.coach, [es.Line(self.a1, self.h1, self.c_kids), es.Line(self.a2, self.h1, self.c_open)])
         e1, e2 = app.entries.order_by("pk")
-        r = es.decide(self.judge, t.pk, [(e1.pk, e1.revision)], "accept_admit")
+        r = es.decide(self.judge, t.pk, [(e1.pk, e1.revision)], "accept")
         self.assertTrue(r[0].ok)
         e2.refresh_from_db()
         es.decide(self.judge, t.pk, [(e2.pk, e2.revision)], "reject", "лимит лошади")

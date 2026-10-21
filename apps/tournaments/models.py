@@ -189,7 +189,7 @@ class ProgramItem(models.Model):
 
 
 class TournamentClass(models.Model):
-    """Зачёт внутри программы: условия допуска и стартовый взнос."""
+    """Зачёт внутри программы: условия участия."""
 
     class Composition(models.TextChoices):
         SINGLE = "single", "Одиночный"

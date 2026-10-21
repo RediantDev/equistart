@@ -14,7 +14,6 @@
   <div class="field"><label class="field__label" for="q">Поиск</label><input id="q" name="q" type="search" value="{{ f.q }}" placeholder="Спортсмен, лошадь, контакт"></div>
   <div class="field"><label class="field__label" for="program">Программа</label><select id="program" name="program"><option value="">Все</option>{% for p in programs %}<option value="{{ p.pk }}"{% if f.program == p.pk|stringformat:"s" %} selected{% endif %}>{{ p.day|date:"d.m" }} · {{ p.name }}</option>{% endfor %}</select></div>
   <div class="field"><label class="field__label" for="decision">Решение</label><select id="decision" name="decision"><option value="">Любое</option>{% for v, l in decisions %}<option value="{{ v }}"{% if v == f.decision %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
-  <div class="field"><label class="field__label" for="admission">Допуск</label><select id="admission" name="admission"><option value="">Любой</option>{% for v, l in admissions %}<option value="{{ v }}"{% if v == f.admission %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
   <div class="filters__actions"><button class="btn btn--dark btn--sm">Показать</button></div>
 </form>
 {% if entries %}

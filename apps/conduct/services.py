@@ -17,8 +17,8 @@ from .models import Result, ResultPublication, StartListPublication, StartSlot
 
 
 def eligible(entry) -> bool:
-    """В порядок попадают принятые и допущенные выступления (и с подтверждённым обязательным денником)."""
-    if entry.decision != Entry.Decision.ACCEPTED or entry.admission != Entry.Admission.ADMITTED:
+    """В порядок попадают принятые выступления (и с подтверждённым обязательным денником)."""
+    if entry.decision != Entry.Decision.ACCEPTED:
         return False
     try:
         from apps.stables.services import stable_dependency_ok
@@ -30,8 +30,6 @@ def eligible(entry) -> bool:
 def why_not_eligible(entry) -> str:
     if entry.decision != Entry.Decision.ACCEPTED:
         return entry.get_decision_display()
-    if entry.admission != Entry.Admission.ADMITTED:
-        return entry.get_admission_display()
     return "Нет подтверждённого денника"
 
 
@@ -76,7 +74,7 @@ def draw(user, program_id) -> int:
 
 @transaction.atomic
 def add_missing(user, program_id) -> int:
-    """Добавить в конец порядка принятых и допущенных, которых в нём ещё нет (без перемешивания)."""
+    """Добавить в конец порядка принятых, которых в нём ещё нет (без перемешивания)."""
     p = _lock_program(user, program_id)
     existing = {s.entry_id for s in p.slots.all()}
     new = [e for e in Entry.objects.filter(program=p) if e.pk not in existing and eligible(e)]

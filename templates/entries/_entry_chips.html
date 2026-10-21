@@ -1,5 +1,4 @@
 <span class="chips">
   {% if e.decision == "pending" %}<span class="chip chip--warning">На рассмотрении</span>{% elif e.decision == "accepted" %}<span class="chip chip--success">Принято</span>{% elif e.decision == "rejected" %}<span class="chip chip--danger">Отклонено</span>{% else %}<span class="chip">Отменено</span>{% endif %}
-  {% if e.decision != "cancelled" and e.decision != "rejected" %}{% if e.admission == "admitted" %}<span class="chip chip--success">Допущен</span>{% elif e.admission == "not_admitted" %}<span class="chip chip--danger">Не допущен</span>{% else %}<span class="chip">Допуск не подтверждён</span>{% endif %}{% endif %}
   {% if e.pending_proposal %}<span class="chip chip--warning">Изменение на рассмотрении</span>{% endif %}
 </span>

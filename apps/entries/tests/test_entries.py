@@ -252,7 +252,7 @@ class DecisionTests(Base):
         self.e1 = self.app.entries.get(athlete=self.a1)
         self.e2 = self.app.entries.get(athlete=self.a2)
 
-    def test_independent_decisions_and_admission(self):
+    def test_independent_decisions(self):
         r = services.decide(self.judge, self.t.pk, [(self.e1.pk, self.e1.revision)], "accept")
         self.assertTrue(r[0].ok)
         r = services.decide(self.judge, self.t.pk, [(self.e2.pk, self.e2.revision)], "reject", "Лимит лошади")
@@ -260,16 +260,11 @@ class DecisionTests(Base):
         self.e2.refresh_from_db()
         self.assertEqual(self.e1.decision, Entry.Decision.ACCEPTED)
         self.assertEqual(self.e2.decision, Entry.Decision.REJECTED)
-        self.assertEqual(self.e1.admission, Entry.Admission.UNCONFIRMED)
-        services.decide(self.judge, self.t.pk, [(self.e1.pk, self.e1.revision)], "admit")
-        self.e1.refresh_from_db()
-        self.assertEqual(self.e1.admission, Entry.Admission.ADMITTED)
         self.client.force_login(self.coach)
         resp = self.client.get(reverse("entries:application", args=[self.app.pk]))
         self.assertContains(resp, "Принято")
         self.assertContains(resp, "Отклонено")
         self.assertContains(resp, "Лимит лошади")
-        self.assertContains(resp, "Допущен")
 
     def test_reject_requires_reason_and_stale_revision(self):
         with self.assertRaises(ValueError):
@@ -327,14 +322,14 @@ class ProposalTests(Base):
         super().setUp()
         self.app = self.submit(self.coach, [services.Line(self.a2, self.h1, self.c_open)])
         self.e = self.app.entries.get()
-        services.decide(self.judge, self.t.pk, [(self.e.pk, self.e.revision)], "accept_admit")
+        services.decide(self.judge, self.t.pk, [(self.e.pk, self.e.revision)], "accept")
         self.e.refresh_from_db()
 
     def test_unchanged_proposal_rejected(self):
         with self.assertRaises(ValueError):
             services.propose(self.coach, self.e.pk, athlete=self.a2, horse=self.h1)
 
-    def test_proposal_keeps_old_until_accepted_and_resets_admission(self):
+    def test_proposal_keeps_old_until_accepted(self):
         p = services.propose(self.coach, self.e.pk, horse=self.h2)
         self.e.refresh_from_db()
         self.assertEqual(self.e.horse, self.h1)
@@ -344,7 +339,6 @@ class ProposalTests(Base):
         self.e.refresh_from_db()
         self.assertEqual(self.e.horse, self.h2)
         self.assertEqual(self.e.horse_snapshot["name"], "Ладога")
-        self.assertEqual(self.e.admission, Entry.Admission.UNCONFIRMED)
         self.assertEqual(self.e.decision, Entry.Decision.ACCEPTED)
 
     def test_proposal_reject_keeps_data_and_foreign_cannot_propose(self):

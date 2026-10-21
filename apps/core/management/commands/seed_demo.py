@@ -112,7 +112,7 @@ class Command(BaseCommand):
             es.Line(ivan, granit, classes[(2, "Открытый")]),
         ], "demo-app-1", contact_name="Соколова Мария", contact_phone=coach.phone)
         entries = list(app.entries.order_by("pk"))
-        es.decide(judge, t.pk, [(e.pk, e.revision) for e in entries[:5]], "accept_admit")
+        es.decide(judge, t.pk, [(e.pk, e.revision) for e in entries[:5]], "accept")
         # шестая остаётся «на рассмотрении» — чтобы было что решить судье
 
         cat = StableCategory.objects.create(tournament=t, name="Денник в конюшне", available_from=start - datetime.timedelta(days=1),

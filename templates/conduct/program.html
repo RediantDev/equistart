@@ -34,7 +34,7 @@
             {% for c in s.conflicts %}<span class="table__sub" style="color: {% if s.exception_reason %}var(--text-muted){% else %}var(--danger){% endif %}; font-weight: 600;">⚠ {{ c }}</span>{% endfor %}
             {% if s.conflicts %}<details><summary class="table__sub" style="cursor: pointer;">{% if s.exception_reason %}Исключение: {{ s.exception_reason }}{% else %}Оставить как исключение…{% endif %}</summary>
               <form method="post" action="{% url 'conduct:action' t.pk p.pk 'exception' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="slot" value="{{ s.pk }}"><input name="reason" value="{{ s.exception_reason }}" placeholder="Причина" aria-label="Причина исключения"><button class="btn btn--ghost btn--sm">Сохранить</button></form></details>{% endif %}
-            {% if not s.still_eligible and s.status == "waiting" %}<span class="chip chip--danger">Утратил допуск — отметьте «Снят»</span>{% endif %}
+            {% if not s.still_eligible and s.status == "waiting" %}<span class="chip chip--danger">Выступление больше не принято — отметьте «Снят»</span>{% endif %}
           </td>
           <td><span class="chip{% if s.status == 'finished' %} chip--success{% elif s.status == 'started' %} chip--warning{% elif s.status != 'waiting' %} chip--danger{% endif %}">{{ s.get_status_display }}</span>
             {% if s.status == "waiting" %}<form method="post" action="{% url 'conduct:action' t.pk p.pk 'status' %}" class="inline-row" style="margin-top: 6px;">{% csrf_token %}<input type="hidden" name="slot" value="{{ s.pk }}"><button class="btn btn--ghost btn--sm" name="status" value="started">На поле</button><button class="btn btn--ghost btn--sm" name="status" value="withdrawn">Снят</button><button class="btn btn--ghost btn--sm" name="status" value="no_show">Не явился</button></form>{% endif %}
@@ -64,7 +64,7 @@
   </table>
 </div>
 {% else %}
-  <div class="card empty"><h2 class="h3">Порядок ещё не сформирован</h2><p class="muted">Нажмите «Жеребьёвка» — в порядок попадут принятые и допущенные выступления.</p></div>
+  <div class="card empty"><h2 class="h3">Порядок ещё не сформирован</h2><p class="muted">Нажмите «Жеребьёвка» — в порядок попадут принятые выступления.</p></div>
 {% endif %}
 
 {% if outside %}

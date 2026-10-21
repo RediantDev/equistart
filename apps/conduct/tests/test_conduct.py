@@ -34,11 +34,11 @@ class ConductBase(Base):
         for e in entries:
             e.refresh_from_db()
             items.append((e.pk, e.revision))
-        eservices.decide(self.judge, self.t.pk, items, "accept_admit")
+        eservices.decide(self.judge, self.t.pk, items, "accept")
 
 
 class DrawTests(ConductBase):
-    def test_draw_takes_only_accepted_and_admitted(self):
+    def test_draw_takes_only_accepted(self):
         app = self.submit(self.coach, [eservices.Line(self.a2, self.h1, self.c_open)], key="k2")
         pending = app.entries.get()
         n = services.draw(self.judge, self.p1.pk)

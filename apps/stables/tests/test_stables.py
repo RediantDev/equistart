@@ -76,7 +76,7 @@ class BookingTests(StableBase):
     def test_required_booking_blocks_only_that_horse(self):
         app = self.submit(self.coach, [eservices.Line(self.a1, self.h1, self.c_kids), eservices.Line(self.a2, self.h3, self.c_open)])
         e1, e2 = app.entries.order_by("pk")
-        eservices.decide(self.judge, self.t.pk, [(e1.pk, e1.revision), (e2.pk, e2.revision)], "accept_admit")
+        eservices.decide(self.judge, self.t.pk, [(e1.pk, e1.revision), (e2.pk, e2.revision)], "accept")
         b = self.book(self.h1, "b1", required=True)
         cs.draw(self.judge, self.p1.pk)
         ids = set(self.p1.slots.values_list("entry_id", flat=True))

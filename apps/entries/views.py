@@ -188,15 +188,12 @@ def _parse_line(request, t, athletes, horse_ids, classes):
 def my_applications(request):
     q = request.GET.get("q", "").strip()
     decision = request.GET.get("decision", "")
-    admission = request.GET.get("admission", "")
     period = request.GET.get("period", "")
     apps = Application.objects.filter(submitted_by=request.user).select_related("tournament").prefetch_related("entries")
     if q:
         apps = apps.filter(Q(tournament__pub_title__icontains=q) | Q(entries__athlete_snapshot__name__icontains=q) | Q(entries__horse_snapshot__name__icontains=q)).distinct()
     if decision:
         apps = apps.filter(entries__decision=decision).distinct()
-    if admission:
-        apps = apps.filter(entries__admission=admission).distinct()
     from django.utils import timezone
 
     today = timezone.localdate()
@@ -207,8 +204,8 @@ def my_applications(request):
     rows = [{"app": a, "summary": services.summarize(a.entries.all()), "count": len(a.entries.all())} for a in apps]
     linked = Entry.objects.filter(athlete__linked_user=request.user).exclude(application__submitted_by=request.user).exists()
     return render(request, "entries/my_list.html", {
-        "rows": rows, "q": q, "decision": decision, "admission": admission, "period": period, "linked": linked,
-        "decisions": Entry.Decision.choices, "admissions": Entry.Admission.choices,
+        "rows": rows, "q": q, "decision": decision, "period": period, "linked": linked,
+        "decisions": Entry.Decision.choices,
     })
 
 
@@ -322,13 +319,11 @@ def manage(request, pk):
     t = get_object_or_404(Tournament, pk=pk)
     services.require_judge(request.user, t)
     qs = Entry.objects.filter(tournament=t).select_related("application", "tclass").prefetch_related("proposals")
-    f = {k: request.GET.get(k, "") for k in ("q", "decision", "admission", "program")}
+    f = {k: request.GET.get(k, "") for k in ("q", "decision", "program")}
     if f["q"]:
         qs = qs.filter(Q(athlete_snapshot__name__icontains=f["q"]) | Q(horse_snapshot__name__icontains=f["q"]) | Q(application__contact_name__icontains=f["q"]))
     if f["decision"]:
         qs = qs.filter(decision=f["decision"])
-    if f["admission"]:
-        qs = qs.filter(admission=f["admission"])
     if f["program"].isdigit():
         qs = qs.filter(program_id=int(f["program"]))
     entries = list(qs)
@@ -336,7 +331,7 @@ def manage(request, pk):
         e.pending_proposal = next((p for p in e.proposals.all() if p.state == ChangeProposal.State.PENDING), None)
     return render(request, "entries/manage.html", {
         "t": t, "entries": entries, "f": f, "programs": t.programs.all(), "actions": services.ACTIONS,
-        "decisions": Entry.Decision.choices, "admissions": Entry.Admission.choices,
+        "decisions": Entry.Decision.choices,
         "counts": services.summarize(Entry.objects.filter(tournament=t)),
     })
 
