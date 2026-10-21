@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     "apps.entries",
     "apps.conduct",
     "apps.stables",
+    "apps.sport",
 ]
 
 MIDDLEWARE = [

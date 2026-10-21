@@ -54,10 +54,11 @@ class Entry(models.Model):
     # Снимки на момент подачи (правка профиля их не переписывает)
     athlete_snapshot = models.JSONField(default=dict)
     horse_snapshot = models.JSONField(default=dict)
-    partners_snapshot = models.JSONField(default=list, blank=True)
     program_name = models.CharField(max_length=200)
     class_name = models.CharField(max_length=200)
     day = models.DateField()
+    height = models.PositiveSmallIntegerField("высота, см", null=True, blank=True)
+    conditions_confirmed = models.BooleanField("участник подтвердил условие зачёта", default=False)
 
     decision = models.CharField(max_length=12, choices=Decision.choices, default=Decision.PENDING)
     decision_reason = models.TextField("причина (не публикуется)", blank=True)
@@ -90,18 +91,6 @@ class Entry(models.Model):
         """Начатое или завершённое выступление нельзя менять и отменять (заполняется этапом проведения)."""
         slot = getattr(self, "start_slot", None)
         return bool(slot and slot.status in ("started", "finished"))
-
-
-class EntryPartner(models.Model):
-    """Дополнительные участники парного или группового выступления."""
-
-    entry = models.ForeignKey(Entry, on_delete=models.CASCADE, related_name="partners")
-    athlete = models.ForeignKey("profiles.Athlete", on_delete=models.PROTECT, related_name="+")
-    horse = models.ForeignKey("profiles.Horse", on_delete=models.PROTECT, related_name="+")
-    position = models.PositiveSmallIntegerField(default=1)
-
-    class Meta:
-        ordering = ["position"]
 
 
 class ChangeProposal(models.Model):

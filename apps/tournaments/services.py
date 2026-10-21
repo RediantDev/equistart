@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from apps.core.models import audit
 
-from .disciplines import DISCIPLINE_NAMES, PROGRAM_TYPE_NAMES, RESULT_FIELDS
+from .disciplines import DISCIPLINE_NAMES
 from .models import TeamMember, Tournament
 from .regions import tz_label
 
@@ -71,26 +71,34 @@ def problems(t: Tournament) -> list[Problem]:
         out.append(Problem(1, "Укажите дату проведения."))
     if not t.venue_id:
         out.append(Problem(1, "Укажите место проведения."))
-    if not t.organizer_name.strip():
-        out.append(Problem(1, "Укажите, кто проводит соревнование."))
+    if not t.contact.strip():
+        out.append(Problem(1, "Укажите телефон для участников — он будет на странице турнира."))
     if not t.timezone:
         out.append(Problem(1, "Не определён часовой пояс места проведения."))
     programs = list(t.programs.all().prefetch_related("classes"))
     if not programs:
-        out.append(Problem(2, "Добавьте хотя бы одну программу (маршрут, езду)."))
+        out.append(Problem(2, "Добавьте хотя бы один маршрут или езду."))
     days = set(t.days())
     for p in programs:
         if p.day not in days:
             out.append(Problem(2, f"«{p.name}»: день {p.day:%d.%m.%Y} вне дат соревнования — выберите новый день."))
     for p in programs:
         if not p.classes.all():
-            out.append(Problem(3, f"«{p.name}»: добавьте хотя бы один зачёт с ценой."))
+            out.append(Problem(2, f"«{p.name}»: добавьте хотя бы один зачёт."))
+        if p.is_dressage and not p.test_snapshot:
+            out.append(Problem(2, f"«{p.name}»: выберите езду."))
+        if p.is_jumping and not p.heights and not p.route.manual:
+            out.append(Problem(2, f"«{p.name}»: укажите высоту."))
+        if p.heights and len(p.heights) > 1:
+            for c in p.classes.all():
+                if c.height and c.height not in p.heights:
+                    out.append(Problem(2, f"«{p.name}», зачёт «{c.name}»: высоты {c.height} см больше нет в маршруте."))
     if not t.entry_deadline:
-        out.append(Problem(4, "Укажите последний день подачи заявок."))
+        out.append(Problem(3, "Укажите последний день подачи заявок."))
     elif t.ends_on and t.entry_deadline > t.ends_on:
-        out.append(Problem(4, "Последний день подачи заявок не может быть позже окончания соревнования."))
+        out.append(Problem(3, "Последний день подачи заявок не может быть позже окончания соревнования."))
     if not t.regulation:
-        out.append(Problem(4, "Загрузите положение о соревновании (PDF)."))
+        out.append(Problem(3, "Загрузите положение о соревновании (PDF)."))
     return out
 
 
@@ -104,6 +112,7 @@ def first_invalid_step(t: Tournament) -> int | None:
 def build_snapshot(t: Tournament) -> dict:
     programs = []
     for p in t.programs.all().prefetch_related("classes"):
+        test = p.test_snapshot or {}
         programs.append(
             {
                 "day": p.day.isoformat(),
@@ -112,17 +121,15 @@ def build_snapshot(t: Tournament) -> dict:
                 "discipline_name": DISCIPLINE_NAMES.get(p.discipline, ""),
                 "name": p.name,
                 "program_type": p.program_type,
-                "program_type_name": PROGRAM_TYPE_NAMES.get(p.program_type, ""),
-                "result_fields": [RESULT_FIELDS.get(f, f) for f in p.result_fields],
-                "limit": p.limit,
+                "program_type_name": p.program_type_name,
+                "variant": p.variant,
+                "table": p.table,
+                "heights": p.heights,
+                "heights_label": p.heights_label,
+                "article": p.article_label,
+                "test": {"name": test.get("name"), "level": test.get("level"), "arena": test.get("arena")} if test else None,
                 "classes": [
-                    {
-                        "name": c.name,
-                        "composition": c.composition,
-                        "composition_name": c.get_composition_display(),
-                        "conditions": c.conditions,
-                        "limit": c.limit,
-                    }
+                    {"name": c.name, "label": c.label, "height": c.height, "conditions": c.conditions, "note": c.note}
                     for c in p.classes.all()
                 ],
             }
@@ -134,7 +141,11 @@ def build_snapshot(t: Tournament) -> dict:
         "venue": t.venue.public_dict() if t.venue else None,
         "timezone": t.timezone,
         "timezone_label": tz_label(t.timezone),
-        "organizer_name": t.organizer_name,
+        "contact_name": t.contact_name,
+        "contact": t.contact,
+        "level": t.level,
+        "level_name": t.get_level_display(),
+        "classification": t.classification,
         "entry_deadline": t.entry_deadline.isoformat() if t.entry_deadline else None,
         "cancel_terms": t.cancel_terms,
         "has_regulation": bool(t.regulation),

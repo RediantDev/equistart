@@ -9,17 +9,17 @@ from dataclasses import dataclass, field
 
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.models import audit, notify
-from apps.profiles.models import Athlete, Horse
+from apps.profiles.models import RANK_SHORT, Athlete, Horse, rank_at_least
 from apps.profiles.services import athletes_for_entry
 from apps.tournaments.models import TeamMember, Tournament, TournamentClass
 from apps.tournaments.services import roles_of
 
-from .models import Application, ChangeProposal, Entry, EntryPartner
+from .models import Application, ChangeProposal, Entry
 
 JUDGE_ROLES = {TeamMember.Role.ORGANIZER, TeamMember.Role.JUDGE}
 
@@ -50,10 +50,11 @@ class Line:
     athlete: Athlete
     horse: Horse
     tclass: TournamentClass
-    partners: list = field(default_factory=list)  # [(Athlete, Horse)]
+    height: int | None = None  # для маршрута с несколькими высотами
+    confirmed: bool = False  # участник подтвердил условие «не выполнявшие норматив …»
 
     def key(self):
-        return (self.athlete.pk, self.horse.pk, self.tclass.pk, tuple((a.pk, h.pk) for a, h in self.partners))
+        return (self.athlete.pk, self.horse.pk, self.tclass.pk, self.height)
 
 
 def athlete_age(athlete, tournament):
@@ -63,33 +64,67 @@ def athlete_age(athlete, tournament):
     return tournament.pub_starts_on.year - athlete.birth_date.year
 
 
+def class_reasons(athlete, horse, c: TournamentClass, year: int, height: int | None = None, confirmed: bool = True) -> list[str]:
+    """Почему пара не подходит в зачёт (APP-02). Пустой список — подходит."""
+    out = []
+    if c.merged_into_id:
+        out.append(f"зачёт объединён с «{c.merged_into.name}»")
+    p = c.program
+    if p.heights and len(p.heights) > 1:
+        if height is None:
+            out.append("выберите высоту")
+        elif height not in p.heights:
+            out.append(f"в маршруте нет высоты {height} см")
+        elif c.height and c.height != height:
+            out.append(f"зачёт для высоты {c.height} см")
+    if c.birth_year_from or c.birth_year_to:
+        if not athlete.birth_date:
+            out.append("нужна дата рождения всадника")
+        else:
+            y = athlete.birth_date.year
+            if (c.birth_year_from and y < c.birth_year_from) or (c.birth_year_to and y > c.birth_year_to):
+                out.append(f"нужен {c.conditions.split(',')[0]}")
+    if c.rank and c.rank_rule:
+        r = athlete.rank_for(p.discipline)
+        if c.rank_rule == TournamentClass.RankRule.MIN and not rank_at_least(r, c.rank):
+            out.append(f"нужен разряд не ниже {RANK_SHORT[c.rank]}" + ("" if r else " (в профиле разряд не указан)"))
+        if c.rank_rule == TournamentClass.RankRule.NEVER:
+            if r and rank_at_least(r, c.rank):
+                out.append(f"у всадника разряд {RANK_SHORT[r]} — зачёт для не выполнявших норматив {RANK_SHORT[c.rank]}")
+            elif not confirmed:
+                out.append(f"подтвердите, что всадник не выполнял норматив {RANK_SHORT[c.rank]} и выше")
+    age = year - horse.birth_year
+    if c.horse_age_min and age < c.horse_age_min:
+        out.append(f"лошади {age} лет, нужно от {c.horse_age_min}")
+    if c.horse_age_max and age > c.horse_age_max:
+        out.append(f"лошади {age} лет, нужно до {c.horse_age_max}")
+    if c.horse_kind == TournamentClass.HorseKind.PONY and not horse.is_pony:
+        out.append("зачёт для пони")
+    if c.horse_kind == TournamentClass.HorseKind.HORSE and horse.is_pony:
+        out.append("зачёт для лошадей, не пони")
+    if c.height_min or c.height_max:
+        if not horse.height_cm:
+            out.append("укажите рост лошади в холке в её профиле")
+        elif (c.height_min and horse.height_cm < c.height_min) or (c.height_max and horse.height_cm > c.height_max):
+            out.append(f"рост в холке {horse.height_cm} см не подходит")
+    return out
+
+
 def check_line(user, tournament, line: Line, late=False, allowed_athletes=None) -> list[str]:
     errors = []
     c = line.tclass
     if c.program.tournament_id != tournament.pk:
         return ["Зачёт не относится к этому турниру."]
     allowed = allowed_athletes if allowed_athletes is not None else set(athletes_for_entry(user).values_list("pk", flat=True))
-    everyone = [line.athlete] + [a for a, _ in line.partners]
-    for a in everyone:
-        if a.pk not in allowed:
-            errors.append(f"Нет права подавать заявку за спортсмена «{a.public_name}».")
-        if not a.consent_confirmed_at:
-            errors.append(f"«{a.public_name}»: не подтверждено согласие на обработку и публикацию.")
-        if c.min_age or c.max_age:
-            age = athlete_age(a, tournament)
-            if age is None:
-                errors.append(f"«{a.public_name}»: для зачёта «{c.name}» нужна дата рождения.")
-            elif (c.min_age and age < c.min_age) or (c.max_age and age > c.max_age):
-                errors.append(f"«{a.public_name}» ({age} лет в {tournament.pub_starts_on.year} г.) не проходит по возрасту в зачёт «{c.name}» ({c.conditions}).")
-        if c.rank_requirement and not a.rank_for(c.program.discipline):
-            errors.append(f"«{a.public_name}»: для зачёта «{c.name}» нужен разряд ({c.rank_requirement}).")
-    if c.composition == TournamentClass.Composition.SINGLE and line.partners:
-        errors.append("Зачёт одиночный — партнёры не нужны.")
-    if c.composition == TournamentClass.Composition.PAIR and len(line.partners) != 1:
-        errors.append("Зачёт парный — укажите одного партнёра с лошадью.")
-    if c.composition == TournamentClass.Composition.GROUP and not line.partners:
-        errors.append("Зачёт групповой — укажите хотя бы одного партнёра с лошадью.")
-    if Entry.objects.filter(tclass=c, athlete=line.athlete, horse=line.horse, decision__in=Entry.ACTIVE).exists():
+    a = line.athlete
+    if a.pk not in allowed:
+        errors.append(f"Нет права подавать заявку за спортсмена «{a.public_name}».")
+    if not a.consent_confirmed_at:
+        errors.append(f"«{a.public_name}»: не подтверждено согласие на обработку и публикацию.")
+    year = (tournament.pub_starts_on or tournament.starts_on or timezone.localdate()).year
+    for r in class_reasons(a, line.horse, c, year, line.height, line.confirmed):
+        errors.append(f"«{a.public_name} / {line.horse.name}» — зачёт «{c.label}»: {r}.")
+    if Entry.objects.filter(tclass=c, athlete=line.athlete, horse=line.horse, height=line.height, decision__in=Entry.ACTIVE).exists():
         errors.append(f"«{line.athlete.public_name}» на «{line.horse.name}» уже заявлен(а) в этот зачёт.")
     return errors
 
@@ -111,27 +146,6 @@ def content_hash(lines) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-def _capacity_errors(lines) -> list[str]:
-    """Лимиты зачёта и программы. Вызывать под блокировкой строк зачётов."""
-    errors = []
-    need_class, need_program = {}, {}
-    for l in lines:
-        need_class[l.tclass.pk] = need_class.get(l.tclass.pk, 0) + 1
-        need_program[l.tclass.program_id] = need_program.get(l.tclass.program_id, 0) + 1
-    classes = {c.pk: c for c in TournamentClass.objects.select_related("program").filter(pk__in=need_class)}
-    taken_c = dict(Entry.objects.filter(tclass_id__in=need_class, decision__in=Entry.ACTIVE).values_list("tclass").annotate(n=Count("id")))
-    taken_p = dict(Entry.objects.filter(program_id__in=need_program, decision__in=Entry.ACTIVE).values_list("program").annotate(n=Count("id")))
-    for cid, n in need_class.items():
-        c = classes[cid]
-        if c.limit and taken_c.get(cid, 0) + n > c.limit:
-            errors.append(f"В зачёте «{c.name}» не осталось мест (лимит {c.limit}).")
-    for pid, n in need_program.items():
-        p = next(c.program for c in classes.values() if c.program_id == pid)
-        if p.limit and taken_p.get(pid, 0) + n > p.limit:
-            errors.append(f"В программе «{p.name}» не осталось мест (лимит {p.limit}).")
-    return errors
-
-
 @transaction.atomic
 def submit(user, tournament_id, lines: list[Line], key: str, contact_name="", contact_phone="", comment="", late=False) -> Application:
     t = Tournament.objects.select_for_update(of=("self",)).get(pk=tournament_id)
@@ -146,17 +160,13 @@ def submit(user, tournament_id, lines: list[Line], key: str, contact_name="", co
         raise ValueError([reason])
     if not lines:
         raise ValueError(["Добавьте хотя бы одно выступление."])
-    # блокируем зачёты, чтобы два запроса не заняли последнее место дважды
-    list(TournamentClass.objects.select_for_update().filter(pk__in={l.tclass.pk for l in lines}).order_by("pk"))
     allowed = set(athletes_for_entry(user).values_list("pk", flat=True))
     errors, seen = [], set()
     for l in lines:
-        l.tclass.refresh_from_db()
         if l.key() in seen:
             errors.append(f"Выступление «{l.athlete.public_name} / {l.horse.name}» добавлено дважды.")
         seen.add(l.key())
         errors += check_line(user, t, l, late=late, allowed_athletes=allowed)
-    errors += _capacity_errors(lines)
     if errors:
         raise ValueError(errors)
     app = Application.objects.create(
@@ -167,13 +177,11 @@ def submit(user, tournament_id, lines: list[Line], key: str, contact_name="", co
         e = Entry.objects.create(
             application=app, tournament=t, program=l.tclass.program, tclass=l.tclass, athlete=l.athlete, horse=l.horse,
             athlete_snapshot=l.athlete.private_snapshot(l.tclass.program.discipline), horse_snapshot=l.horse.public_snapshot(),
-            partners_snapshot=[{"athlete": a.private_snapshot(l.tclass.program.discipline), "horse": hh.public_snapshot()} for a, hh in l.partners],
+            height=l.height, conditions_confirmed=l.confirmed,
             program_name=l.tclass.program.name, class_name=l.tclass.name, day=l.tclass.program.day,
             decision=Entry.Decision.ACCEPTED if late else Entry.Decision.PENDING,
             decided_by=user if late else None, decided_at=timezone.now() if late else None,
         )
-        for i, (a, hh) in enumerate(l.partners, start=1):
-            EntryPartner.objects.create(entry=e, athlete=a, horse=hh, position=i)
     audit(user, "application.submit", app, tournament=t.pk, entries=len(lines), late=late)
     judges = _judges(t)
     notify(judges, f"Новая заявка №{app.pk} на «{t.pub_title}»: выступлений {len(lines)}", reverse("entries:manage", args=[t.pk]), "application")
@@ -312,10 +320,9 @@ def propose(user, entry_id, athlete=None, horse=None, tclass=None) -> ChangeProp
         raise ValueError("Ничего не изменено — выберите другого спортсмена, лошадь или зачёт.")
     if ChangeProposal.objects.filter(entry=e, state=ChangeProposal.State.PENDING).exists():
         raise ValueError("По этому выступлению уже есть предложение на рассмотрении.")
-    line = Line(athlete or e.athlete, horse or e.horse, tclass or e.tclass, partners=[(p.athlete, p.horse) for p in e.partners.all()])
+    height = e.height if (tclass or e.tclass).program_id == e.program_id else None
+    line = Line(athlete or e.athlete, horse or e.horse, tclass or e.tclass, height, confirmed=e.conditions_confirmed)
     errors = check_line(user, e.tournament, line)
-    if tclass:
-        errors += _capacity_errors([line])
     if errors:
         raise ValueError(errors[0])
     p = ChangeProposal.objects.create(entry=e, athlete=athlete, horse=horse, tclass=tclass, created_by=user)
@@ -336,12 +343,10 @@ def decide_proposal(user, proposal_id, accept: bool, reason: str = "") -> Change
         if not e.is_active or e.is_started:
             raise ValueError("Выступление уже нельзя изменить.")
         new_class = p.tclass or e.tclass
-        line = Line(p.athlete or e.athlete, p.horse or e.horse, new_class, partners=[(x.athlete, x.horse) for x in e.partners.all()])
+        height = e.height if new_class.program_id == e.program_id else None
+        line = Line(p.athlete or e.athlete, p.horse or e.horse, new_class, height, confirmed=e.conditions_confirmed)
         allowed = set(athletes_for_entry(e.application.submitted_by).values_list("pk", flat=True))
         errors = check_line(e.application.submitted_by, e.tournament, line, allowed_athletes=allowed)
-        if p.tclass_id:
-            TournamentClass.objects.select_for_update().filter(pk=new_class.pk).exists()
-            errors += _capacity_errors([line])
         if errors:
             raise ValueError(errors[0])
         if p.athlete_id:

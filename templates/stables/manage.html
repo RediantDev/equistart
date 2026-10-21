@@ -3,7 +3,7 @@
 {% block title %}Денники и услуги — {{ t.pub_title|default:t.title }} — EquiStart{% endblock %}
 {% block content %}
 <div class="page-head"><div>
-  <a class="back" href="{% if manage %}{% url 'tournaments:step' t.pk 5 %}{% else %}{% url 'tournaments:public' t.pk %}{% endif %}">← {{ t.pub_title|default:t.title }}</a>
+  <a class="back" href="{% if manage %}{% url 'tournaments:step' t.pk 4 %}{% else %}{% url 'tournaments:public' t.pk %}{% endif %}">← {{ t.pub_title|default:t.title }}</a>
   <h1 class="h1">Денники и услуги</h1></div>
   <a class="btn btn--ghost" href="{% url 'stables:book' t.pk %}">Страница для участников</a>
 </div>

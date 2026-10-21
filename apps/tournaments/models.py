@@ -7,6 +7,8 @@ from django.db import models
 from django.utils import timezone
 
 from .disciplines import DISCIPLINE_CHOICES, DISCIPLINE_COLORS, PROGRAM_TYPE_NAMES, RESULT_FIELDS
+from apps.profiles.models import RANKS
+
 from .regions import REGION_CHOICES, REGION_NAMES
 
 User = settings.AUTH_USER_MODEL
@@ -47,6 +49,12 @@ class Venue(models.Model):
 
 
 class Tournament(models.Model):
+    class Level(models.TextChoices):
+        CLUB = "club", "Клубные"
+        MUNICIPAL = "municipal", "Муниципальные"
+        REGIONAL = "regional", "Региональные"
+        OTHER = "other", "Иной статус"
+
     class Status(models.TextChoices):
         DRAFT = "draft", "Черновик"
         REVIEW = "review", "На проверке"
@@ -67,8 +75,10 @@ class Tournament(models.Model):
     ends_on = models.DateField("дата окончания", null=True, blank=True)
     venue = models.ForeignKey(Venue, null=True, blank=True, on_delete=models.PROTECT, related_name="tournaments")
     timezone = models.CharField("часовой пояс", max_length=64, blank=True)
-    organizer_name = models.CharField("кто проводит", max_length=200, blank=True)
-    contact = models.CharField("контакт организатора", max_length=200, blank=True, help_text="Не публикуется")
+    contact_name = models.CharField("контакт для участников: имя", max_length=120, blank=True)
+    contact = models.CharField("контакт для участников: телефон", max_length=200, blank=True, help_text="Виден всем на странице турнира (TRN-02)")
+    level = models.CharField("статус соревнований", max_length=12, choices=Level.choices, default=Level.CLUB)
+    classification = models.BooleanField("классификационные (присвоение разрядов)", default=False)
     entry_deadline = models.DateField("последний день подачи заявок", null=True, blank=True)
     cancel_terms = models.TextField("условия отмены и возврата", blank=True)
     regulation = models.FileField("положение (PDF)", upload_to="regulations/%Y/%m/", blank=True)
@@ -94,9 +104,9 @@ class Tournament(models.Model):
     pub_deadline = models.DateField(null=True, blank=True)
     pub_timezone = models.CharField(max_length=64, blank=True)
     cancelled_reason = models.TextField(blank=True)
-    min_rest_minutes = models.PositiveSmallIntegerField(
-        "минимальный интервал между стартами одной лошади или всадника, мин", default=0,
-        help_text="0 — не проверять. Значение задаёт организатор; правила дисциплин — после утверждения матрицы.",
+    min_gap_starts = models.PositiveSmallIntegerField(
+        "минимум участников между стартами одной лошади или одного всадника", default=10,
+        help_text="0 — не проверять. По умолчанию 10 — для лошадей одного всадника (п. 8.1.1.3 гл. X Правил).",
     )
     finished_at = models.DateTimeField(null=True, blank=True)
 
@@ -128,6 +138,11 @@ class Tournament(models.Model):
     @property
     def is_multiday(self):
         return bool(self.starts_on and self.ends_on and self.ends_on > self.starts_on)
+
+    @property
+    def is_official(self):
+        """Официальные соревнования (не клубные) — для подсказок по ограничениям Правил."""
+        return self.level in (self.Level.MUNICIPAL, self.Level.REGIONAL)
 
     @property
     def is_published(self):
@@ -166,9 +181,18 @@ class ProgramItem(models.Model):
     start_time = models.TimeField("начало", null=True, blank=True)
     discipline = models.CharField("дисциплина", max_length=32, choices=DISCIPLINE_CHOICES)
     name = models.CharField("название", max_length=200, help_text="Например: «Маршрут №1 · 80 см»")
-    program_type = models.CharField("вид программы", max_length=32)
-    result_fields = models.JSONField("поля результата", default=list)
-    limit = models.PositiveIntegerField("лимит участников", null=True, blank=True)
+    program_type = models.CharField("тип маршрута / езды", max_length=32, help_text="Ключ из apps/sport/jumping.py или dressage_test")
+    variant = models.CharField("вариант формулы", max_length=16, blank=True)
+    table = models.CharField("таблица штрафов", max_length=6, blank=True)
+    heights = ArrayField(models.PositiveSmallIntegerField(), default=list, blank=True, verbose_name="высоты, см")
+    dressage_test = models.ForeignKey("sport.DressageTest", null=True, blank=True, on_delete=models.PROTECT, related_name="programs",
+                                      verbose_name="езда")
+    test_snapshot = models.JSONField("снимок езды", null=True, blank=True)
+    arena = models.CharField("манеж", max_length=6, blank=True)
+    course = models.JSONField("параметры маршрута", default=dict, blank=True,
+                              help_text="Вносятся в день старта: длина, скорость, нормы времени по гитам, число препятствий, хронометраж")
+    scheme = models.FileField("схема маршрута", upload_to="schemes/%Y/%m/", blank=True)
+    result_fields = models.JSONField("поля результата (прочий маршрут)", default=list, blank=True)
     position = models.PositiveIntegerField(default=0)
     slot_minutes = models.PositiveSmallIntegerField("интервал между стартами, мин", default=2)
 
@@ -176,8 +200,40 @@ class ProgramItem(models.Model):
         return self.name
 
     @property
+    def is_jumping(self):
+        return self.discipline == "jumping"
+
+    @property
+    def is_dressage(self):
+        return self.discipline == "dressage"
+
+    @property
+    def route(self):
+        from apps.sport.jumping import route
+
+        return route(self.program_type) if self.is_jumping else None
+
+    @property
+    def is_manual(self):
+        return self.program_type in ("manual", "dressage_manual") or (self.is_dressage and not self.test_snapshot)
+
+    @property
     def program_type_name(self):
+        if self.is_jumping:
+            return self.route.name
+        if self.is_dressage:
+            return (self.test_snapshot or {}).get("name") or "Езда (ручной ввод)"
         return PROGRAM_TYPE_NAMES.get(self.program_type, "")
+
+    @property
+    def heights_label(self):
+        return "-".join(str(h) for h in self.heights) + " см" if self.heights else ""
+
+    @property
+    def article_label(self):
+        from apps.sport.jumping import article_label
+
+        return article_label(self.route, self.table) if self.is_jumping else ""
 
     @property
     def discipline_color(self):
@@ -189,30 +245,49 @@ class ProgramItem(models.Model):
 
 
 class TournamentClass(models.Model):
-    """Зачёт внутри программы: условия участия."""
+    """Зачёт внутри маршрута или езды (TRN-04): условия участия, места считаются отдельно."""
 
-    class Composition(models.TextChoices):
-        SINGLE = "single", "Одиночный"
-        PAIR = "pair", "Парный"
-        GROUP = "group", "Групповой"
+    class RankRule(models.TextChoices):
+        NONE = "", "без условия"
+        MIN = "min", "не ниже"
+        NEVER = "never", "никогда не выполнявшие норматив … и выше"
+
+    class HorseKind(models.TextChoices):
+        ANY = "", "лошадь или пони"
+        HORSE = "horse", "только лошади"
+        PONY = "pony", "только пони"
 
     program = models.ForeignKey(ProgramItem, on_delete=models.CASCADE, related_name="classes")
-    name = models.CharField("название зачёта", max_length=200, help_text="Например: «Любители», «Дети до 14 лет»")
-    composition = models.CharField("состав", max_length=8, choices=Composition.choices, default=Composition.SINGLE)
-    min_age = models.PositiveSmallIntegerField("возраст от", null=True, blank=True)
-    max_age = models.PositiveSmallIntegerField("возраст до", null=True, blank=True)
-    rank_requirement = models.CharField("разряд / звание", max_length=120, blank=True)
-    limit = models.PositiveIntegerField("лимит участников", null=True, blank=True)
+    template = models.ForeignKey("sport.ClassTemplate", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    name = models.CharField("название зачёта", max_length=200, help_text="Например: «Любители», «Дети 12–14 лет»")
+    height = models.PositiveSmallIntegerField("высота, см", null=True, blank=True, help_text="Для маршрута с несколькими высотами")
+    birth_year_from = models.PositiveSmallIntegerField("год рождения всадника с", null=True, blank=True)
+    birth_year_to = models.PositiveSmallIntegerField("год рождения всадника по", null=True, blank=True)
+    rank_rule = models.CharField("условие по разряду", max_length=6, choices=RankRule.choices, blank=True)
+    rank = models.CharField("разряд", max_length=8, choices=RANKS, blank=True)
+    horse_age_min = models.PositiveSmallIntegerField("возраст лошади от, лет", null=True, blank=True)
+    horse_age_max = models.PositiveSmallIntegerField("возраст лошади до, лет", null=True, blank=True)
+    horse_kind = models.CharField("лошадь / пони", max_length=6, choices=HorseKind.choices, blank=True)
+    height_min = models.PositiveSmallIntegerField("рост в холке от, см", null=True, blank=True)
+    height_max = models.PositiveSmallIntegerField("рост в холке до, см", null=True, blank=True)
+    min_pairs = models.PositiveSmallIntegerField("минимум пар для открытия", null=True, blank=True)
+    note = models.CharField("примечание для участников", max_length=300, blank=True)
+    merged_into = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="merged",
+                                    verbose_name="объединён с зачётом")
     position = models.PositiveIntegerField(default=0)
 
     class Meta:
         verbose_name = "зачёт"
         verbose_name_plural = "зачёты"
-        ordering = ["position", "id"]
+        ordering = ["height", "position", "id"]
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(min_age__isnull=True) | models.Q(max_age__isnull=True) | models.Q(max_age__gte=models.F("min_age")),
-                name="class_age_range",
+                condition=models.Q(birth_year_from__isnull=True) | models.Q(birth_year_to__isnull=True) | models.Q(birth_year_to__gte=models.F("birth_year_from")),
+                name="class_birth_years_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(horse_age_min__isnull=True) | models.Q(horse_age_max__isnull=True) | models.Q(horse_age_max__gte=models.F("horse_age_min")),
+                name="class_horse_age_range",
             ),
         ]
 
@@ -220,16 +295,42 @@ class TournamentClass(models.Model):
         return self.name
 
     @property
+    def label(self):
+        return f"{self.name} · {self.height} см" if self.height else self.name
+
+    @property
     def conditions(self) -> str:
+        from apps.profiles.models import RANK_SHORT
+
         parts = []
-        if self.min_age and self.max_age:
-            parts.append(f"{self.min_age}–{self.max_age} лет")
-        elif self.min_age:
-            parts.append(f"от {self.min_age} лет")
-        elif self.max_age:
-            parts.append(f"до {self.max_age} лет")
-        if self.rank_requirement:
-            parts.append(self.rank_requirement)
+        a, b = self.birth_year_from, self.birth_year_to
+        if a and b:
+            parts.append(f"{a}–{b} г.р." if a != b else f"{a} г.р.")
+        elif a:
+            parts.append(f"{a} г.р. и моложе")
+        elif b:
+            parts.append(f"{b} г.р. и старше")
+        if self.rank_rule == self.RankRule.MIN and self.rank:
+            parts.append(f"разряд не ниже {RANK_SHORT.get(self.rank, self.rank)}")
+        elif self.rank_rule == self.RankRule.NEVER and self.rank:
+            parts.append(f"не выполнявшие норматив {RANK_SHORT.get(self.rank, self.rank)} и выше")
+        if self.horse_kind == self.HorseKind.PONY:
+            parts.append("пони")
+        elif self.horse_kind == self.HorseKind.HORSE:
+            parts.append("лошади")
+        h1, h2 = self.horse_age_min, self.horse_age_max
+        if h1 and h2:
+            parts.append(f"лошади {h1} лет" if h1 == h2 else f"лошади {h1}–{h2} лет")
+        elif h1:
+            parts.append(f"лошади от {h1} лет")
+        elif h2:
+            parts.append(f"лошади до {h2} лет")
+        if self.height_min and self.height_max:
+            parts.append(f"рост в холке {self.height_min}–{self.height_max} см")
+        elif self.height_min:
+            parts.append(f"рост в холке от {self.height_min} см")
+        elif self.height_max:
+            parts.append(f"рост в холке до {self.height_max} см")
         return ", ".join(parts)
 
 
@@ -251,6 +352,9 @@ class TeamMember(models.Model):
     phone = models.CharField("телефон", max_length=13)
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.CASCADE, related_name="team_roles")
     role = models.CharField("роль", max_length=16, choices=Role.choices)
+    title = models.CharField("должность", max_length=80, blank=True, help_text="Главный судья, главный секретарь, курс-дизайнер… Прав не меняет.")
+    category = models.CharField("судейская категория", max_length=20, blank=True, help_text="ВК, 1К, 2К, 3К, МК4*…")
+    region = models.CharField("регион", max_length=120, blank=True)
     state = models.CharField(max_length=16, choices=State.choices, default=State.PENDING)
     invited_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)

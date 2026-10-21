@@ -10,9 +10,10 @@ from django.urls import reverse
 from apps.core.models import audit, notify
 from apps.entries.models import Entry
 from apps.entries.services import require_judge
-from apps.tournaments.disciplines import RESULT_FIELDS
 from apps.tournaments.models import ProgramItem, TournamentClass
+from apps.tournaments.services import can_manage
 
+from . import scoring
 from .models import Result, ResultPublication, StartListPublication, StartSlot
 
 
@@ -25,6 +26,15 @@ def eligible(entry) -> bool:
     except ImportError:
         return True
     return stable_dependency_ok(entry)
+
+
+def entry_height(entry):
+    p = entry.program
+    if entry.height:
+        return entry.height
+    if entry.tclass_id and entry.tclass.height:
+        return entry.tclass.height
+    return max(p.heights) if p.heights else None
 
 
 def why_not_eligible(entry) -> str:
@@ -64,6 +74,8 @@ def draw(user, program_id) -> int:
     movable = [s for s in slots if s.status == StartSlot.Status.WAITING]
     positions = [s.position for s in movable]
     random.shuffle(movable)
+    if len(p.heights) > 1:
+        movable.sort(key=lambda s: entry_height(s.entry) or 0)  # блоки по высотам, внутри блока — жребий (JMP-02)
     for pos, s in zip(sorted(positions), movable):
         s.position = pos
         s.save(update_fields=["position"])
@@ -138,7 +150,9 @@ def set_status(user, slot_id, status, reason=""):
         raise ValueError(f"Нельзя перевести из «{slot.get_status_display()}» в «{StartSlot.Status(status).label}».")
     slot.status = status
     slot.save(update_fields=["status", "updated_at"])
-    if status in (StartSlot.Status.WITHDRAWN, StartSlot.Status.NO_SHOW):
+    if status in (StartSlot.Status.WITHDRAWN, StartSlot.Status.NO_SHOW) and not slot.program.is_manual:
+        scoring.recompute(slot.program)
+    elif status in (StartSlot.Status.WITHDRAWN, StartSlot.Status.NO_SHOW):
         r, _ = Result.objects.get_or_create(entry=slot.entry)
         r.status = Result.Status.WITHDRAWN if status == StartSlot.Status.WITHDRAWN else Result.Status.NO_SHOW
         r.updated_by = user
@@ -156,35 +170,36 @@ def set_exception(user, slot_id, reason):
 
 
 def conflicts(tournament) -> dict[int, list[str]]:
-    """Конфликты интервалов: одна лошадь или один всадник ближе минимального интервала. {slot_id: [описания]}."""
-    gap = tournament.min_rest_minutes
+    """Конфликты порядка: одна лошадь или один всадник стартуют, а между стартами меньше `min_gap_starts` других пар.
+    {slot_id: [описания]}. Проверяется внутри программы; судья может оставить исключение с причиной."""
+    gap = tournament.min_gap_starts
     out = {}
     if not gap:
         return out
-    slots = list(
-        StartSlot.objects.filter(program__tournament=tournament, start_time__isnull=False)
-        .exclude(status__in=[StartSlot.Status.WITHDRAWN, StartSlot.Status.NO_SHOW])
-        .select_related("entry", "program")
-    )
-    for i, a in enumerate(slots):
-        ta = datetime.datetime.combine(a.program.day, a.start_time)
-        for b in slots[i + 1:]:
-            if a.program.day != b.program.day:
-                continue
-            tb = datetime.datetime.combine(b.program.day, b.start_time)
-            diff = abs((ta - tb).total_seconds()) / 60
-            if diff >= gap:
-                continue
-            same = []
-            if a.entry.horse_id == b.entry.horse_id:
-                same.append(f"лошадь {a.entry.horse_snapshot.get('name')}")
-            if a.entry.athlete_id == b.entry.athlete_id:
-                same.append(f"всадник {a.entry.athlete_snapshot.get('name')}")
-            if same:
-                text = f"{', '.join(same)}: {a.program.name} {a.start_time:%H:%M} и {b.program.name} {b.start_time:%H:%M} — {int(diff)} мин (нужно ≥ {gap})"
-                out.setdefault(a.pk, []).append(text)
-                out.setdefault(b.pk, []).append(text)
+    by_program = {}
+    for sl in (StartSlot.objects.filter(program__tournament=tournament)
+               .exclude(status__in=[StartSlot.Status.WITHDRAWN, StartSlot.Status.NO_SHOW])
+               .select_related("entry", "program").order_by("program_id", "position")):
+        by_program.setdefault(sl.program_id, []).append(sl)
+    for slots in by_program.values():
+        for i, a in enumerate(slots):
+            for j in range(i + 1, min(len(slots), i + gap + 1)):
+                b = slots[j]
+                between = j - i - 1
+                same = []
+                if a.entry.horse_id == b.entry.horse_id:
+                    same.append(f"лошадь {a.entry.horse_snapshot.get('name')}")
+                if a.entry.athlete_id == b.entry.athlete_id:
+                    same.append(f"всадник {a.entry.athlete_snapshot.get('name')}")
+                if same:
+                    text = f"{', '.join(same)}: №{a.position} и №{b.position} — между стартами {between} (нужно ≥ {gap})"
+                    out.setdefault(a.pk, []).append(text)
+                    out.setdefault(b.pk, []).append(text)
     return out
+
+
+ATHLETE_PUBLIC = ("name", "birth_year", "rank", "club", "region", "coach")
+HORSE_PUBLIC = ("name", "birth_year", "sex", "color", "breed")
 
 
 def public_row(slot):
@@ -192,10 +207,9 @@ def public_row(slot):
     a = e.athlete_snapshot
     return {
         "entry": e.pk, "position": slot.position, "time": slot.start_time.strftime("%H:%M") if slot.start_time else "",
-        "athlete": {k: a.get(k) for k in ("name", "birth_year", "rank", "club", "region")},
-        "partners": [{"name": p["athlete"].get("name"), "horse": p["horse"].get("name")} for p in e.partners_snapshot],
-        "horse": {k: e.horse_snapshot.get(k) for k in ("name", "birth_year", "sex", "color", "breed")},
-        "class": e.class_name, "status": slot.status if slot.status in (StartSlot.Status.WITHDRAWN, StartSlot.Status.NO_SHOW) else "",
+        "athlete": {k: a.get(k) for k in ATHLETE_PUBLIC},
+        "horse": {k: e.horse_snapshot.get(k) for k in HORSE_PUBLIC},
+        "class": e.class_name, "height": entry_height(e), "status": slot.status if slot.status in (StartSlot.Status.WITHDRAWN, StartSlot.Status.NO_SHOW) else "",
     }
 
 
@@ -238,6 +252,8 @@ def parse_value(raw: str):
 def save_result(user, entry_id, values: dict, place, status, note="", finish=True):
     e = Entry.objects.select_for_update(of=("self",)).select_related("program", "tournament").get(pk=entry_id)
     require_judge(user, e.tournament)
+    if not e.program.is_manual:
+        raise ValueError("Результат этой программы считается автоматически — вводите данные на экране судьи.")
     clean = {}
     for f in e.program.result_fields:
         v = parse_value(values.get(f, ""))
@@ -265,30 +281,39 @@ def save_result(user, entry_id, values: dict, place, status, note="", finish=Tru
 @transaction.atomic
 def publish_results(user, class_id) -> ResultPublication:
     c = TournamentClass.objects.select_for_update().select_related("program__tournament").get(pk=class_id)
-    require_judge(user, c.program.tournament)
-    entries = list(Entry.objects.filter(tclass=c, decision=Entry.Decision.ACCEPTED).select_related("result"))
-    with_results = [e for e in entries if hasattr(e, "result")]
+    p = c.program
+    require_judge(user, p.tournament)
+    if c.merged_into_id:
+        raise ValueError(f"Зачёт объединён с «{c.merged_into.label}» — публикуйте результаты объединённого зачёта.")
+    if p.is_dressage and not p.is_manual and not scoring.is_scorer(user, p) and not can_manage(user, p.tournament):
+        raise ValueError("Результаты езды публикует судья-подсчёт.")
+    classes = [c] + list(c.merged.all())
+    entries = list(Entry.objects.filter(tclass__in=classes, decision=Entry.Decision.ACCEPTED).select_related("result", "tclass"))
+    with_results = [e for e in entries if hasattr(e, "result") and not (e.result.values or {}).get("pending")]
     if not with_results:
         raise ValueError("Нет результатов для публикации.")
+    if p.is_dressage and not p.is_manual:
+        waiting = [e for e in with_results if not e.result.status and not (e.result.values or {}).get("approved")]
+        if waiting:
+            raise ValueError(f"Не утверждены результаты: {', '.join(e.athlete_snapshot.get('name', '') for e in waiting[:5])}.")
     rows = []
     for e in with_results:
         r = e.result
         rows.append({
             "entry": e.pk, "place": r.place,
-            "athlete": {k: e.athlete_snapshot.get(k) for k in ("name", "birth_year", "rank", "club", "region")},
-            "partners": [{"name": p["athlete"].get("name"), "horse": p["horse"].get("name")} for p in e.partners_snapshot],
-            "horse": {k: e.horse_snapshot.get(k) for k in ("name", "birth_year", "sex", "color", "breed")},
-            "values": {f: r.values.get(f) for f in c.program.result_fields}, "status": r.get_status_display() if r.status else "",
+            "athlete": {k: e.athlete_snapshot.get(k) for k in ATHLETE_PUBLIC},
+            "horse": {k: e.horse_snapshot.get(k) for k in HORSE_PUBLIC},
+            "class": e.tclass.label if e.tclass_id != c.pk else "",
+            "cells": scoring.result_cells(p, r), "values": r.values if p.is_manual else {},
+            "status": r.get_status_display() if r.status else "",
         })
     rows.sort(key=lambda x: (x["place"] is None, x["place"] or 0, x["athlete"]["name"] or ""))
     version = (c.result_publications.aggregate(m=Max("version"))["m"] or 0) + 1
-    pub = ResultPublication.objects.create(
-        tclass=c, version=version, rows=rows, fields=[RESULT_FIELDS.get(f, f) for f in c.program.result_fields], published_by=user
-    )
-    audit(user, "results.publish", c.program.tournament, tclass=c.pk, version=version)
+    pub = ResultPublication.objects.create(tclass=c, version=version, rows=rows, fields=scoring.result_columns(p), published_by=user)
+    audit(user, "results.publish", p.tournament, tclass=c.pk, version=version)
     users = [e.application.submitted_by for e in with_results] + [e.athlete.linked_user for e in with_results if e.athlete.linked_user_id]
-    notify(users, f"Опубликованы результаты: «{c.program.tournament.pub_title}», {c.program.name} · {c.name}",
-           reverse("tournaments:public", args=[c.program.tournament_id]) + "?tab=results", "results")
+    notify(users, f"Опубликованы результаты: «{p.tournament.pub_title}», {p.name} · {c.label}",
+           reverse("tournaments:public", args=[p.tournament_id]) + "?tab=results", "results")
     return pub
 
 

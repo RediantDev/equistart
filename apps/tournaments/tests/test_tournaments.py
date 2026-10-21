@@ -41,11 +41,11 @@ class Base(TestCase):
         venue = Venue.objects.create(name="КСК «Белая роща»", region="mos", settlement="Берёзки", timezone="Europe/Moscow", created_by=owner)
         t = Tournament.objects.create(
             owner=owner, title="Кубок «Белая роща»", starts_on=self.start, ends_on=self.start + datetime.timedelta(days=days - 1),
-            venue=venue, timezone="Europe/Moscow", organizer_name="КСК «Белая роща»",
+            venue=venue, timezone="Europe/Moscow", contact_name="КСК «Белая роща»", contact="+7 900 000-00-00",
             entry_deadline=self.start - datetime.timedelta(days=3), cancel_terms="Возврат до срока подачи.",
         )
         t.regulation.save("p.pdf", SimpleUploadedFile("p.pdf", PDF, "application/pdf"))
-        p = ProgramItem.objects.create(tournament=t, day=self.start, discipline="jumping", name="Маршрут №1 · 80 см", program_type="jumping_clear_time", result_fields=["penalties", "time"])
+        p = ProgramItem.objects.create(tournament=t, day=self.start, discipline="jumping", name="Маршрут №1 · 80 см", program_type="clear_speed", table="A", heights=[80])
         TournamentClass.objects.create(program=p, name="Любители")
         return t
 
@@ -70,7 +70,7 @@ class WizardTests(Base):
             "title": "Осенний приз", "starts_on": self.start.isoformat(), "multiday": "on",
             "ends_on": (self.start + datetime.timedelta(days=1)).isoformat(),
             "venue_name": "КСК «Озёрный»", "venue_region": "sve", "venue_settlement": "Берёзовский",
-            "organizer_name": "КСК «Озёрный»", "contact": "+7 900 000-00-00",
+            "contact_name": "КСК «Озёрный»", "contact": "+7 900 000-00-00",
         })
         t = Tournament.objects.get()
         self.assertRedirects(resp, reverse("tournaments:step", args=[t.pk, 2]))
@@ -82,7 +82,7 @@ class WizardTests(Base):
     def test_yakutia_requires_zone(self):
         self.client.force_login(self.org)
         data = {"title": "Якутия", "starts_on": self.start.isoformat(), "venue_name": "Клуб", "venue_region": "sa",
-                "venue_settlement": "Якутск", "organizer_name": "Клуб"}
+                "venue_settlement": "Якутск", "contact_name": "Клуб"}
         resp = self.client.post(reverse("tournaments:create"), data)
         self.assertContains(resp, "Выберите часовой пояс района")
         data["venue_timezone"] = "Asia/Srednekolymsk"
@@ -91,7 +91,7 @@ class WizardTests(Base):
 
     def test_one_day_ignores_end_and_multiday_validates(self):
         self.client.force_login(self.org)
-        base = {"title": "X", "starts_on": self.start.isoformat(), "venue_name": "К", "venue_region": "mos", "venue_settlement": "Н", "organizer_name": "О"}
+        base = {"title": "X", "starts_on": self.start.isoformat(), "venue_name": "К", "venue_region": "mos", "venue_settlement": "Н", "contact_name": "О"}
         resp = self.client.post(reverse("tournaments:create"), {**base, "multiday": "on", "ends_on": self.start.isoformat()})
         self.assertContains(resp, "Дата окончания должна быть позже")
         self.client.post(reverse("tournaments:create"), {**base, "ends_on": (self.start - datetime.timedelta(days=5)).isoformat()})
@@ -101,40 +101,60 @@ class WizardTests(Base):
     def test_cannot_jump_ahead(self):
         t = Tournament.objects.create(owner=self.org, title="Черновик", starts_on=self.start, ends_on=self.start)
         self.client.force_login(self.org)
-        resp = self.client.get(reverse("tournaments:step", args=[t.pk, 4]))
+        resp = self.client.get(reverse("tournaments:step", args=[t.pk, 3]))
         self.assertRedirects(resp, reverse("tournaments:step", args=[t.pk, 1]))
+        self.assertEqual(self.client.get(reverse("tournaments:step", args=[t.pk, 4])).status_code, 200)  # проверка доступна всегда
 
     def test_program_and_class_flow(self):
         t = self.make_ready()
         self.client.force_login(self.org)
         resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), {
             "revision": t.revision, "day": (self.start + datetime.timedelta(days=1)).isoformat(), "start_time": "12:30",
-            "discipline": "jumping", "name": "Маршрут №2 · 110 см", "program_type": "jumping_jumpoff", "limit": "",
+            "discipline": "jumping", "name": "Маршрут №2 · 110 см", "program_type": "jumpoff", "table": "A", "heights_text": "100, 110",
         })
         self.assertEqual(resp.status_code, 302)
         p = ProgramItem.objects.get(name__startswith="Маршрут №2")
-        self.assertEqual(p.result_fields, ["penalties", "time", "jumpoff_penalties", "jumpoff_time"])
+        self.assertEqual((p.program_type, p.heights, p.table), ("jumpoff", [100, 110], "A"))
+        self.assertEqual(p.article_label, "гл. X, п. 16.4.2.2, табл. «A» (ст. 238.2.2 FEI)")
         t.refresh_from_db()
         resp = self.client.post(reverse("tournaments:class_add", args=[t.pk, p.pk]), {
-            "revision": t.revision, "name": "Взрослые", "composition": "single", "min_age": "18", "max_age": "",
+            "revision": t.revision, "name": "Взрослые", "height": "110", "birth_year_to": str(self.start.year - 18),
         })
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(TournamentClass.objects.get(name="Взрослые").min_age, 18)
+        c = TournamentClass.objects.get(name="Взрослые")
+        self.assertEqual((c.birth_year_to, c.height, c.label), (self.start.year - 18, 110, "Взрослые · 110 см"))
+        # шаблон зачёта: возраст пересчитывается в годы рождения от года турнира
+        from apps.sport.models import ClassTemplate
+
+        tpl = ClassTemplate.objects.get(name="Дети")
+        t.refresh_from_db()
+        resp = self.client.post(reverse("tournaments:class_from_template", args=[t.pk, p.pk]), {"revision": t.revision, "template": tpl.pk, "height": "100"})
+        self.assertEqual(resp.status_code, 302)
+        c = TournamentClass.objects.get(program=p, name="Дети")
+        self.assertEqual((c.birth_year_from, c.birth_year_to, c.height), (self.start.year - 14, self.start.year - 12, 100))
 
     def test_program_type_must_match_discipline(self):
         t = self.make_ready()
         self.client.force_login(self.org)
         resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), {
-            "revision": t.revision, "day": self.start.isoformat(), "discipline": "dressage", "name": "Езда", "program_type": "jumping_clear",
+            "revision": t.revision, "day": self.start.isoformat(), "discipline": "dressage", "name": "Езда", "program_type": "no_time",
         })
         self.assertEqual(resp.status_code, 422)
-        self.assertContains(resp, "не относится к выбранной дисциплине", status_code=422)
+        self.assertContains(resp, "Выберите езду", status_code=422)
+        t.level = "regional"
+        t.save()
+        t.refresh_from_db()
+        resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), {
+            "revision": t.revision, "day": self.start.isoformat(), "discipline": "jumping", "name": "М", "program_type": "two_phases_special",
+            "table": "B2", "heights_text": "130",
+        })
+        self.assertEqual(resp.status_code, 422)  # B2 на официальных — только до 130 см (гл. X п. 16.3)
 
     def test_day_outside_period_rejected(self):
         t = self.make_ready(days=1)
         self.client.force_login(self.org)
         resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), {
-            "revision": t.revision, "day": (self.start + datetime.timedelta(days=9)).isoformat(), "discipline": "jumping", "name": "Х", "program_type": "jumping_clear",
+            "revision": t.revision, "day": (self.start + datetime.timedelta(days=9)).isoformat(), "discipline": "jumping", "name": "Х", "program_type": "no_time", "table": "A", "heights_text": "80",
         })
         self.assertEqual(resp.status_code, 422)
 
@@ -142,7 +162,7 @@ class WizardTests(Base):
         t = self.make_ready()
         self.client.force_login(self.org)
         resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), {
-            "revision": t.revision - 1, "day": self.start.isoformat(), "discipline": "jumping", "name": "Х", "program_type": "jumping_clear",
+            "revision": t.revision - 1, "day": self.start.isoformat(), "discipline": "jumping", "name": "Х", "program_type": "no_time", "table": "A", "heights_text": "80",
         }, follow=True)
         self.assertContains(resp, "изменились")
         self.assertEqual(t.programs.count(), 1)
@@ -158,7 +178,7 @@ class WizardTests(Base):
         t = self.make_ready()
         self.client.force_login(self.org)
         bad = SimpleUploadedFile("x.pdf", b"<html>not pdf</html>", "application/pdf")
-        resp = self.client.post(reverse("tournaments:step", args=[t.pk, 4]), {
+        resp = self.client.post(reverse("tournaments:step", args=[t.pk, 3]), {
             "revision": t.revision, "entry_deadline": t.entry_deadline.isoformat(), "cancel_terms": "", "regulation": bad,
         })
         self.assertContains(resp, "Нужен файл в формате PDF")
@@ -168,7 +188,7 @@ class WizardTests(Base):
         self.client.force_login(self.other)
         for url in [
             reverse("tournaments:step", args=[t.pk, 1]),
-            reverse("tournaments:step", args=[t.pk, 5]),
+            reverse("tournaments:step", args=[t.pk, 4]),
             reverse("tournaments:regulation_working", args=[t.pk]),
         ]:
             with self.subTest(url=url):
@@ -200,11 +220,11 @@ class ModerationTests(Base):
     def test_full_cycle_return_fix_publish(self):
         t = self.make_ready()
         self.client.force_login(self.org)
-        self.client.post(reverse("tournaments:step", args=[t.pk, 5]), {"revision": t.revision})
+        self.client.post(reverse("tournaments:step", args=[t.pk, 4]), {"revision": t.revision})
         t.refresh_from_db()
         self.assertEqual(t.status, Tournament.Status.REVIEW)
         # во время проверки правка закрыта
-        resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), {"revision": t.revision, "day": self.start.isoformat(), "discipline": "jumping", "name": "Х", "program_type": "jumping_clear"})
+        resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), {"revision": t.revision, "day": self.start.isoformat(), "discipline": "jumping", "name": "Х", "program_type": "no_time", "table": "A", "heights_text": "80"})
         self.assertEqual(t.programs.count(), 1)
         # черновик не публичен
         self.client.logout()
@@ -218,7 +238,7 @@ class ModerationTests(Base):
         t.refresh_from_db()
         self.assertEqual(t.status, Tournament.Status.RETURNED)
         self.client.force_login(self.org)
-        self.assertContains(self.client.get(reverse("tournaments:step", args=[t.pk, 5])), "Положение нечитаемо")
+        self.assertContains(self.client.get(reverse("tournaments:step", args=[t.pk, 4])), "Положение нечитаемо")
         # организатор отправляет снова, модератор публикует и подтверждает место
         services.submit(self.org, t.pk, t.revision)
         t.refresh_from_db()
@@ -266,7 +286,7 @@ class ModerationTests(Base):
         t = self.publish(self.make_ready())
         c = TournamentClass.objects.get()
         self.client.force_login(self.org)
-        self.client.post(reverse("tournaments:class_save", args=[t.pk, c.program_id, c.pk]), {"revision": t.revision, "name": "Любители 2", "composition": "single"})
+        self.client.post(reverse("tournaments:class_save", args=[t.pk, c.program_id, c.pk]), {"revision": t.revision, "name": "Любители 2"})
         t.refresh_from_db()
         self.assertEqual(t.status, Tournament.Status.DRAFT)
         self.assertEqual(t.publication, Tournament.Publication.PUBLISHED)
@@ -283,7 +303,7 @@ class ModerationTests(Base):
         t = self.publish(self.make_ready())
         old = t.published_regulation
         self.client.force_login(self.org)
-        self.client.post(reverse("tournaments:step", args=[t.pk, 4]), {
+        self.client.post(reverse("tournaments:step", args=[t.pk, 3]), {
             "revision": t.revision, "entry_deadline": t.entry_deadline.isoformat(), "cancel_terms": "x",
             "regulation": SimpleUploadedFile("new.pdf", PDF + b"new", "application/pdf"),
         })
@@ -314,7 +334,10 @@ class CalendarTests(Base):
         b.title = "Выездка «Осень»"
         b.save()
         p = b.programs.first()
-        p.discipline, p.program_type = "dressage", "dressage_test"
+        from apps.sport.models import DressageTest
+
+        test = DressageTest.objects.filter(is_official=True).first()
+        p.discipline, p.program_type, p.dressage_test, p.test_snapshot, p.heights = "dressage", "dressage_test", test, test.snapshot(), []
         p.save()
         b.venue.region = "sve"
         b.venue.save()

@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-head">
   <div>
-    <a class="back" href="{% if manage %}{% url 'tournaments:step' t.pk 5 %}{% else %}{% url 'tournaments:public' t.pk %}{% endif %}">← {{ t.title }}</a>
+    <a class="back" href="{% if manage %}{% url 'tournaments:step' t.pk 4 %}{% else %}{% url 'tournaments:public' t.pk %}{% endif %}">← {{ t.title }}</a>
     <h1 class="h1">Проведение</h1>
     <div class="chips"><a class="tag tag--sky" href="{% url 'entries:manage' t.pk %}">Заявки</a><a class="tag" href="{% url 'tournaments:public' t.pk %}">Публичная страница</a>{% if t.publication == "finished" %}<span class="chip">Турнир завершён</span>{% endif %}</div>
   </div>
@@ -29,7 +29,7 @@
     <section class="card">
       <h2 class="h3">Интервалы</h2>
       <form method="post" action="{% url 'conduct:settings' t.pk %}" class="form" style="margin-top: var(--space-3);">{% csrf_token %}
-        <div class="field"><label class="field__label" for="mr">Минимум между стартами одной лошади или всадника, мин</label><input id="mr" name="min_rest_minutes" type="number" min="0" value="{{ t.min_rest_minutes }}"><p class="field__help">0 — не проверять. Нарушения покажем как конфликты; судья может оставить исключение с причиной.</p></div>
+        <div class="field"><label class="field__label" for="mr">Минимум других стартов между выступлениями одной лошади или всадника</label><input id="mr" name="min_gap_starts" type="number" min="0" value="{{ t.min_gap_starts }}"><p class="field__help">0 — не проверять. Нарушения покажем как конфликты; судья может оставить исключение с причиной.</p></div>
         <button class="btn btn--dark btn--sm">Сохранить</button>
       </form>
     </section>

@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-head">
   <div>
-    <a class="back" href="{% url 'tournaments:step' t.pk 5 %}">← {{ t.title }}</a>
+    <a class="back" href="{% url 'tournaments:step' t.pk 4 %}">← {{ t.title }}</a>
     <h1 class="h1">Заявки турнира</h1>
     <div class="chips">{% for label, n, color in counts %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>
   </div>

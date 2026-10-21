@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{% if test %}Изменить езду{% else %}Новая езда{% endif %} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% if test %}{% url 'sport:test_detail' test.pk %}{% else %}{% url 'sport:test_list' %}{% endif %}">← {% if test %}{{ test.name }}{% else %}Езды выездки{% endif %}</a>
+    <h1 class="h1">{% if test %}Изменить езду{% else %}Новая езда{% endif %}</h1>
+    <p class="muted">Перенесите лист из бланка: каждое упражнение — отдельной строкой. Турниры, где езда уже выбрана, хранят свою копию — правка их не изменит.</p>
+  </div>
+</div>
+<form method="post" novalidate class="card form">
+  {% csrf_token %}{% if back %}<input type="hidden" name="t" value="{{ back }}">{% endif %}
+  {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
+  <div class="form__group">
+    <h2 class="h3">Езда</h2>
+    {% include "partials/field.html" with field=form.name %}
+    <div class="grid-2">{% include "partials/field.html" with field=form.short %}{% include "partials/field.html" with field=form.level %}</div>
+    <div class="grid-2">{% include "partials/field.html" with field=form.kind %}{% include "partials/field.html" with field=form.arena %}</div>
+    <div class="grid-2">{% include "partials/field.html" with field=form.duration_min %}{% include "partials/field.html" with field=form.min_horse_age %}</div>
+    <div class="grid-2">{% include "partials/field.html" with field=form.penalty_scheme %}{% include "partials/field.html" with field=form.tie_rule %}</div>
+    {% include "partials/field.html" with field=form.source %}
+  </div>
+  <div class="form__group" style="border-bottom: 0;">
+    <h2 class="h3">Судейский лист</h2>
+    {% include "partials/field.html" with field=form.step %}
+    {% include "partials/field.html" with field=form.technique_movements %}
+    {% include "partials/field.html" with field=form.technique_collective %}
+    <div id="second-part">{% include "partials/field.html" with field=form.second_collective %}</div>
+  </div>
+  <div class="form-actions"><button class="btn btn--primary">Сохранить езду</button></div>
+</form>
+<script>
+(function () {
+  var kind = document.getElementById("id_kind"), box = document.getElementById("second-part");
+  function sync() { box.hidden = kind.value === "standard"; }
+  kind.addEventListener("change", sync); sync();
+})();
+</script>
+{% endblock %}

@@ -79,17 +79,17 @@ class DrawTests(ConductBase):
             services.set_status(self.judge, s.pk, StartSlot.Status.STARTED)
 
     def test_conflicts_by_horse_interval(self):
-        p2 = ProgramItem.objects.create(tournament=self.t, day=self.start, start_time=datetime.time(10, 5), discipline="jumping", name="Маршрут №2", program_type="jumping_clear", result_fields=["penalties"])
-        c2 = TournamentClass.objects.create(program=p2, name="Открытый-2")
-        app = self.submit(self.coach, [eservices.Line(self.a2, self.h1, c2)], key="k3")
+        c_open = self.p1.classes.get(name="Открытый")
+        app = self.submit(self.coach, [eservices.Line(self.a2, self.h1, c_open)], key="k3")
         self.accept(app.entries.get())
+        self.t.min_gap_starts = 0
+        self.t.save()
         services.draw(self.judge, self.p1.pk)
-        services.draw(self.judge, p2.pk)
         self.assertEqual(services.conflicts(self.t), {})
-        self.t.min_rest_minutes = 30
+        self.t.min_gap_starts = 3
         self.t.save()
         conf = services.conflicts(self.t)
-        self.assertTrue(any("лошадь Барон" in x for v in conf.values() for x in v))
+        self.assertTrue(any("лошадь Барон" in x and "нужно ≥ 3" in x for v in conf.values() for x in v))
 
     def test_publish_versions_and_public_tab(self):
         services.draw(self.judge, self.p1.pk)
@@ -172,7 +172,7 @@ class PermissionTests(ConductBase):
             (reverse("conduct:action", args=[self.t.pk, self.p1.pk, "publish"]), {}),
             (reverse("conduct:action", args=[self.t.pk, self.p1.pk, "result"]), {"entry": slot.entry_id, "v_penalties": "0"}),
             (reverse("conduct:live_save", args=[self.t.pk, self.p1.pk]), {"slot": slot.pk}),
-            (reverse("conduct:settings", args=[self.t.pk]), {"min_rest_minutes": "5"}),
+            (reverse("conduct:settings", args=[self.t.pk]), {"min_gap_starts": "5"}),
             (reverse("conduct:finish", args=[self.t.pk]), {"confirm": "1"}),
         ]
         for u in urls_get:
@@ -187,7 +187,7 @@ class PermissionTests(ConductBase):
         self.assertFalse(StartListPublication.objects.exists())
         self.assertFalse(Result.objects.exists())
         self.t.refresh_from_db()
-        self.assertEqual(self.t.min_rest_minutes, 0)
+        self.assertEqual(self.t.min_gap_starts, 10)
         self.assertEqual(self.t.publication, Tournament.Publication.PUBLISHED)
 
     def test_program_of_other_tournament(self):

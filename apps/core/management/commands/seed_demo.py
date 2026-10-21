@@ -14,9 +14,11 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.conduct import services as cs
+from apps.conduct.models import JudgePosition
 from apps.entries import services as es
 from apps.entries.models import Application
 from apps.profiles.models import Athlete, Horse
+from apps.sport.models import ClassTemplate, DressageTest
 from apps.stables import services as ss
 from apps.stables.models import Service, StableCategory
 from apps.tournaments import services as ts
@@ -67,25 +69,30 @@ class Command(BaseCommand):
         venue = Venue.objects.create(name="КСК «Белая роща»", region="mos", settlement="д. Берёзки", address="ул. Полевая, 14",
                                      timezone="Europe/Moscow", created_by=org, confirmed=True)
         t = Tournament.objects.create(owner=org, title="Кубок «Белая роща» по конкуру, 3-й этап", starts_on=start, ends_on=end, venue=venue,
-                                      timezone="Europe/Moscow", organizer_name="КСК «Белая роща»", contact="+7 999 000-00-01",
+                                      timezone="Europe/Moscow", contact_name="Соколова Мария, главный секретарь", contact="+7 999 000-00-01",
+                                      level="club", min_gap_starts=3,
                                       entry_deadline=start - datetime.timedelta(days=4),
                                       cancel_terms="Отмена выступления — до окончания приёма заявок.")
         t.regulation.save("polozhenie.pdf", ContentFile(PDF))
+        tpl = {c.name: c for c in ClassTemplate.objects.all()}
+        test = DressageTest.objects.filter(is_official=True, name__icontains="Дети").first() or DressageTest.objects.filter(is_official=True).first()
         progs = [
-            (start, datetime.time(10, 0), "jumping", "Маршрут №1 · 60 см", "jumping_clear", ["penalties"], [("Дети до 14 лет", 0, 14), ("Любители", 18, None)]),
-            (start, datetime.time(11, 30), "jumping", "Маршрут №2 · 80 см", "jumping_clear_time", ["penalties", "time"], [("Любители", 18, None), ("Открытый", None, None)]),
-            (end, datetime.time(10, 0), "jumping", "Маршрут №3 · 100 см", "jumping_jumpoff", ["penalties", "time", "jumpoff_penalties", "jumpoff_time"], [("Открытый", None, None)]),
-            (end, datetime.time(13, 0), "dressage", "Езда «Предварительный приз. Дети»", "dressage_test", ["percent"], [("Дети", 10, 14)]),
+            # день, время, дисциплина, название, маршрут, таблица, высоты, зачёты
+            (start, datetime.time(10, 0), "jumping", "Маршрут №1 · 60 см", "no_time", "A", [60], ["Дети", "Любители"]),
+            (start, datetime.time(11, 30), "jumping", "Маршрут №2 · 80 см", "clear_speed", "A", [80], ["Любители", "Общий / Открытый"]),
+            (end, datetime.time(10, 0), "jumping", "Маршрут №3 · 100 см", "jumpoff", "A", [100], ["Общий / Открытый"]),
+            (end, datetime.time(13, 0), "dressage", f"Езда «{test.name if test else 'Предварительный приз. Дети'}»", "dressage_test", "", [], ["Дети"]),
         ]
         classes = {}
-        for i, (day, tm, disc, name, ptype, fields, cls) in enumerate(progs):
-            p = ProgramItem.objects.create(tournament=t, day=day, start_time=tm, discipline=disc, name=name, program_type=ptype, result_fields=fields, position=i, slot_minutes=3)
-            for j, (cname, amin, amax) in enumerate(cls):
-                classes[(i, cname)] = TournamentClass.objects.create(program=p, name=cname, min_age=amin, max_age=amax, position=j)
+        for i, (day, tm, disc, name, ptype, table, heights, cls) in enumerate(progs):
+            p = ProgramItem.objects.create(tournament=t, day=day, start_time=tm, discipline=disc, name=name, program_type=ptype, table=table,
+                                           heights=heights, position=i, slot_minutes=3,
+                                           dressage_test=test if disc == "dressage" else None,
+                                           test_snapshot=test.snapshot() if disc == "dressage" and test else None)
+            for j, cname in enumerate(cls):
+                classes[(i, cname)] = TournamentClass.objects.create(program=p, template=tpl[cname], position=j, **tpl[cname].for_year(start.year))
         for user, role in ((judge, "judge"), (judge2, "judge"), (groom, "stable")):
             TeamMember.objects.create(tournament=t, phone=user.phone, user=user, role=role, state="accepted", invited_by=org)
-        t.min_rest_minutes = 20
-        t.save()
         ts.submit(org, t.pk, t.revision)
         t.refresh_from_db()
         ts.approve(mod, t.pk, t.revision)
@@ -104,16 +111,22 @@ class Command(BaseCommand):
         lisa, dima, anna, ivan, alina = athletes
         baron, iskra, granit, vihr, ladoga = horses
         app = es.submit(coach, t.pk, [
-            es.Line(lisa, baron, classes[(0, "Дети до 14 лет")]),
-            es.Line(alina, iskra, classes[(0, "Дети до 14 лет")]),
-            es.Line(dima, granit, classes[(1, "Любители")]),
-            es.Line(anna, vihr, classes[(1, "Любители")]),
-            es.Line(ivan, ladoga, classes[(1, "Открытый")]),
-            es.Line(ivan, granit, classes[(2, "Открытый")]),
+            es.Line(lisa, baron, classes[(0, "Дети")]),
+            es.Line(alina, iskra, classes[(0, "Дети")]),
+            es.Line(dima, granit, classes[(1, "Любители")], confirmed=True),
+            es.Line(anna, vihr, classes[(1, "Любители")], confirmed=True),
+            es.Line(ivan, ladoga, classes[(1, "Общий / Открытый")]),
+            es.Line(ivan, granit, classes[(2, "Общий / Открытый")]),
+            es.Line(lisa, iskra, classes[(3, "Дети")]),
+            es.Line(alina, ladoga, classes[(3, "Дети")]),
         ], "demo-app-1", contact_name="Соколова Мария", contact_phone=coach.phone)
         entries = list(app.entries.order_by("pk"))
-        es.decide(judge, t.pk, [(e.pk, e.revision) for e in entries[:5]], "accept")
+        es.decide(judge, t.pk, [(e.pk, e.revision) for e in entries if e.pk != entries[5].pk], "accept")
         # шестая остаётся «на рассмотрении» — чтобы было что решить судье
+        dp = t.programs.get(position=3)
+        for letter, who, name in (("C", judge, "Кузнецова Е. В."), ("E", judge, "Морозов А. П."), ("B", judge2, "Волкова Н. С."),
+                                  ("SCORER", judge2, "Волкова Н. С.")):
+            JudgePosition.objects.create(program=dp, letter=letter, user=who, judge_name=name, judge_category="1К", judge_region="Московская область")
 
         cat = StableCategory.objects.create(tournament=t, name="Денник в конюшне", available_from=start - datetime.timedelta(days=1),
                                             available_to=end + datetime.timedelta(days=1), capacity=12, checkin_time=datetime.time(12, 0),

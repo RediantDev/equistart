@@ -27,11 +27,11 @@
       {% else %}<a class="btn btn--primary btn--block" href="{% url 'accounts:login' %}?next={% url 'entries:apply' t.pk %}">Войти и подать заявку</a>{% endif %}
     {% endif %}
     {% if s.has_regulation %}<a class="btn btn--dark btn--block" href="{% url 'tournaments:public_regulation' t.pk %}" target="_blank" rel="noopener">Положение (PDF)</a>{% endif %}
-    {% if can_manage %}<a class="btn btn--ghost btn--block" href="{% url 'tournaments:step' t.pk 5 %}">Управление турниром</a>{% endif %}
+    {% if can_manage %}<a class="btn btn--ghost btn--block" href="{% url 'tournaments:step' t.pk 4 %}">Управление турниром</a>{% endif %}
     {% if can_judge %}<a class="btn btn--ghost btn--block" href="{% url 'entries:manage' t.pk %}">Заявки турнира</a><a class="btn btn--ghost btn--block" href="{% url 'conduct:overview' t.pk %}">Проведение</a>{% endif %}
     {% if can_stable %}<a class="btn btn--ghost btn--block" href="{% url 'stables:manage' t.pk %}">Конюшня и услуги</a>{% endif %}
     {% if has_stables %}<a class="btn btn--ghost btn--block" href="{% url 'stables:book' t.pk %}">Денники и услуги</a>{% endif %}
-    <p class="table__sub" style="margin: 0;">Проводит: {{ s.organizer_name }}.</p>
+    <p class="table__sub" style="margin: 0;">Контакт: {{ s.contact_name }}{% if s.contact %}, {{ s.contact }}{% endif %}.</p>
   </div>
 </section>
 
@@ -49,7 +49,7 @@
       <thead><tr><th class="num">№</th><th class="num">Время</th><th>Всадник</th><th>Лошадь</th><th>Зачёт</th></tr></thead>
       <tbody>{% for r in b.rows %}<tr{% if r.mark %} class="is-muted"{% endif %}>
         <td class="num">{{ r.position }}</td><td class="num">{{ r.time|default:"—" }}</td>
-        <td><strong>{{ r.athlete.name }}</strong><span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.rank %} · {{ r.athlete.rank }}{% endif %}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>{% for pt in r.partners %}<span class="table__sub">+ {{ pt.name }} / {{ pt.horse }}</span>{% endfor %}{% if r.mark %}<span class="chip chip--danger">{{ r.mark }}</span>{% endif %}</td>
+        <td><strong>{{ r.athlete.name }}</strong><span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.rank %} · {{ r.athlete.rank }}{% endif %}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>{% if r.athlete.coach %}<span class="table__sub">тренер {{ r.athlete.coach }}</span>{% endif %}{% if r.mark %}<span class="chip chip--danger">{{ r.mark }}</span>{% endif %}</td>
         <td>{{ r.horse.name }}<span class="table__sub">{{ r.horse.birth_year|default:"" }} {{ r.horse.sex|default:"" }} {{ r.horse.color|default:"" }}{% if r.horse.breed %} · {{ r.horse.breed }}{% endif %}</span></td>
         <td>{{ r.class }}</td></tr>{% endfor %}</tbody>
     </table></div>
@@ -63,7 +63,7 @@
       <thead><tr><th class="num">Место</th><th>Всадник</th><th>Лошадь</th>{% for f in b.pub.fields %}<th class="num">{{ f }}</th>{% endfor %}</tr></thead>
       <tbody>{% for r in b.rows %}<tr>
         <td class="num"><strong>{{ r.place|default:"—" }}</strong></td>
-        <td><strong>{{ r.athlete.name }}</strong><span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>{% for pt in r.partners %}<span class="table__sub">+ {{ pt.name }} / {{ pt.horse }}</span>{% endfor %}{% if r.status %}<span class="chip">{{ r.status }}</span>{% endif %}</td>
+        <td><strong>{{ r.athlete.name }}</strong><span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>{% if r.athlete.coach %}<span class="table__sub">тренер {{ r.athlete.coach }}</span>{% endif %}{% if r.status %}<span class="chip">{{ r.status }}</span>{% endif %}</td>
         <td>{{ r.horse.name }}</td>
         {% for v in r.cells %}<td class="num">{{ v|num }}</td>{% endfor %}</tr>{% endfor %}</tbody>
     </table></div>
@@ -71,15 +71,15 @@
 </section>
 {% else %}
 <section class="stack">
-  <h2 class="h2">Программа и цены</h2>
+  <h2 class="h2">Программа</h2>
   {% for d in days %}
     <h3 class="h3" style="margin-top: var(--space-3);">{{ d.weekday }}, {{ d.date|isodate:False }}</h3>
     <div class="prog-cards only-narrow">
       {% for p in d.programs %}
         <article class="prog-card">
-          <div class="prog-card__head"><span class="prog-row__time">{{ p.start_time|default:"—" }}</span><span><strong>{{ p.name }}</strong><span class="table__sub">{{ p.program_type_name }}{% if p.limit %} · лимит {{ p.limit }}{% endif %}</span></span></div>
+          <div class="prog-card__head"><span class="prog-row__time">{{ p.start_time|default:"—" }}</span><span><strong>{{ p.name }}</strong><span class="table__sub">{{ p.program_type_name }}{% if p.heights %} · {{ p.heights_label }}{% endif %}{% if p.article_label %} · {{ p.article_label }}{% endif %}</span></span></div>
           {% for c in p.classes %}
-            <div class="prog-card__class"><span>{{ c.name }}<span class="table__sub">{{ c.conditions|default:"без ограничений" }}{% if c.composition != "single" %} · {{ c.composition_name }}{% endif %}</span></span></div>
+            <div class="prog-card__class"><span>{{ c.label }}<span class="table__sub">{{ c.conditions|default:"без ограничений" }}{% if c.note %} · {{ c.note }}{% endif %}</span></span></div>
           {% endfor %}
         </article>
       {% endfor %}
@@ -92,9 +92,9 @@
             {% for c in p.classes %}
               <tr>
                 <td class="num">{% if forloop.first %}{{ p.start_time|default:"—" }}{% endif %}</td>
-                <td>{% if forloop.first %}<strong>{{ p.name }}</strong><span class="table__sub">{{ p.program_type_name }}{% if p.limit %} · лимит {{ p.limit }}{% endif %}</span>{% endif %}</td>
-                <td>{{ c.name }}{% if c.composition != "single" %}<span class="table__sub">{{ c.composition_name }}</span>{% endif %}</td>
-                <td>{{ c.conditions|default:"—" }}{% if c.limit %}<span class="table__sub">лимит {{ c.limit }}</span>{% endif %}</td>
+                <td>{% if forloop.first %}<strong>{{ p.name }}</strong><span class="table__sub">{{ p.program_type_name }}{% if p.heights %} · {{ p.heights_label }}{% endif %}{% if p.article_label %} · {{ p.article_label }}{% endif %}</span>{% endif %}</td>
+                <td>{{ c.label }}{% if c.note %}<span class="table__sub">{{ c.note }}</span>{% endif %}</td>
+                <td>{{ c.conditions|default:"—" }}</td>
               </tr>
             {% endfor %}
           {% endfor %}

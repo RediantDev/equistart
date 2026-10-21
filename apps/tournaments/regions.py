@@ -133,6 +133,8 @@ def region_timezone(region: str, chosen: str | None = None) -> str:
 
 def tz_label(tz: str) -> str:
     """Подпись пояса для людей: «московское время» или «время UTC+5»."""
+    if not tz:
+        return ""
     if tz in TZ_LABELS:
         return TZ_LABELS[tz]
     import datetime

@@ -55,11 +55,11 @@ class Base(TestCase):
     def make_tournament(self):
         v = Venue.objects.create(name="КСК", region="mos", settlement="Н", timezone="Europe/Moscow", created_by=self.org)
         t = Tournament.objects.create(owner=self.org, title="Кубок", starts_on=self.start, ends_on=self.start, venue=v, timezone="Europe/Moscow",
-                                      organizer_name="КСК", entry_deadline=self.start - datetime.timedelta(days=2))
+                                      contact_name="КСК", contact="+7 900 000-00-00", entry_deadline=self.start - datetime.timedelta(days=2))
         t.regulation.save("p.pdf", SimpleUploadedFile("p.pdf", PDF))
-        p = ProgramItem.objects.create(tournament=t, day=self.start, discipline="jumping", name="Маршрут №1", program_type="jumping_clear", result_fields=["penalties"], limit=3)
-        TournamentClass.objects.create(program=p, name="Дети", min_age=10, max_age=14)
-        TournamentClass.objects.create(program=p, name="Открытый", limit=2)
+        p = ProgramItem.objects.create(tournament=t, day=self.start, discipline="jumping", name="Маршрут №1", program_type="manual", result_fields=["penalties"], heights=[80])
+        TournamentClass.objects.create(program=p, name="Дети", birth_year_from=self.start.year - 14, birth_year_to=self.start.year - 10)
+        TournamentClass.objects.create(program=p, name="Открытый")
         tservices.submit(self.org, t.pk, t.revision)
         t.refresh_from_db()
         tservices.approve(self.mod, t.pk, t.revision)
@@ -191,7 +191,7 @@ class SubmitTests(Base):
     def test_age_and_rank_conditions(self):
         with self.assertRaises(ValueError) as cm:
             self.submit(self.coach, [services.Line(self.a2, self.h1, self.c_kids)])
-        self.assertIn("не проходит по возрасту", cm.exception.args[0][0])
+        self.assertIn("г.р.", cm.exception.args[0][0])
         self.a1.birth_date = None
         self.a1.save()
         with self.assertRaises(ValueError) as cm:
@@ -207,13 +207,26 @@ class SubmitTests(Base):
         app = self.submit(self.coach, [services.Line(self.a2, self.h2, self.c_open)])
         self.assertEqual(app.entries.get().horse, self.h2)
 
-    def test_class_limit(self):
-        a3 = Athlete.objects.create(last_name="Ким", first_name="Ал", manager=self.coach, consent_confirmed_at=timezone.now())
-        self.submit(self.coach, [services.Line(self.a2, self.h1, self.c_open), services.Line(a3, self.h1, self.c_open)])
-        a4 = Athlete.objects.create(last_name="Петров", first_name="Пётр", manager=self.coach, consent_confirmed_at=timezone.now())
+    def test_height_required_for_multi_height_route(self):
+        p = self.c_open.program
+        p.heights = [80, 100]
+        p.save()
         with self.assertRaises(ValueError) as cm:
-            self.submit(self.coach, [services.Line(a4, self.h1, self.c_open)], key="k3")
-        self.assertIn("не осталось мест", cm.exception.args[0][0])
+            self.submit(self.coach, [services.Line(self.a2, self.h1, self.c_open)])
+        self.assertIn("высоту", cm.exception.args[0][0])
+        app = self.submit(self.coach, [services.Line(self.a2, self.h1, self.c_open, 100)], key="k2")
+        self.assertEqual(app.entries.get().height, 100)
+
+    def test_rules_warnings_do_not_block(self):
+        from apps.sport.rules import entry_warnings
+
+        young = Horse.objects.create(name="Малыш", birth_year=self.start.year - 4, color="bay", sex="mare", breed="x", manager=self.coach)
+        p = self.c_open.program
+        p.heights = [130]
+        p.save()
+        w = entry_warnings(self.t, [services.Line(self.a2, young, self.c_open)])
+        self.assertTrue(any("п. 2.3" in x for x in w))
+        self.submit(self.coach, [services.Line(self.a2, young, self.c_open)])  # подача не запрещена
 
     def test_duplicate_entry_rejected(self):
         self.submit(self.coach, [services.Line(self.a2, self.h1, self.c_open)])
@@ -236,8 +249,10 @@ class SubmitTests(Base):
     def test_apply_page_flow(self):
         self.client.force_login(self.coach)
         url = reverse("entries:apply", args=[self.t.pk])
-        self.client.post(url, {"action": "add", "athlete": self.a1.pk, "horse": self.h1.pk, "tclass": self.c_kids.pk})
+        self.client.post(url, {"action": "pair_add", "athlete": self.a1.pk, "horse": self.h1.pk})
         resp = self.client.get(url)
+        self.assertContains(resp, self.c_kids.name)
+        self.client.post(url, {"action": "add", "a": self.a1.pk, "h": self.h1.pk, "tclass": self.c_kids.pk})
         resp = self.client.post(url, {"action": "submit", "contact_name": "Мария", "contact_phone": "+7 999 000-10-03"})
         app = Application.objects.get()
         self.assertRedirects(resp, reverse("entries:application", args=[app.pk]))

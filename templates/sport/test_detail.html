@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ test.name }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'sport:test_list' %}">← Езды выездки</a>
+    <h1 class="h1">{{ test.name }}</h1>
+    <p class="muted">{{ test.get_kind_display }} · манеж {{ test.get_arena_display }}{% if test.duration_min %} · {{ test.duration_min }} мин{% endif %}{% if test.min_horse_age %} · лошади от {{ test.min_horse_age }} лет{% endif %}{% if test.is_official %} · официальная{% else %} · клубная{% endif %}</p>
+    <p class="table__sub">Штрафы: {{ scheme|default:"не выбраны" }} · при равенстве: {{ test.get_tie_rule_display|default:"—" }}{% if test.source %} · источник: {{ test.source }}{% endif %}</p>
+  </div>
+  <div class="chips">
+    {% if can_edit %}<a class="btn btn--dark" href="{% url 'sport:test_edit' test.pk %}">Изменить</a>{% endif %}
+    <a class="btn btn--ghost" href="{% url 'sport:test_new' %}?from={{ test.pk }}">Скопировать</a>
+  </div>
+</div>
+{% for part in parts %}
+  <section class="card">
+    <h2 class="h3">{{ part.p.title }} <span class="table__sub">максимум {{ part.max }} · шаг {{ part.p.step|default:"0.5" }}</span></h2>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th class="num">№</th><th>Буквы</th><th>Упражнение / оценка</th><th class="num">Коэф.</th></tr></thead>
+      <tbody>{% for it in part.items %}<tr><td class="num">{{ it.n|default:"" }}</td><td>{{ it.letters|default:"" }}</td><td>{{ it.text }}</td><td class="num">{{ it.coef }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+{% endfor %}
+{% endblock %}

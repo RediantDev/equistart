@@ -1,33 +1,69 @@
 {% extends "tournaments/_wizard.html" %}
 {% block step %}
-<form method="post" enctype="multipart/form-data" novalidate class="card form" style="margin-top: 0;">
-  {% csrf_token %}
-  <input type="hidden" name="revision" value="{{ t.revision }}">
-  {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
+<div class="wizard-main">
+  {% if problems %}
+    <section class="card" style="border-color: var(--danger);">
+      <h2 class="h3">Что нужно заполнить перед отправкой</h2>
+      <ul class="list">
+        {% for p in problems %}
+          <li class="list__row"><span class="tag">Шаг {{ p.step }}</span><span style="flex: 1;">{{ p.text }}</span><a class="btn btn--ghost btn--sm" href="{% url 'tournaments:step' t.pk p.step %}">Исправить</a></li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
 
-  <div class="form__group">
-    <h2 class="h3">Положение о соревновании</h2>
-    {% if t.regulation %}
-      <p>Загружено: <a href="{% url 'tournaments:regulation_working' t.pk %}" target="_blank" rel="noopener">открыть положение (PDF)</a>. Чтобы заменить, выберите новый файл.</p>
-    {% endif %}
-    <div class="field{% if form.regulation.errors %} field--error{% endif %}">
-      <label class="field__label" for="{{ form.regulation.id_for_label }}">{% if t.regulation %}Новый файл{% else %}Файл положения{% endif %}</label>
-      <input type="file" name="regulation" id="{{ form.regulation.id_for_label }}" accept="application/pdf">
-      <p class="field__help">{{ form.regulation.help_text }}</p>
-      {% for error in form.regulation.errors %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ error }}</p>{% endfor %}
+  <section class="card">
+    <div class="section-head">
+      <h2 class="h3" style="margin: 0;">Так турнир увидят участники</h2>
+      {% if t.regulation %}<a class="tag tag--lemon" href="{% url 'tournaments:regulation_working' t.pk %}" target="_blank" rel="noopener">Положение (PDF)</a>{% endif %}
     </div>
-  </div>
+    {% if preview %}{% include "tournaments/_preview.html" %}{% else %}<p class="muted">Заполните основные сведения.</p>{% endif %}
+  </section>
 
-  <div class="form__group" style="border-bottom: 0; padding-bottom: 0;">
-    <h2 class="h3">Сроки и условия</h2>
-    <div class="grid-2">{% include "partials/field.html" with field=form.entry_deadline %}</div>
-    {% include "partials/field.html" with field=form.cancel_terms %}
-  </div>
+  <section class="card">
+    {% if t.status == "review" %}
+      <h2 class="h3">На проверке</h2>
+      <p class="muted">Отправлено {{ t.submitted_at|date:"j E в H:i" }}. Модератор проверит положение, даты, место, программу и цены.</p>
+    {% elif t.status == "approved" %}
+      <h2 class="h3">Опубликовано</h2>
+      <p class="muted">Турнир виден в календаре. Любое изменение условий снова отправит его на проверку; до одобрения участники видят опубликованную версию.</p>
+    {% else %}
+      <h2 class="h3">Отправить на проверку</h2>
+      <p class="muted">Модератор проверит положение и сведения. После одобрения турнир появится в календаре.</p>
+      <form method="post" class="form-actions" style="justify-content: flex-start;">
+        {% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}">
+        <button type="submit" class="btn btn--primary"{% if problems %} disabled{% endif %}>Отправить на проверку</button>
+      </form>
+    {% endif %}
+  </section>
 
-  <div class="form-actions">
-    <a class="btn btn--ghost" href="{% url 'tournaments:step' t.pk 3 %}">← Зачёты и цены</a>
-    <button type="submit" name="save" class="btn btn--ghost"{% if t.is_locked %} disabled{% endif %}>Сохранить</button>
-    <button type="submit" name="next" class="btn btn--primary"{% if t.is_locked %} disabled{% endif %}>Далее: проверка</button>
-  </div>
-</form>
+  {% if t.publication == "published" or not t.is_published and t.status != "review" %}
+  <details class="card danger-zone">
+    <summary class="h3">{% if t.is_published %}Отменить соревнование{% else %}Удалить черновик{% endif %}</summary>
+    {% if t.is_published %}
+      <form method="post" action="{% url 'tournaments:cancel' t.pk %}" class="form">
+        {% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}">
+        <p class="muted">Отмена сразу видна в календаре.</p>
+        <div class="field"><label class="field__label" for="reason">Причина отмены — увидят участники</label><textarea id="reason" name="reason" rows="3" required></textarea></div>
+        <div class="form-actions" style="justify-content: flex-start;"><button type="submit" class="btn btn--danger">Отменить «{{ t.title }}»</button></div>
+      </form>
+    {% else %}
+      <form method="post" action="{% url 'tournaments:delete' t.pk %}" class="form">
+        {% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}">
+        <p class="muted">Черновик «{{ t.title }}» и его программа будут удалены без возможности восстановления.</p>
+        <div class="form-actions" style="justify-content: flex-start;"><button type="submit" class="btn btn--danger">Удалить черновик</button></div>
+      </form>
+    {% endif %}
+  </details>
+  {% endif %}
+
+  {% if history %}
+  <details class="card">
+    <summary class="h3">История</summary>
+    <ul class="list">
+      {% for h in history %}<li class="list__row"><span class="num muted" style="min-width: 120px;">{{ h.created_at|date:"d.m.Y H:i" }}</span><span style="flex: 1;">{{ h.label }}{% if h.data.name %} «{{ h.data.name }}»{% endif %}{% if h.data.comment %}: «{{ h.data.comment }}»{% endif %}</span><span class="muted">{{ h.actor.short_name|default:"" }}</span></li>{% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+</div>
 {% endblock %}

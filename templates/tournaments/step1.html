@@ -32,9 +32,15 @@
   </div>
 
   <div class="form__group" style="border-bottom: 0; padding-bottom: 0;">
-    <h2 class="h3">Организатор</h2>
-    {% include "partials/field.html" with field=form.organizer_name %}
-    {% include "partials/field.html" with field=form.contact %}
+    <h2 class="h3">Статус и контакт</h2>
+    <div class="grid-2">
+      {% include "partials/field.html" with field=form.level %}
+      {% include "partials/field.html" with field=form.classification %}
+    </div>
+    <div class="grid-2">
+      {% include "partials/field.html" with field=form.contact_name %}
+      {% include "partials/field.html" with field=form.contact %}
+    </div>
   </div>
 
   <div class="form-actions">

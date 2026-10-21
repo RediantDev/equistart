@@ -15,6 +15,7 @@ urlpatterns = [
     path("organizer/t/<int:pk>/programs/<int:item_id>/save/", views.program_save, name="program_save"),
     path("organizer/t/<int:pk>/programs/<int:item_id>/delete/", views.program_delete, name="program_delete"),
     path("organizer/t/<int:pk>/programs/<int:program_id>/classes/add/", views.class_save, name="class_add"),
+    path("organizer/t/<int:pk>/programs/<int:program_id>/classes/from-template/", views.class_from_template, name="class_from_template"),
     path("organizer/t/<int:pk>/programs/<int:program_id>/classes/<int:class_id>/", views.class_edit, name="class_edit"),
     path("organizer/t/<int:pk>/programs/<int:program_id>/classes/<int:class_id>/save/", views.class_save, name="class_save"),
     path("organizer/t/<int:pk>/programs/<int:program_id>/classes/<int:class_id>/delete/", views.class_delete, name="class_delete"),

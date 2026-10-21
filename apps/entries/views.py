@@ -20,9 +20,6 @@ from . import services
 from .models import Application, ChangeProposal, Entry
 from .services import Conflict, Line
 
-MAX_PARTNERS = 3
-
-
 # ---------------- корзина заявки (в сессии) ----------------
 
 def _cart_key(t, late):
@@ -31,8 +28,8 @@ def _cart_key(t, late):
 
 def _cart(request, t, late):
     cart = request.session.get(_cart_key(t, late))
-    if not cart:
-        cart = {"lines": [], "horses": [], "key": uuid.uuid4().hex}
+    if not cart or "pairs" not in cart:
+        cart = {"pairs": [], "lines": [], "horses": [], "key": uuid.uuid4().hex}
     return cart
 
 
@@ -47,8 +44,8 @@ def _load_lines(cart):
         try:
             line = Line(
                 Athlete.objects.get(pk=raw["a"]), Horse.objects.get(pk=raw["h"]),
-                TournamentClass.objects.select_related("program").get(pk=raw["c"]),
-                partners=[(Athlete.objects.get(pk=a), Horse.objects.get(pk=h)) for a, h in raw.get("p", [])],
+                TournamentClass.objects.select_related("program", "merged_into").get(pk=raw["c"]),
+                raw.get("ht"), bool(raw.get("cf")),
             )
         except (Athlete.DoesNotExist, Horse.DoesNotExist, TournamentClass.DoesNotExist):
             continue
@@ -56,18 +53,23 @@ def _load_lines(cart):
     return out
 
 
-def _class_choices(t):
-    classes = TournamentClass.objects.filter(program__tournament=t).select_related("program").order_by("program__day", "program__start_time", "program__position", "position")
-    groups = {}
-    for c in classes:
-        label = f"{c.program.day:%d.%m} · {c.program.name}"
-        groups.setdefault(label, []).append((c.pk, f"{c.name}{' · ' + c.conditions if c.conditions else ''}{' · ' + c.get_composition_display().lower() if c.composition != 'single' else ''}"))
-    return list(groups.items()), {c.pk: c for c in classes}
+def _programs(t):
+    return list(t.programs.all().prefetch_related("classes").order_by("day", "start_time", "position", "id"))
+
+
+def _int(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
 
 
 @login_required
 @require_http_methods(["GET", "POST"])
 def apply(request, pk):
+    """APP-01…04: заявка строится из пар «всадник + лошадь»; у пары — выступления (маршрут/езда + ровно один зачёт)."""
+    from apps.sport import rules
+
     t = get_object_or_404(Tournament, pk=pk)
     late = request.GET.get("late") == "1" or request.POST.get("late") == "1"
     reason = services.tournament_open_for(request.user, t, late)
@@ -76,40 +78,70 @@ def apply(request, pk):
         return redirect("tournaments:public", pk=t.pk)
     cart = _cart(request, t, late)
     athletes = list(athletes_for_entry(request.user))
+    by_a = {a.pk: a for a in athletes}
     horse_ids = set(Horse.objects.filter(manager=request.user, archived=False).values_list("pk", flat=True)) | set(cart["horses"])
     horses = list(Horse.objects.filter(pk__in=horse_ids).order_by("name"))
-    class_groups, classes = _class_choices(t)
+    by_h = {h.pk: h for h in horses}
+    programs = _programs(t)
+    classes = {c.pk: c for p in programs for c in p.classes.all()}
+    year = (t.pub_starts_on or t.starts_on).year
     errors = []
-    add_values = {}
 
     if request.method == "POST":
         action = request.POST.get("action") or ("pick" if request.POST.get("pick_horse") else "")
         if action == "pick":
-            hid = request.POST.get("horse")
-            if hid and Horse.objects.filter(pk=hid, archived=False).exists() and int(hid) not in cart["horses"]:
-                cart["horses"].append(int(hid))
+            hid = _int(request.POST.get("horse"))
+            if hid and Horse.objects.filter(pk=hid, archived=False).exists() and hid not in cart["horses"]:
+                cart["horses"].append(hid)
                 _save_cart(request, t, late, cart)
                 messages.success(request, "Лошадь добавлена в список выбора. Она видна только в этой заявке.")
+            return redirect(_apply_url(t, late))
+        if action == "pair_add":
+            a, h = by_a.get(_int(request.POST.get("athlete"))), by_h.get(_int(request.POST.get("horse")))
+            if not a or not h:
+                errors.append("Выберите всадника и лошадь.")
+            elif [a.pk, h.pk] in cart["pairs"]:
+                errors.append("Такая пара уже есть в заявке.")
+            else:
+                cart["pairs"].append([a.pk, h.pk])
+                _save_cart(request, t, late, cart)
+                return redirect(_apply_url(t, late) + f"#pair-{a.pk}-{h.pk}")
+        if action == "pair_remove":
+            pair = [_int(request.POST.get("a")), _int(request.POST.get("h"))]
+            if pair in cart["pairs"]:
+                cart["pairs"].remove(pair)
+                cart["lines"] = [r for r in cart["lines"] if [r["a"], r["h"]] != pair]
+                _save_cart(request, t, late, cart)
             return redirect(_apply_url(t, late))
         if action == "remove":
             try:
                 cart["lines"].pop(int(request.POST.get("index")))
-            except (ValueError, IndexError):
+            except (ValueError, IndexError, TypeError):
                 pass
             _save_cart(request, t, late, cart)
             return redirect(_apply_url(t, late))
         if action == "add":
-            add_values = request.POST
-            line, errors = _parse_line(request, t, athletes, horse_ids, classes)
-            if line and not errors:
-                errors = services.check_line(request.user, t, line, late=late, allowed_athletes={a.pk for a in athletes})
-                if any((r["a"], r["h"], r["c"], tuple(tuple(x) for x in r.get("p", []))) == line.key() for r in cart["lines"]):
+            a, h = by_a.get(_int(request.POST.get("a"))), by_h.get(_int(request.POST.get("h")))
+            c = classes.get(_int(request.POST.get("tclass")))
+            ht = _int(request.POST.get("height"))
+            if c and not (c.program.heights and len(c.program.heights) > 1):
+                ht = None
+            if c and c.height and ht is None:
+                ht = c.height
+            if not (a and h):
+                errors.append("Пара не найдена — добавьте её заново.")
+            elif not c:
+                errors.append("Выберите зачёт.")
+            else:
+                line = Line(a, h, c, ht, request.POST.get("confirm") == "1")
+                errors = services.check_line(request.user, t, line, late=late, allowed_athletes=set(by_a))
+                if any((r["a"], r["h"], r["c"], r.get("ht")) == line.key() for r in cart["lines"]):
                     errors.append("Такое выступление уже есть в заявке.")
-            if not errors:
-                cart["lines"].append({"a": line.athlete.pk, "h": line.horse.pk, "c": line.tclass.pk, "p": [[a.pk, h.pk] for a, h in line.partners]})
-                _save_cart(request, t, late, cart)
-                messages.success(request, "Выступление добавлено в заявку.")
-                return redirect(_apply_url(t, late))
+                if not errors:
+                    cart["lines"].append({"a": a.pk, "h": h.pk, "c": c.pk, "ht": ht, "cf": line.confirmed})
+                    _save_cart(request, t, late, cart)
+                    messages.success(request, f"Добавлено: {a.public_name} / {h.name} — {c.program.name}, {c.label}.")
+                    return redirect(_apply_url(t, late) + f"#pair-{a.pk}-{h.pk}")
         if action == "submit":
             lines = _load_lines(cart)
             try:
@@ -133,53 +165,46 @@ def apply(request, pk):
                 return redirect("entries:application", pk=app.pk)
 
     lines = _load_lines(cart)
+    pairs = []
+    for i_a, i_h in cart["pairs"]:
+        a, h = by_a.get(i_a), Horse.objects.filter(pk=i_h).first()
+        if not a or not h:
+            continue
+        mine = [(i, l) for i, l in enumerate(lines) if l.athlete.pk == a.pk and l.horse.pk == h.pk]
+        progs = []
+        for p in programs:
+            opts = []
+            for c in p.classes.all():
+                if c.merged_into_id:
+                    continue
+                why = services.class_reasons(a, h, c, year, c.height, True)
+                why = [w for w in why if w != "выберите высоту" and not w.startswith("зачёт для высоты")]
+                opts.append({"c": c, "why": why})
+            progs.append({"p": p, "opts": opts, "added": [(i, l) for i, l in mine if l.tclass.program_id == p.pk],
+                          "never": any(o["c"].rank_rule == "never" for o in opts)})
+        pairs.append({"a": a, "h": h, "programs": progs, "count": len(mine)})
+    warnings = rules.entry_warnings(t, lines)
     return render(
         request, "entries/apply.html",
         {
-            "t": t, "s": t.snapshot, "late": late, "lines": list(enumerate(lines)), "errors": errors,
-            "athletes": athletes, "horses": horses, "class_groups": class_groups, "add": add_values,
-            "partner_range": range(1, MAX_PARTNERS + 1), "key": cart["key"],
+            "t": t, "s": t.snapshot, "late": late, "pairs": pairs, "lines": lines, "errors": errors, "warnings": warnings,
+            "athletes": athletes, "horses": horses, "key": cart["key"],
         },
     )
 
 
+def _class_choices(t):
+    classes = TournamentClass.objects.filter(program__tournament=t, merged_into__isnull=True).select_related("program").order_by(
+        "program__day", "program__start_time", "program__position", "height", "position")
+    groups = {}
+    for c in classes:
+        label = f"{c.program.day:%d.%m} · {c.program.name}"
+        groups.setdefault(label, []).append((c.pk, f"{c.label}{' · ' + c.conditions if c.conditions else ''}"))
+    return list(groups.items()), {c.pk: c for c in classes}
+
+
 def _apply_url(t, late):
     return reverse("entries:apply", args=[t.pk]) + ("?late=1" if late else "")
-
-
-def _parse_line(request, t, athletes, horse_ids, classes):
-    errors = []
-    by_id = {a.pk: a for a in athletes}
-
-    def athlete(field):
-        v = request.POST.get(field)
-        return by_id.get(int(v)) if v and v.isdigit() else None
-
-    def horse(field):
-        v = request.POST.get(field)
-        if v and v.isdigit() and int(v) in horse_ids:
-            return Horse.objects.filter(pk=int(v)).first()
-        return None
-
-    a, h = athlete("athlete"), horse("horse")
-    cid = request.POST.get("tclass")
-    c = classes.get(int(cid)) if cid and cid.isdigit() else None
-    if not a:
-        errors.append("Выберите спортсмена.")
-    if not h:
-        errors.append("Выберите лошадь.")
-    if not c:
-        errors.append("Выберите программу и зачёт.")
-    partners = []
-    for i in range(1, MAX_PARTNERS + 1):
-        pa, ph = athlete(f"partner_athlete_{i}"), horse(f"partner_horse_{i}")
-        if pa and ph:
-            partners.append((pa, ph))
-        elif pa or ph:
-            errors.append(f"Партнёр {i}: выберите и спортсмена, и лошадь.")
-    if errors:
-        return None, errors
-    return Line(a, h, c, partners=partners), []
 
 
 # ---------------- мои заявки ----------------
@@ -223,7 +248,7 @@ def application(request, pk):
         raise PermissionDenied
     owner = app.submitted_by_id == request.user.pk
     judge = services.can_judge(request.user, app.tournament)
-    entries = list(app.entries.select_related("tclass", "athlete", "horse").prefetch_related("proposals", "partners"))
+    entries = list(app.entries.select_related("tclass", "athlete", "horse").prefetch_related("proposals"))
     for e in entries:
         e.pending_proposal = next((p for p in e.proposals.all() if p.state == ChangeProposal.State.PENDING), None)
     history = AuditLog.objects.filter(Q(target_type="application", target_id=app.pk) | Q(target_type="entry", target_id__in=[e.pk for e in entries])).select_related("actor")[:50]

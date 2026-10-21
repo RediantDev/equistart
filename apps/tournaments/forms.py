@@ -1,13 +1,10 @@
 import datetime
-from decimal import Decimal, InvalidOperation
-
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 
 from apps.accounts.phone import normalize_phone
 
-from .disciplines import DISCIPLINE_CHOICES, PROGRAM_TYPE_FIELDS, program_type_choices, types_for
 from .models import ProgramItem, TeamMember, Tournament, TournamentClass, Venue
 from .regions import MULTI_ZONE, REGION_CHOICES, region_timezone
 
@@ -35,13 +32,12 @@ class BasicsForm(forms.Form):
         choices=[("", "— выберите —")] + [c for zones in MULTI_ZONE.values() for c in zones],
         help_text="Нужен только для Якутии: в республике три часовых пояса.",
     )
-    organizer_name = forms.CharField(
-        label="Кто проводит соревнование", max_length=200,
-        help_text="Клуб, федерация или организатор — так будет указано на странице турнира.",
-    )
+    level = forms.ChoiceField(label="Статус соревнований", choices=Tournament.Level.choices, initial=Tournament.Level.CLUB, required=False)
+    classification = forms.BooleanField(label="Классификационные (присвоение разрядов)", required=False)
+    contact_name = forms.CharField(label="Контакт для участников: имя", max_length=120, required=False)
     contact = forms.CharField(
-        label="Контакт для участников", max_length=200, required=False,
-        help_text="Телефон или email. Не публикуется — виден участникам после подачи заявки.",
+        label="Контакт для участников: телефон", max_length=200, required=False,
+        help_text="Виден всем на странице турнира.",
     )
 
     def __init__(self, user, *args, **kwargs):
@@ -51,6 +47,7 @@ class BasicsForm(forms.Form):
 
     def clean(self):
         c = super().clean()
+        c["level"] = c.get("level") or Tournament.Level.CLUB
         start, end = c.get("starts_on"), c.get("ends_on")
         if c.get("multiday"):
             if not end:
@@ -75,94 +72,166 @@ class BasicsForm(forms.Form):
 
 
 class ProgramForm(forms.ModelForm):
-    """Шаг 2: элемент программы."""
+    """Шаг 2: маршрут конкура (тип из справочника, высоты, таблица) или езда выездки (из справочника езд)."""
 
-    program_type = forms.ChoiceField(label="Вид программы")
+    heights_text = forms.CharField(
+        label="Высота, см", required=False, max_length=60,
+        help_text="Одна высота или несколько через запятую: «60, 70, 80». Каждая высота — отдельная классификация.",
+    )
 
     class Meta:
         model = ProgramItem
-        fields = ["day", "start_time", "discipline", "name", "program_type", "limit"]
+        fields = ["day", "start_time", "discipline", "name", "program_type", "variant", "table", "dressage_test"]
         widgets = {"start_time": TIME}
-        labels = {"limit": "Лимит участников"}
+        labels = {"program_type": "Тип маршрута", "variant": "Вариант", "table": "Таблица штрафов", "dressage_test": "Езда"}
 
-    def __init__(self, tournament, *args, **kwargs):
+    def __init__(self, tournament, user=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from apps.sport.jumping import ROUTE_CHOICES, ROUTE_TYPES, TABLES
+        from apps.sport.models import DressageTest
+
         self.tournament = tournament
         days = tournament.days()
         self.fields["day"] = forms.TypedChoiceField(
-            label="День",
-            choices=[(d.isoformat(), d.strftime("%d.%m.%Y")) for d in days],
-            coerce=datetime.date.fromisoformat,
+            label="День", choices=[(d.isoformat(), d.strftime("%d.%m.%Y")) for d in days], coerce=datetime.date.fromisoformat,
         )
         if len(days) == 1:
             self.fields["day"].initial = days[0].isoformat()
             self.fields["day"].widget = forms.HiddenInput()
-        self.fields["program_type"].choices = [("", "— выберите —")] + program_type_choices()
-        self.fields["discipline"].choices = [("", "— выберите —")] + DISCIPLINE_CHOICES
-        self.fields["limit"].required = False
+        self.fields["discipline"] = forms.ChoiceField(label="Дисциплина", choices=[("jumping", "Конкур"), ("dressage", "Выездка")],
+                                                      widget=forms.RadioSelect, initial="jumping")
+        self.fields["program_type"] = forms.ChoiceField(label="Тип маршрута", required=False, choices=[("", "— выберите —")] + ROUTE_CHOICES)
+        variants = [(v, f"{r.name}: {label}") for r in ROUTE_TYPES for v, label in r.variants]
+        self.fields["variant"] = forms.ChoiceField(label="Вариант формулы", required=False, choices=[("", "—")] + variants)
+        self.fields["table"] = forms.ChoiceField(label="Таблица штрафов", required=False,
+                                                 choices=[("", "по типу маршрута")] + [(k, v) for k, v in TABLES.items() if k != "STYLE"])
+        owner = user or tournament.owner
+        self.fields["dressage_test"].queryset = DressageTest.objects.filter(is_active=True).filter(Q(is_official=True) | Q(owner=owner))
+        self.fields["dressage_test"].required = False
+        self.fields["dressage_test"].empty_label = "— выберите езду —"
         self.fields["start_time"].required = False
+        self.fields["name"].required = False
+        self.fields["name"].help_text = "Можно не заполнять — название составится из номера, высоты и типа."
+        if self.instance.pk and self.instance.heights:
+            self.fields["heights_text"].initial = ", ".join(str(h) for h in self.instance.heights)
 
     def clean(self):
+        from apps.sport.jumping import route, table_allowed
+
         c = super().clean()
-        d, t = c.get("discipline"), c.get("program_type")
-        if d and t and t not in types_for(d):
-            self.add_error("program_type", "Этот вид программы не относится к выбранной дисциплине.")
+        d = c.get("discipline")
+        if d == "jumping":
+            key = c.get("program_type")
+            if not key:
+                self.add_error("program_type", "Выберите тип маршрута.")
+                return c
+            rt = route(key)
+            raw = (c.get("heights_text") or "").replace(";", ",")
+            try:
+                heights = sorted({int(x.strip()) for x in raw.split(",") if x.strip()})
+            except ValueError:
+                self.add_error("heights_text", "Высоты — целые числа в сантиметрах через запятую.")
+                return c
+            if not heights and not rt.manual:
+                self.add_error("heights_text", "Укажите высоту маршрута.")
+            if any(h < 10 or h > 220 for h in heights):
+                self.add_error("heights_text", "Высота — от 10 до 220 см.")
+            c["heights"] = heights
+            table = c.get("table") or rt.default_table
+            if rt.tables and table not in rt.tables:
+                self.add_error("table", f"Для «{rt.name}» допустимы таблицы: {', '.join(rt.tables)}.")
+            msg = table_allowed(table, max(heights) if heights else None, self.tournament.is_official)
+            if msg:
+                self.add_error("table", msg)
+            c["table"] = table if rt.tables else ""
+            variants = [v for v, _ in rt.variants]
+            if variants and c.get("variant") not in variants:
+                c["variant"] = variants[0] if not c.get("variant") else ""
+                if not c["variant"]:
+                    self.add_error("variant", "Выберите вариант формулы этого маршрута.")
+            elif not variants:
+                c["variant"] = ""
+            c["dressage_test"] = None
+        elif d == "dressage":
+            if not c.get("dressage_test"):
+                self.add_error("dressage_test", "Выберите езду из справочника или создайте свою.")
+            c["program_type"], c["variant"], c["table"], c["heights"] = "dressage_test", "", "", []
         return c
 
     def save(self, commit=True):
         obj = super().save(commit=False)
         obj.tournament = self.tournament
-        if not obj.result_fields or "program_type" in self.changed_data:
-            obj.result_fields = list(PROGRAM_TYPE_FIELDS.get(obj.program_type, ["points"]))
+        obj.heights = self.cleaned_data.get("heights", [])
+        obj.program_type = self.cleaned_data.get("program_type") or obj.program_type
+        test = self.cleaned_data.get("dressage_test")
+        if test and (not obj.test_snapshot or obj.test_snapshot.get("id") != test.pk or "dressage_test" in self.changed_data):
+            obj.test_snapshot = test.snapshot()
+            obj.arena = test.arena
+            if test.duration_min:
+                import math
+
+                obj.slot_minutes = math.ceil(float(test.duration_min)) + 2
+        if not test:
+            obj.test_snapshot = None
+        if obj.program_type == "manual" and not obj.result_fields:
+            obj.result_fields = ["penalties", "time"]
+        if not (obj.name or "").strip():
+            obj.name = self.auto_name(obj)
         if commit:
             obj.save()
         return obj
 
-
-class RubField(forms.CharField):
-    """Сумма в рублях с копейками → целые копейки."""
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.widget.attrs.update({"inputmode": "decimal", "placeholder": "2 500"})
-
-    def clean(self, value):
-        value = super().clean(value)
-        raw = (value or "").replace(" ", "").replace(" ", "").replace("₽", "").replace(",", ".")
-        try:
-            rub = Decimal(raw)
-        except InvalidOperation:
-            raise ValidationError("Введите сумму числом, например 2500 или 2500,50.")
-        if rub < 0:
-            raise ValidationError("Сумма не может быть отрицательной.")
-        if rub > Decimal("10000000"):
-            raise ValidationError("Слишком большая сумма.")
-        kop = rub * 100
-        if kop != kop.to_integral_value():
-            raise ValidationError("Не больше двух знаков после запятой.")
-        return int(kop)
+    def auto_name(self, obj):
+        if obj.discipline == "dressage" and obj.test_snapshot:
+            return f"Езда «{obj.test_snapshot['name']}»"
+        n = self.tournament.programs.filter(discipline="jumping").exclude(pk=obj.pk).count() + 1
+        h = "-".join(str(x) for x in obj.heights)
+        return f"Маршрут №{n}" + (f" · {h} см" if h else "")
 
 
 class ClassForm(forms.ModelForm):
-    """Зачёт и условия участия."""
+    """Зачёт: выбор из шаблонов или свой (TRN-04)."""
 
     class Meta:
         model = TournamentClass
-        fields = ["name", "composition", "min_age", "max_age", "rank_requirement", "limit"]
-        labels = {"rank_requirement": "Разряд / звание", "limit": "Лимит участников"}
-        help_texts = {"rank_requirement": "Необязательно. Например: «II разряд и выше»."}
+        fields = ["name", "height", "birth_year_from", "birth_year_to", "rank_rule", "rank", "horse_age_min", "horse_age_max",
+                  "horse_kind", "height_min", "height_max", "min_pairs", "note"]
+        help_texts = {
+            "birth_year_from": "Самый ранний год рождения (старшие всадники).",
+            "birth_year_to": "Самый поздний год рождения (младшие всадники).",
+            "rank_rule": "«Не ниже» — проверяется автоматически; «никогда не выполнявшие» участник подтверждает в заявке.",
+            "min_pairs": "Если пар меньше, судья может объединить зачёт с другим.",
+        }
 
     def __init__(self, program, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.program = program
-        for f in ("min_age", "max_age", "limit"):
-            self.fields[f].required = False
+        for f in self.fields.values():
+            f.required = False
+        self.fields["name"].required = True
+        if program.heights and len(program.heights) > 1:
+            self.fields["height"] = forms.TypedChoiceField(
+                label="Высота", coerce=int, empty_value=None, required=False,
+                choices=[("", "для всех высот")] + [(h, f"{h} см") for h in program.heights])
+        else:
+            del self.fields["height"]
 
     def clean(self):
         c = super().clean()
-        lo, hi = c.get("min_age"), c.get("max_age")
-        if lo and hi and hi < lo:
-            self.add_error("max_age", "Верхняя граница возраста меньше нижней.")
+        a, b = c.get("birth_year_from"), c.get("birth_year_to")
+        if a and b and b < a:
+            self.add_error("birth_year_to", "Год «по» раньше года «с».")
+        for f in ("birth_year_from", "birth_year_to"):
+            y = c.get(f)
+            if y and not 1920 <= y <= datetime.date.today().year + 1:
+                self.add_error(f, "Проверьте год рождения.")
+        h1, h2 = c.get("horse_age_min"), c.get("horse_age_max")
+        if h1 and h2 and h2 < h1:
+            self.add_error("horse_age_max", "Верхняя граница меньше нижней.")
+        if c.get("rank_rule") and not c.get("rank"):
+            self.add_error("rank", "Выберите разряд для условия.")
+        if c.get("rank") and not c.get("rank_rule"):
+            self.add_error("rank_rule", "Выберите условие: «не ниже» или «никогда не выполнявшие».")
         return c
 
     def save(self, commit=True):

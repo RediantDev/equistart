@@ -25,6 +25,7 @@ class SeedDemoTests(TestCase):
         self.assertEqual(Tournament.objects.count(), 1)
         t = Tournament.objects.get()
         self.assertEqual(t.publication, "published")
-        self.assertEqual(Entry.objects.filter(tournament=t).count(), 6)
+        self.assertEqual(Entry.objects.filter(tournament=t).count(), 8)
+        self.assertTrue(t.programs.get(discipline="dressage").test_snapshot)
         self.assertTrue(User.objects.get(phone="+79990000005").check_password("Demo-Pass-2026"))
         self.assertEqual(self.client.get(f"/t/{t.pk}/?tab=starts").status_code, 200)

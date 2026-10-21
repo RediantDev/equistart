@@ -28,7 +28,7 @@
               <div class="entry-row__main">
                 <strong>{{ e.athlete_snapshot.name }}</strong> на <strong>{{ e.horse_snapshot.name }}</strong>
                 <span class="table__sub">{{ e.program_name }} · {{ e.class_name }} · {{ e.day|date:"j E" }}</span>
-                {% for p in e.partners_snapshot %}<span class="table__sub">+ {{ p.athlete.name }} / {{ p.horse.name }}</span>{% endfor %}
+                {% if e.height %}<span class="table__sub">{{ e.height }} см</span>{% endif %}
                 {% if e.decision == "rejected" and e.decision_reason and show_contacts %}<span class="table__sub" style="color: var(--danger);">Причина: {{ e.decision_reason }}</span>{% endif %}
                 {% if e.decision == "cancelled" and e.cancel_reason and show_contacts %}<span class="table__sub">Причина отмены: {{ e.cancel_reason }}</span>{% endif %}
                 {% if e.pending_proposal %}

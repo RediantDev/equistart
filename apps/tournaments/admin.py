@@ -6,7 +6,7 @@ from .models import ProgramItem, TeamMember, Tournament, TournamentClass, Venue
 class ProgramInline(admin.TabularInline):
     model = ProgramItem
     extra = 0
-    fields = ("day", "start_time", "discipline", "name", "program_type", "limit")
+    fields = ("day", "start_time", "discipline", "name", "program_type", "table", "heights")
 
 
 @admin.register(Tournament)

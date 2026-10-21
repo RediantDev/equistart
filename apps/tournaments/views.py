@@ -25,11 +25,11 @@ from .services import Conflict
 
 STEPS = [
     (1, "Основные сведения"),
-    (2, "Дисциплины и программа"),
-    (3, "Зачёты и цены"),
-    (4, "Положение и условия"),
-    (5, "Проверка и отправка"),
+    (2, "Программа и зачёты"),
+    (3, "Положение и условия"),
+    (4, "Проверка и отправка"),
 ]
+LAST = len(STEPS)
 CONFLICT_MSG = "Данные турнира изменились в другой вкладке или другим пользователем. Страница обновлена — проверьте и повторите."
 
 
@@ -47,7 +47,7 @@ def _managed(request, pk, lock=False) -> Tournament:
 def _editable_or_redirect(request, t):
     if t.is_locked:
         messages.error(request, "Турнир на проверке у модератора — редактирование откроется после решения.")
-        return redirect("tournaments:step", pk=t.pk, step=5)
+        return redirect("tournaments:step", pk=t.pk, step=LAST)
     return None
 
 
@@ -60,9 +60,9 @@ def _step_state(t):
 
 def _wizard_ctx(t, step, **extra):
     probs, bad = _step_state(t)
-    first_bad = min(bad) if bad else 6
+    first_bad = min(bad) if bad else LAST + 1
     steps = [
-        {"n": n, "name": name, "done": n not in bad and n < 5, "current": n == step, "reachable": n <= first_bad or n <= step}
+        {"n": n, "name": name, "done": n not in bad and n < LAST, "current": n == step, "reachable": n <= first_bad or n <= step}
         for n, name in STEPS
     ]
     ctx = {"t": t, "step": step, "steps": steps, "problems": probs, "first_bad": first_bad}
@@ -93,7 +93,7 @@ def create(request):
         messages.info(request, "Чтобы создавать соревнования, добавьте роль «Организатор», «Судья» или «Клуб».")
         return redirect("accounts:add_role")
     last = Tournament.objects.filter(owner=request.user).select_related("venue").order_by("-created_at").first()
-    initial = {"organizer_name": last.organizer_name, "contact": last.contact, "venue": last.venue_id} if last else {}
+    initial = {"contact_name": last.contact_name, "contact": last.contact, "venue": last.venue_id, "level": last.level} if last else {}
     form = BasicsForm(request.user, request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
@@ -125,8 +125,10 @@ def _apply_basics(request, t, form):
     t.ends_on = c["ends_on"]
     t.venue = venue
     t.timezone = venue.timezone
-    t.organizer_name = c["organizer_name"].strip()
+    t.contact_name = c.get("contact_name", "").strip()
     t.contact = c.get("contact", "").strip()
+    t.level = c.get("level") or Tournament.Level.CLUB
+    t.classification = bool(c.get("classification"))
 
 
 # ---------------- шаги мастера ----------------
@@ -134,12 +136,12 @@ def _apply_basics(request, t, form):
 @login_required
 @require_http_methods(["GET", "POST"])
 def step(request, pk, step):
-    if step not in (1, 2, 3, 4, 5):
+    if step not in range(1, LAST + 1):
         raise Http404
     t = _managed(request, pk)
-    if request.method == "GET" and step not in (5,) and not t.is_locked:
+    if request.method == "GET" and step != LAST and not t.is_locked:
         probs, bad = _step_state(t)
-        first_bad = min(bad) if bad else 6
+        first_bad = min(bad) if bad else LAST + 1
         if step > first_bad:
             messages.error(request, "Сначала заполните предыдущий шаг.")
             return redirect("tournaments:step", pk=t.pk, step=first_bad)
@@ -148,10 +150,8 @@ def step(request, pk, step):
     if step == 2:
         return render(request, "tournaments/step2.html", _wizard_ctx(t, 2, **_step2_ctx(t)))
     if step == 3:
-        return render(request, "tournaments/step3.html", _wizard_ctx(t, 3, **_step3_ctx(t)))
-    if step == 4:
-        return _step4(request, t)
-    return _step5(request, t)
+        return _step3(request, t)
+    return _step4(request, t)
 
 
 def _step1(request, t):
@@ -179,22 +179,33 @@ def _step1(request, t):
             request.user,
             initial={
                 "title": t.title, "starts_on": t.starts_on, "ends_on": t.ends_on, "multiday": t.is_multiday,
-                "venue": t.venue_id, "organizer_name": t.organizer_name, "contact": t.contact,
+                "venue": t.venue_id, "contact_name": t.contact_name, "contact": t.contact,
+                "level": t.level, "classification": t.classification,
             },
         )
     return render(request, "tournaments/step1.html", _wizard_ctx(t, 1, form=form))
 
 
-def _step2_ctx(t, form=None, editing=None):
+def _step2_ctx(t, form=None, editing=None, class_form=None, class_program=None, editing_class=None, user=None):
+    from apps.sport.jumping import ROUTE_TYPES
+    from apps.sport.models import ClassTemplate
+
     days = t.days()
-    programs = list(t.programs.all().prefetch_related("classes"))
+    programs = list(t.programs.all().prefetch_related("classes").select_related("dressage_test"))
+    for p in programs:
+        if class_program is not None and p.pk == class_program.pk:
+            p.form, p.editing_class, p.form_open = class_form, editing_class, True
+        else:
+            p.form, p.editing_class, p.form_open = ClassForm(p), None, False
     by_day = [{"day": d, "programs": [p for p in programs if p.day == d]} for d in days]
     orphans = [p for p in programs if p.day not in days]
     return {
         "by_day": by_day,
         "orphans": orphans,
-        "form": form or ProgramForm(t, initial={"day": days[0].isoformat()} if days else None),
+        "form": form or ProgramForm(t, user, initial={"day": days[0].isoformat(), "discipline": "jumping"} if days else None),
         "editing": editing,
+        "templates": ClassTemplate.objects.filter(is_active=True),
+        "route_types": ROUTE_TYPES,
         "discipline_colors": DISCIPLINE_COLORS,
     }
 
@@ -206,9 +217,9 @@ def program_save(request, pk, item_id=None):
     if (r := _editable_or_redirect(request, t)):
         return r
     instance = get_object_or_404(ProgramItem, pk=item_id, tournament=t) if item_id else None
-    form = ProgramForm(t, request.POST, instance=instance)
+    form = ProgramForm(t, request.user, request.POST, instance=instance)
     if not form.is_valid():
-        return render(request, "tournaments/step2.html", _wizard_ctx(t, 2, **_step2_ctx(t, form=form, editing=instance)), status=422)
+        return render(request, "tournaments/step2.html", _wizard_ctx(t, 2, **_step2_ctx(t, form=form, editing=instance, user=request.user)), status=422)
     try:
         with transaction.atomic():
             locked = _managed(request, pk, lock=True)
@@ -223,7 +234,7 @@ def program_save(request, pk, item_id=None):
     except Conflict:
         messages.error(request, CONFLICT_MSG)
         return redirect("tournaments:step", pk=pk, step=2)
-    messages.success(request, f"Программа «{obj.name}» сохранена.")
+    messages.success(request, f"«{obj.name}» сохранено.")
     return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + f"#program-{obj.pk}")
 
 
@@ -234,8 +245,8 @@ def program_edit(request, pk, item_id):
     if (r := _editable_or_redirect(request, t)):
         return r
     item = get_object_or_404(ProgramItem, pk=item_id, tournament=t)
-    form = ProgramForm(t, instance=item, initial={"day": item.day.isoformat()})
-    return render(request, "tournaments/step2.html", _wizard_ctx(t, 2, **_step2_ctx(t, form=form, editing=item)))
+    form = ProgramForm(t, request.user, instance=item, initial={"day": item.day.isoformat()})
+    return render(request, "tournaments/step2.html", _wizard_ctx(t, 2, **_step2_ctx(t, form=form, editing=item, user=request.user)))
 
 
 @login_required
@@ -257,20 +268,10 @@ def program_delete(request, pk, item_id):
         messages.error(request, CONFLICT_MSG)
         return redirect("tournaments:step", pk=pk, step=2)
     except ProtectedError:
-        messages.error(request, "На эту программу уже поданы заявки — удалить её нельзя. Отмените заявки или измените программу.")
+        messages.error(request, "Уже поданы заявки — удалить нельзя. Отмените заявки или измените маршрут.")
         return redirect("tournaments:step", pk=pk, step=2)
-    messages.success(request, f"Программа «{name}» удалена вместе с её зачётами.")
+    messages.success(request, f"«{name}» удалено из программы вместе с зачётами.")
     return redirect("tournaments:step", pk=pk, step=2)
-
-
-def _step3_ctx(t, form=None, form_program=None, editing=None):
-    programs = list(t.programs.all().prefetch_related("classes"))
-    for p in programs:
-        if form is not None and form_program is not None and p.pk == form_program.pk:
-            p.form = form
-        else:
-            p.form = ClassForm(p)
-    return {"programs": programs, "editing": editing}
 
 
 @login_required
@@ -284,8 +285,8 @@ def class_save(request, pk, program_id, class_id=None):
     form = ClassForm(program, request.POST, instance=instance)
     if not form.is_valid():
         return render(
-            request, "tournaments/step3.html",
-            _wizard_ctx(t, 3, **_step3_ctx(t, form=form, form_program=program, editing=instance)), status=422,
+            request, "tournaments/step2.html",
+            _wizard_ctx(t, 2, **_step2_ctx(t, class_form=form, class_program=program, editing_class=instance, user=request.user)), status=422,
         )
     try:
         with transaction.atomic():
@@ -300,9 +301,9 @@ def class_save(request, pk, program_id, class_id=None):
             audit(request.user, "class.save", locked, tclass=obj.pk, name=obj.name)
     except Conflict:
         messages.error(request, CONFLICT_MSG)
-        return redirect("tournaments:step", pk=pk, step=3)
+        return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + "#programs")
     messages.success(request, f"Зачёт «{obj.name}» сохранён.")
-    return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 3}) + f"#program-{program.pk}")
+    return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + f"#program-{program.pk}")
 
 
 @login_required
@@ -314,7 +315,42 @@ def class_edit(request, pk, program_id, class_id):
     program = get_object_or_404(ProgramItem, pk=program_id, tournament=t)
     item = get_object_or_404(TournamentClass, pk=class_id, program=program)
     form = ClassForm(program, instance=item)
-    return render(request, "tournaments/step3.html", _wizard_ctx(t, 3, **_step3_ctx(t, form=form, form_program=program, editing=item)))
+    return render(request, "tournaments/step2.html", _wizard_ctx(t, 2, **_step2_ctx(t, class_form=form, class_program=program, editing_class=item, user=request.user)))
+
+
+@login_required
+@require_POST
+def class_from_template(request, pk, program_id):
+    """Зачёт из шаблона одним нажатием: годы рождения считаются от года турнира (TRN-04)."""
+    from apps.sport.models import ClassTemplate
+
+    t = _managed(request, pk)
+    if (r := _editable_or_redirect(request, t)):
+        return r
+    program = get_object_or_404(ProgramItem, pk=program_id, tournament=t)
+    tpl = get_object_or_404(ClassTemplate, pk=request.POST.get("template"), is_active=True)
+    height = request.POST.get("height") or None
+    if height is not None:
+        try:
+            height = int(height)
+        except ValueError:
+            height = None
+        if height not in (program.heights or []):
+            height = None
+    try:
+        with transaction.atomic():
+            locked = _managed(request, pk, lock=True)
+            services.check_revision(locked, request.POST.get("revision"))
+            data = tpl.for_year((locked.starts_on or timezone.localdate()).year)
+            obj = TournamentClass.objects.create(program=program, template=tpl, height=height, position=program.classes.count(), **data)
+            locked.mark_changed()
+            locked.save()
+            audit(request.user, "class.save", locked, tclass=obj.pk, name=obj.name, template=tpl.pk)
+    except Conflict:
+        messages.error(request, CONFLICT_MSG)
+        return redirect("tournaments:step", pk=pk, step=2)
+    messages.success(request, f"Зачёт «{obj.label}» добавлен: {obj.conditions or 'без ограничений'}. Условия можно поправить.")
+    return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + f"#program-{program.pk}")
 
 
 @login_required
@@ -334,15 +370,15 @@ def class_delete(request, pk, program_id, class_id):
             audit(request.user, "class.delete", t, name=name)
     except Conflict:
         messages.error(request, CONFLICT_MSG)
-        return redirect("tournaments:step", pk=pk, step=3)
+        return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + "#programs")
     except ProtectedError:
         messages.error(request, "В этот зачёт уже поданы заявки — удалить его нельзя.")
-        return redirect("tournaments:step", pk=pk, step=3)
+        return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + "#programs")
     messages.success(request, f"Зачёт «{name}» удалён.")
-    return redirect("tournaments:step", pk=pk, step=3)
+    return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + "#programs")
 
 
-def _step4(request, t):
+def _step3(request, t):
     if request.method == "POST":
         if (r := _editable_or_redirect(request, t)):
             return r
@@ -362,18 +398,18 @@ def _step4(request, t):
                         locked.regulation = None
                     locked.mark_changed()
                     locked.save()
-                    audit(request.user, "tournament.edit", locked, step=4, new_regulation=bool(new_file))
+                    audit(request.user, "tournament.edit", locked, step=3, new_regulation=bool(new_file))
             except Conflict:
                 messages.error(request, CONFLICT_MSG)
-                return redirect("tournaments:step", pk=t.pk, step=4)
+                return redirect("tournaments:step", pk=t.pk, step=3)
             messages.success(request, "Сохранено.")
-            return redirect("tournaments:step", pk=t.pk, step=5 if "next" in request.POST else 4)
+            return redirect("tournaments:step", pk=t.pk, step=4 if "next" in request.POST else 3)
     else:
         form = TermsForm(instance=t)
-    return render(request, "tournaments/step4.html", _wizard_ctx(t, 4, form=form))
+    return render(request, "tournaments/step3.html", _wizard_ctx(t, 3, form=form))
 
 
-def _step5(request, t):
+def _step4(request, t):
     if request.method == "POST":
         try:
             services.submit(request.user, t.pk, request.POST.get("revision"))
@@ -383,10 +419,10 @@ def _step5(request, t):
             messages.error(request, "Не всё заполнено — исправьте пункты ниже.")
         else:
             messages.success(request, "Турнир отправлен на проверку. Мы сообщим о решении модератора в кабинете.")
-        return redirect("tournaments:step", pk=t.pk, step=5)
+        return redirect("tournaments:step", pk=t.pk, step=LAST)
     preview = services.build_snapshot(t) if t.starts_on else None
     history = AuditLog.objects.filter(target_type="tournament", target_id=t.pk).select_related("actor")[:20]
-    return render(request, "tournaments/step5.html", _wizard_ctx(t, 5, preview=preview, history=history, tz_label=tz_label(t.timezone) if t.timezone else ""))
+    return render(request, "tournaments/step4.html", _wizard_ctx(t, LAST, preview=preview, history=history, tz_label=tz_label(t.timezone) if t.timezone else ""))
 
 
 @login_required
@@ -396,7 +432,7 @@ def delete(request, pk):
         services.delete_draft(request.user, pk, request.POST.get("revision"))
     except Conflict:
         messages.error(request, "Удалить можно только неопубликованный черновик, который не на проверке.")
-        return redirect("tournaments:step", pk=pk, step=5)
+        return redirect("tournaments:step", pk=pk, step=LAST)
     messages.success(request, "Черновик удалён.")
     return redirect("tournaments:mine")
 
@@ -412,7 +448,7 @@ def cancel(request, pk):
         messages.error(request, str(e))
     else:
         messages.success(request, "Соревнование отменено. В календаре оно отмечено как отменённое.")
-    return redirect("tournaments:step", pk=pk, step=5)
+    return redirect("tournaments:step", pk=pk, step=LAST)
 
 
 @login_required
@@ -669,8 +705,7 @@ def _public_tabs(request, t):
             for c in p.classes.all():
                 pub = pubs.get(c.pk)
                 if pub:
-                    keys = p.result_fields
-                    rows = [dict(r, cells=[r["values"].get(k) for k in keys]) for r in pub.rows]
+                    rows = [r if "cells" in r else dict(r, cells=[r["values"].get(k) for k in p.result_fields]) for r in pub.rows]
                     results.append({"p": p, "c": c, "pub": pub, "rows": rows})
     return {"tab": tab, "starts": starts, "results": results}
 
