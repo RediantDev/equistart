@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Лист {{ pos.letter }} · {{ p.name }} — EquiStart{% endblock %}
+{% block content %}
+<div class="sheet" id="sheet" data-mark-url="{% url 'conduct:judge_mark' t.pk p.pk pos.letter %}">
+  <div class="live__head">
+    <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← {{ p.name }}</a>
+    <h1 class="h3" style="margin: 0;">Судья {{ pos.letter }}{% if pos.role != "all" %} · {{ pos.get_role_display }}{% endif %} — {{ pos.judge_name }}</h1>
+    {% if test %}<div class="table__sub">{{ test.name }} · манеж {{ test.arena }}</div>{% endif %}
+  </div>
+
+  {% if not queue %}
+    <div class="card empty"><h2 class="h3">Пар пока нет</h2><p class="muted">Здесь появятся принятые выступления в стартовом порядке.</p></div>
+  {% else %}
+  <nav class="pair-strip" aria-label="Пары">
+    {% for e, s, sh in queue %}<a class="pair-strip__item{% if e.pk == entry.pk %} is-active{% endif %}{% if sh.signed %} is-done{% elif sh.returned_reason %} is-returned{% endif %}" href="?entry={{ e.pk }}">{% if s %}{{ s.position }}. {% endif %}{{ e.athlete_snapshot.name }}{% if sh.signed %} ✓{% elif sh.returned_reason %} ↩{% endif %}</a>{% endfor %}
+  </nav>
+
+  <section class="card sheet__pair">
+    <div class="live__name" style="font-size: 20px; line-height: 26px;">{{ entry.athlete_snapshot.name }}</div>
+    <div class="table__sub">{{ entry.horse_snapshot.name }} · {{ entry.class_name }}</div>
+    {% if sheet.returned_reason %}<div class="alert alert--warning" role="alert">Лист возвращён судьёй-подсчётом: {{ sheet.returned_reason }}</div>{% endif %}
+    {% if flags.eliminated %}<div class="alert alert--error">Пара исключена: {{ flags.reason }}</div>{% endif %}
+  </section>
+
+  {% if is_c %}
+    <section class="card">
+      <h2 class="h3">Отметки судьи на C</h2>
+      <p class="table__sub">Схема штрафов: {{ scheme|default:"не выбрана в езде" }}</p>
+      <form method="post" action="{% url 'conduct:flags' t.pk p.pk %}" class="form">{% csrf_token %}<input type="hidden" name="entry" value="{{ entry.pk }}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <div class="grid-2">
+          <label class="field"><span class="field__label">Ошибки в схеме</span><input name="errors" type="number" min="0" max="5" inputmode="numeric" value="{{ flags.errors|default:0 }}"></label>
+          <label class="field"><span class="field__label">Прочие ошибки (технические)</span><input name="technical" type="number" min="0" max="10" inputmode="numeric" value="{{ flags.technical|default:0 }}"></label>
+        </div>
+        <label class="check"><input type="checkbox" name="eliminated" value="1"{% if flags.eliminated %} checked{% endif %}><span>Исключение</span></label>
+        <label class="field"><span class="field__label">Причина исключения</span><select name="reason">{% for r in reasons %}<option{% if flags.reason == r %} selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+        <button class="btn btn--dark btn--sm">Сохранить отметки</button>
+      </form>
+    </section>
+  {% endif %}
+
+  {% if sheet.signed %}
+    <section class="card">
+      <div class="alert alert--success">Лист подписан {{ sheet.signed_at|date:"j E H:i" }}.{% if score %} {{ score.points|num }} баллов · {{ score.pct|floatformat:3 }} %{% endif %}</div>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th class="num">№</th><th>Упражнение</th><th class="num">Коэф.</th><th class="num">Оценка</th></tr></thead>
+        <tbody>{% for r in rows %}<tr><td class="num">{{ r.n }}</td><td>{{ r.text }}{% if r.comment %}<span class="table__sub">{{ r.comment }}</span>{% endif %}</td><td class="num">{{ r.coef }}</td><td class="num"><strong>{{ r.value|num }}</strong></td></tr>{% endfor %}</tbody>
+      </table></div>
+      {% if sheet.remark %}<p class="muted">{{ sheet.remark }}</p>{% endif %}
+      <p class="table__sub">Исправить оценку можно, только если судья-подсчёт вернёт лист.</p>
+    </section>
+  {% else %}
+    <form method="post" action="{% url 'conduct:judge_sign' t.pk p.pk pos.letter %}" class="card sheet__form" id="sheet-form">{% csrf_token %}
+      <input type="hidden" name="entry" value="{{ entry.pk }}">
+      {% regroup rows by part_title as parts %}
+      {% for part in parts %}
+        {% if parts|length > 1 %}<h2 class="h3">{{ part.grouper }}</h2>{% endif %}
+        {% for r in part.list %}
+          {% ifchanged r.collective %}{% if r.collective and not part.list.0.collective %}<div class="caption muted sheet__sep">ОБЩИЕ ОЦЕНКИ</div>{% endif %}{% endifchanged %}
+          <div class="mark-row">
+            <div class="mark-row__text"><span class="mark-row__n">{{ r.n }}</span>{% if r.letters %}<span class="mark-row__letters">{{ r.letters }}</span>{% endif %}<span>{{ r.text }}</span>{% if r.coef != 1 %}<span class="chip">×{{ r.coef }}</span>{% endif %}</div>
+            <input class="mark-row__val" name="m_{{ r.part }}_{{ r.i }}" data-part="{{ r.part }}" data-i="{{ r.i }}" inputmode="decimal" autocomplete="off" value="{{ r.value|default_if_none:'' }}" aria-label="Оценка: {{ r.text }}" placeholder="0–10">
+            <details class="mark-row__comment"{% if r.comment %} open{% endif %}><summary>комментарий</summary><textarea name="c_{{ r.part }}_{{ r.i }}" data-part="{{ r.part }}" data-i="{{ r.i }}" rows="2">{{ r.comment }}</textarea></details>
+          </div>
+        {% endfor %}
+      {% endfor %}
+      <label class="field"><span class="field__label">Общее замечание <span class="field__optional">необязательно</span></span><textarea name="remark" rows="3">{{ sheet.remark }}</textarea></label>
+      <p class="table__sub" id="sheet-status">Оценки сохраняются автоматически. Шаг оценки — {{ rows.0.step|default:"0.5" }}.{% if missing %} Не заполнено: {{ missing|length }}.{% endif %}</p>
+      <button class="btn btn--primary btn--block btn--lg">Подписать лист</button>
+    </form>
+  {% endif %}
+  {% endif %}
+</div>
+<script>
+(function () {
+  var root = document.getElementById("sheet"), form = document.getElementById("sheet-form");
+  if (!form) return;
+  var url = root.dataset.markUrl, status = document.getElementById("sheet-status");
+  var csrf = form.querySelector("[name=csrfmiddlewaretoken]").value, entry = form.querySelector("[name=entry]").value;
+  function save(el) {
+    var fd = new FormData();
+    fd.append("csrfmiddlewaretoken", csrf); fd.append("entry", entry);
+    fd.append("part", el.dataset.part); fd.append("i", el.dataset.i);
+    var mark = form.querySelector('[name="m_' + el.dataset.part + "_" + el.dataset.i + '"]');
+    var com = form.querySelector('[name="c_' + el.dataset.part + "_" + el.dataset.i + '"]');
+    fd.append("value", mark.value.replace(",", ".")); if (com) fd.append("comment", com.value);
+    fetch(url, { method: "POST", body: fd, headers: { "X-Requested-With": "fetch" }, credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { mark.classList.toggle("is-error", !j.ok); status.textContent = j.ok ? "Сохранено." : j.error; })
+      .catch(function () { status.textContent = "Нет связи — оценки отправятся при подписи листа."; });
+  }
+  form.querySelectorAll(".mark-row__val, .mark-row__comment textarea").forEach(function (el) { el.addEventListener("change", function () { save(el); }); });
+  form.querySelectorAll(".mark-row__val").forEach(function (el, idx, all) {
+    el.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); if (all[idx + 1]) all[idx + 1].focus(); } });
+  });
+})();
+</script>
+{% endblock %}

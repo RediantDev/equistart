@@ -6,14 +6,52 @@
   <div>
     <a class="back" href="{% url 'conduct:overview' t.pk %}">← Проведение</a>
     <h1 class="h1">{{ p.name }}</h1>
-    <p class="muted">{{ p.day|date:"l, j E" }}{% if p.start_time %} · начало {{ p.start_time|time:"H:i" }}{% endif %} · {{ p.program_type_name }} · поля: {% for f, l in fields %}{{ l }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+    <p class="muted">{{ p.day|date:"l, j E" }}{% if p.start_time %} · начало {{ p.start_time|time:"H:i" }}{% endif %} · {{ p.program_type_name }}{% if p.heights %} · {{ p.heights_label }}{% endif %}{% if p.article_label %} · {{ p.article_label }}{% endif %}{% if not auto %} · поля: {% for f, l in fields %}{{ l }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}</p>
     <div class="chips">{% if published %}<span class="chip chip--info">Опубликован протокол v{{ published.version }} · {{ published.published_at|date:"j E H:i" }}</span>{% else %}<span class="chip">Протокол не опубликован</span>{% endif %}</div>
   </div>
   <div class="form-actions">
-    <a class="btn btn--ghost" href="{% url 'conduct:live' t.pk p.pk %}">Экран судьи</a>
+    {% if has_panel %}
+      {% for l in my_letters %}<a class="btn btn--dark" href="{% url 'conduct:judge_sheet' t.pk p.pk l %}">Мой лист · {{ l }}</a>{% endfor %}
+      {% if is_scorer or user.pk == t.owner_id %}<a class="btn btn--ghost" href="{% url 'conduct:scorer' t.pk p.pk %}">Судья-подсчёт</a>{% endif %}
+    {% else %}
+      <a class="btn btn--dark" href="{% url 'conduct:live' t.pk p.pk %}">Экран судьи</a>
+    {% endif %}
     <form method="post" action="{% url 'conduct:action' t.pk p.pk 'publish' %}">{% csrf_token %}<button class="btn btn--primary"{% if not slots %} disabled{% endif %}>{% if published %}Опубликовать новую версию{% else %}Опубликовать протокол{% endif %}</button></form>
   </div>
 </div>
+
+{% if course_rounds %}
+<section class="card" id="course" style="margin-bottom: var(--space-4);">
+  <div class="section-head"><h2 class="h3">Параметры маршрута</h2><span class="table__sub">вносятся в день старта, после просмотра маршрута; результаты пересчитываются</span></div>
+  <form method="post" action="{% url 'conduct:course' t.pk p.pk %}" class="form">{% csrf_token %}
+    {% for r in course_rounds %}
+      <fieldset class="course-round"><legend class="label">{{ r.spec.title }} · табл. {{ r.params.table }}{% if r.params.time_allowed %} · норма {{ r.params.time_allowed }} с{% endif %}{% if r.params.limit %} · лимит {{ r.params.limit }} с{% endif %}</legend>
+        <div class="grid-3">
+          <label class="field"><span class="field__label">Длина, м</span><input name="{{ r.spec.key }}_length" type="number" min="1" inputmode="numeric" value="{{ r.data.length|default_if_none:'' }}"></label>
+          <label class="field"><span class="field__label">Скорость, м/мин</span><input name="{{ r.spec.key }}_speed" type="number" min="1" inputmode="numeric" value="{{ r.data.speed|default_if_none:'' }}"></label>
+          <label class="field"><span class="field__label">Норма времени, с</span><input name="{{ r.spec.key }}_time_allowed" type="text" inputmode="decimal" value="{{ r.data.time_allowed|default_if_none:'' }}" placeholder="из длины и скорости"></label>
+        </div>
+      </fieldset>
+    {% endfor %}
+    <p class="field__help">Норма времени предлагается как длина / скорость с округлением вверх до целой секунды — проверьте и при необходимости исправьте. Лимит — две нормы{% if p.table == "C" %}; для таблицы C — 120 или 180 с по длине маршрута{% endif %}.</p>
+    <div class="grid-3">
+      <label class="field"><span class="field__label">Препятствий</span><input name="obstacles" type="number" min="1" value="{{ course.obstacles|default_if_none:'' }}"></label>
+      <label class="field"><span class="field__label">Хронометраж</span><select name="timing"><option value="electronic"{% if course.timing != "manual" %} selected{% endif %}>электронный (0,01 с)</option><option value="manual"{% if course.timing == "manual" %} selected{% endif %}>ручной (0,1 с)</option></select></label>
+      <label class="check" style="align-self: end;"><input type="checkbox" name="indoor" value="1"{% if course.indoor %} checked{% endif %}><span>В помещении</span></label>
+    </div>
+    <div class="form-actions"><button class="btn btn--dark">Сохранить параметры</button></div>
+  </form>
+</section>
+{% endif %}
+
+{% if has_panel %}
+<section class="card" id="panel" style="margin-bottom: var(--space-4);">
+  <div class="section-head"><h2 class="h3">Судейская бригада</h2><a class="btn btn--ghost btn--sm" href="{% url 'conduct:panel' t.pk p.pk %}">{% if panel %}Изменить{% else %}Назначить{% endif %}</a></div>
+  {% if panel %}
+    <ul class="list">{% for x in panel %}<li class="list__row"><strong style="min-width: 5ch;">{% if x.is_scorer %}Подсчёт{% else %}{{ x.letter }}{% endif %}</strong><span style="flex: 1;">{{ x.judge_name }}{% if x.judge_category %} · {{ x.judge_category }}{% endif %}{% if x.judge_region %} · {{ x.judge_region }}{% endif %}<span class="table__sub">{% if x.role != "all" %}{{ x.get_role_display }} · {% endif %}вводит {{ x.user.full_name }}</span></span></li>{% endfor %}</ul>
+  {% else %}<p class="muted">Назначьте 3 или 5 судей на буквах и судью-подсчёт. Буквы выбираются вручную.</p>{% endif %}
+</section>
+{% endif %}
 
 <div class="bulk-bar">
   <form method="post" action="{% url 'conduct:action' t.pk p.pk 'draw' %}">{% csrf_token %}<button class="btn btn--dark btn--sm">Жеребьёвка</button></form>
@@ -40,6 +78,9 @@
             {% if s.status == "waiting" %}<form method="post" action="{% url 'conduct:action' t.pk p.pk 'status' %}" class="inline-row" style="margin-top: 6px;">{% csrf_token %}<input type="hidden" name="slot" value="{{ s.pk }}"><button class="btn btn--ghost btn--sm" name="status" value="started">На поле</button><button class="btn btn--ghost btn--sm" name="status" value="withdrawn">Снят</button><button class="btn btn--ghost btn--sm" name="status" value="no_show">Не явился</button></form>{% endif %}
           </td>
           <td>
+            {% if auto %}
+              {% if s.result %}<span class="table__sub">{% for v in s.cells %}{% if v != "" and v is not None %}{{ v }}{% if not forloop.last %} · {% endif %}{% endif %}{% endfor %}</span>{% if s.result.place %}<strong>{{ s.result.place }} место</strong>{% endif %}{% if s.result.status %} <span class="chip chip--danger">{{ s.result.get_status_display }}</span>{% endif %}{% if s.result.values.pending %}<span class="table__sub">листы подписаны: {{ s.result.values.signed }} из {{ s.result.values.of }}</span>{% endif %}{% else %}<span class="table__sub">—</span>{% endif %}
+            {% else %}
             <details{% if s.status == "started" %} open{% endif %}><summary class="table__sub" style="cursor: pointer;">{% if s.result %}{% for f, l in fields %}{{ s.result.values|get:f|num }}{% if not forloop.last %} / {% endif %}{% endfor %}{% if s.result.place %} · {{ s.result.place }} место{% endif %}{% if s.result.status %} · {{ s.result.get_status_display }}{% endif %}{% else %}Ввести{% endif %}</summary>
               <form method="post" action="{% url 'conduct:action' t.pk p.pk 'result' %}" class="result-form">{% csrf_token %}<input type="hidden" name="entry" value="{{ s.entry_id }}"><input type="hidden" name="next" value="{{ request.path }}#slot-{{ s.pk }}">
                 {% for f, l in fields %}<label class="field"><span class="field__label">{{ l }}</span><input type="text" name="v_{{ f }}" inputmode="decimal" autocomplete="off" value="{{ s.result.values|get:f|default_if_none:'' }}"></label>{% endfor %}
@@ -48,6 +89,7 @@
                 <button class="btn btn--dark btn--sm">Сохранить</button>
               </form>
             </details>
+            {% endif %}
           </td>
           <td style="white-space: nowrap;">
             {% if not s.locked %}
@@ -73,11 +115,24 @@
   </section>
 {% endif %}
 
+{% if standings %}
+<section class="stack" style="margin-top: var(--space-4);">
+  <h2 class="h3">Текущие места</h2>
+  {% for g in standings %}
+    <div class="table-wrap"><table class="table">
+      <caption class="label" style="text-align: left; padding: 8px 0;">{{ g.title }}</caption>
+      <thead><tr><th class="num">Место</th><th>Пара</th>{% for c in columns %}<th class="num">{{ c }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for r in g.rows %}<tr><td class="num"><strong>{{ r.r.place|default:"—" }}</strong></td><td>{{ r.e.athlete_snapshot.name }}<span class="table__sub">{{ r.e.horse_snapshot.name }}{% if r.r.status %} · {{ r.r.get_status_display }}{% endif %}</span></td>{% for v in r.cells %}<td class="num">{{ v|default_if_none:"" }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table></div>
+  {% endfor %}
+</section>
+{% endif %}
+
 <section class="card" style="margin-top: var(--space-4);">
   <h2 class="h3">Публикация результатов по зачётам</h2>
   <p class="muted">Сохранённые результаты не видны публике до публикации. Исправление после публикации — новая версия.</p>
   <ul class="list">{% for r in classes %}
-    <li class="list__row"><span style="flex: 1;"><strong>{{ r.c.name }}</strong><span class="table__sub">результатов введено: {{ r.count }}</span></span>
+    <li class="list__row"><span style="flex: 1;"><strong>{{ r.c.label }}</strong><span class="table__sub">результатов введено: {{ r.count }}</span></span>
       {% if r.published %}<span class="chip chip--info">Опубликовано v{{ r.published.version }}</span>{% endif %}
       <form method="post" action="{% url 'conduct:action' t.pk p.pk 'publish_results' %}">{% csrf_token %}<input type="hidden" name="tclass" value="{{ r.c.pk }}"><button class="btn btn--primary btn--sm"{% if not r.count %} disabled{% endif %}>{% if r.published %}Опубликовать исправление{% else %}Опубликовать результаты{% endif %}</button></form>
     </li>{% endfor %}</ul>

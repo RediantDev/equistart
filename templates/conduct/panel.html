@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Бригада · {{ p.name }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← {{ p.name }}</a>
+    <h1 class="h1">Судейская бригада</h1>
+    <p class="muted">3 или 5 судей на буквах (на клубных стартах можно 1–2) и судья-подсчёт. Буквы выбираются вручную. «Кто вводит» — аккаунт, с которого вносятся оценки: сам судья или секретарь, переносящий бумажный лист.</p>
+  </div>
+</div>
+<form method="post" class="card form" novalidate>
+  {% csrf_token %}
+  {% for r in rows %}
+    <fieldset class="panel-row">
+      <legend class="label">Судья {{ forloop.counter }}</legend>
+      <div class="grid-3">
+        <label class="field"><span class="field__label">Позиция</span>
+          <select name="letter_{{ forloop.counter0 }}"><option value="">—</option>{% for v, l in letters %}<option value="{{ v }}"{% if r.letter == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
+        <label class="field"><span class="field__label">Кто вводит оценки</span>
+          <select name="user_{{ forloop.counter0 }}"><option value="">—</option>{% for u in candidates %}<option value="{{ u.pk }}"{% if r.user == u.pk|stringformat:"s" %} selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></label>
+        {% if children %}<label class="field"><span class="field__label">Оценивает</span>
+          <select name="role_{{ forloop.counter0 }}">{% for v, l in roles %}<option value="{{ v }}"{% if r.role == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>{% endif %}
+      </div>
+      <div class="grid-3">
+        <label class="field"><span class="field__label">Судья (для протокола)</span><input type="text" name="judge_name_{{ forloop.counter0 }}" value="{{ r.judge_name|default:'' }}" placeholder="Фамилия И. О."></label>
+        <label class="field"><span class="field__label">Категория</span><input type="text" name="judge_category_{{ forloop.counter0 }}" value="{{ r.judge_category|default:'' }}" placeholder="ВК, 1К…"></label>
+        <label class="field"><span class="field__label">Регион</span><input type="text" name="judge_region_{{ forloop.counter0 }}" value="{{ r.judge_region|default:'' }}"></label>
+      </div>
+    </fieldset>
+  {% endfor %}
+  <p class="field__help">Нет нужного человека в списке «Кто вводит»? Пригласите его в команду турнира судьёй.</p>
+  <div class="form-actions"><button class="btn btn--primary">Сохранить бригаду</button></div>
+</form>
+{% endblock %}

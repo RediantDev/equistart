@@ -410,3 +410,41 @@ a.chip, a.tag { text-decoration: none; }
 .pair-prog__form { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .pair-prog__form select { flex: 1 1 220px; min-width: 0; }
 @media (max-width: 480px) { .pair-prog__form .btn { width: 100%; } }
+.course-round { border: 0; padding: 0; margin: 0 0 var(--space-3); }
+.course-round legend { margin-bottom: var(--space-2); }
+
+/* ---- Судья у поля: счётчики, офлайн-очередь ---- */
+.counters { display: flex; flex-direction: column; gap: var(--space-2); }
+.counter { display: grid; grid-template-columns: minmax(0, 1fr) 56px 64px 56px; align-items: center; gap: var(--space-2); }
+.counter__label { font-weight: 700; font-size: 15px; overflow-wrap: anywhere; }
+.counter__btn { min-height: 56px; border-radius: var(--radius-md); border: 1px solid var(--control-border); background: var(--surface); color: var(--ink); font-size: 26px; font-weight: 800; cursor: pointer; }
+.counter__btn:active { background: var(--accent); }
+.live__current .counter__val { text-align: center; font-size: 26px; font-weight: 800; padding: 0; font-variant-numeric: tabular-nums; }
+.btn--lg { min-height: 56px; font-size: 18px; }
+.live__more summary { cursor: pointer; color: var(--neutral-soft); font-weight: 600; padding: 6px 0; }
+.live__more[open] { display: flex; flex-direction: column; gap: var(--space-2); }
+.live__more .btn--ghost { background: transparent; color: var(--surface); border-color: var(--control-border); }
+.offline-bar { background: var(--warning-soft); color: var(--text); border: 1px solid var(--warning); border-radius: var(--radius-md); padding: 10px 14px; font-weight: 600; font-size: 14px; }
+.row-card.is-current { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+@media (max-width: 380px) { .counter { grid-template-columns: minmax(0, 1fr) 48px 56px 48px; } .counter__label { font-size: 14px; } }
+
+/* ---- Лист судьи выездки ---- */
+.sheet { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-3); }
+.pair-strip { display: flex; gap: var(--space-2); overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.pair-strip__item { flex: 0 0 auto; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-pill); background: var(--surface); color: var(--text); text-decoration: none; font-weight: 600; font-size: 14px; white-space: nowrap; }
+.pair-strip__item.is-active { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.pair-strip__item.is-done { border-color: var(--success); }
+.pair-strip__item.is-returned { border-color: var(--warning); }
+.sheet__pair { gap: var(--space-2); }
+.mark-row { display: grid; grid-template-columns: 1fr 84px; gap: 6px var(--space-3); align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
+.mark-row__text { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-size: 15px; }
+.mark-row__n { font-weight: 800; min-width: 2ch; }
+.mark-row__letters { font-weight: 700; color: var(--text-muted); }
+.mark-row__val { text-align: center; font-size: 22px !important; font-weight: 800; min-height: 52px; font-variant-numeric: tabular-nums; }
+.mark-row__val.is-error { border-color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
+.mark-row__comment { grid-column: 1 / -1; font-size: 13px; }
+.mark-row__comment summary { cursor: pointer; color: var(--text-muted); }
+.mark-row__comment textarea { width: 100%; margin-top: 4px; }
+.sheet__sep { margin-top: var(--space-3); }
+.panel-row { border: 0; border-bottom: 1px solid var(--border); padding: 0 0 var(--space-3); margin: 0 0 var(--space-3); }
+.table tr.is-warning td { background: var(--warning-soft); }

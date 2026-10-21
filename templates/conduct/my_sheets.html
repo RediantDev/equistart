@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Листы судей — {{ e.athlete_snapshot.name }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'entries:application' e.application_id %}">← Заявка</a>
+    <h1 class="h1">Листы судей</h1>
+    <p class="muted">{{ t.pub_title|default:t.title }} · {{ p.name }} · {{ e.athlete_snapshot.name }} / {{ e.horse_snapshot.name }}</p>
+    {% if result and result.values.pct %}<p><strong>{{ result.values.pct }} %</strong>{% if result.place %} · {{ result.place }} место{% endif %}{% if flags.errors %} · ошибок в схеме: {{ flags.errors }}{% endif %}</p>{% endif %}
+  </div>
+  <button type="button" class="btn btn--ghost no-print" onclick="window.print()">Печать</button>
+</div>
+{% for s in sheets %}
+  <section class="card">
+    <h2 class="h3">{{ s.pos.letter }} — {{ s.pos.judge_name }}{% if s.pos.judge_category %} ({{ s.pos.judge_category }}){% endif %}{% with j=result.values.judges|get:s.pos.letter %}{% if j %} <span class="table__sub">{{ j.points }} баллов · {{ j.pct }} %</span>{% endif %}{% endwith %}</h2>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th class="num">№</th><th>Буквы</th><th>Упражнение</th><th class="num">Коэф.</th><th class="num">Оценка</th><th>Комментарий</th></tr></thead>
+      <tbody>{% for r in s.rows %}<tr><td class="num">{{ r.n }}</td><td>{{ r.letters }}</td><td>{{ r.text }}</td><td class="num">{{ r.coef }}</td><td class="num"><strong>{{ r.value|num }}</strong></td><td>{{ r.comment }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% if s.remark %}<p class="muted">{{ s.remark }}</p>{% endif %}
+  </section>
+{% empty %}<div class="card empty"><h2 class="h3">Подписанных листов нет</h2></div>{% endfor %}
+{% endblock %}

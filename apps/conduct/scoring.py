@@ -571,3 +571,114 @@ def result_cells(program, result) -> list:
         errs = v.get("errors") or 0
         return out + [errs or "", v.get("total_points", ""), v.get("pct", ""), v.get("norm", "")]
     return [v.get(f) for f in program.result_fields]
+
+
+# ======================= БРИГАДА ВЫЕЗДКИ (DRS-02) =======================
+
+def panel_candidates(program):
+    """Кто может вводить оценки: принятые судьи и организаторы турнира."""
+    from apps.accounts.models import User
+    from apps.tournaments.models import TeamMember
+
+    t = program.tournament
+    ids = set(TeamMember.objects.filter(tournament=t, state=TeamMember.State.ACCEPTED,
+                                        role__in=[TeamMember.Role.JUDGE, TeamMember.Role.ORGANIZER]).values_list("user_id", flat=True))
+    ids.add(t.owner_id)
+    return list(User.objects.filter(pk__in=ids).order_by("last_name", "first_name"))
+
+
+@transaction.atomic
+def save_panel(user, program, rows: list[dict]) -> list[JudgePosition]:
+    """rows: [{"letter", "role", "user", "judge_name", "judge_category", "judge_region"}]. Буквы выбирает судья (решение Q6)."""
+    from apps.tournaments.models import ProgramItem
+
+    program = ProgramItem.objects.select_for_update().select_related("tournament").get(pk=program.pk)
+    require_judge(user, program.tournament)
+    if not program.is_dressage or not program.test_snapshot:
+        raise ValueError("Бригада назначается для езды из справочника.")
+    allowed = {u.pk: u for u in panel_candidates(program)}
+    kind = test_of(program)["kind"]
+    seen, clean = set(), []
+    for r in rows:
+        letter = r.get("letter")
+        if not letter and not r.get("user"):
+            continue
+        if letter not in JudgePosition.Letter.values:
+            raise ValueError("Выберите позицию судьи.")
+        if letter in seen:
+            raise ValueError(f"Позиция {letter} указана дважды.")
+        seen.add(letter)
+        try:
+            uid = int(r.get("user") or 0)
+        except ValueError:
+            uid = 0
+        if uid not in allowed:
+            raise ValueError(f"{letter}: выберите, кто вводит оценки (судья или организатор турнира).")
+        name = (r.get("judge_name") or "").strip() or allowed[uid].full_name
+        role = r.get("role") or "all"
+        if letter == "SCORER":
+            role = "all"
+        elif kind == "children" and role not in ("all", "technique", "quality"):
+            raise ValueError("Неизвестная роль судьи.")
+        elif kind != "children":
+            role = "all"
+        clean.append(dict(letter=letter, role=role, user=allowed[uid], judge_name=name[:200],
+                          judge_category=(r.get("judge_category") or "").strip()[:20], judge_region=(r.get("judge_region") or "").strip()[:120]))
+    letters_ = [c for c in clean if c["letter"] != "SCORER"]
+    if len(letters_) not in (1, 2, 3, 5):
+        raise ValueError("На буквах — 3 или 5 судей (на клубных стартах допускается 1–2).")
+    if "SCORER" not in seen:
+        raise ValueError("Назначьте судью-подсчёт: он сводит оценки и утверждает результат.")
+    if kind == "children":
+        roles = {c["role"] for c in letters_}
+        if "all" not in roles and not {"technique", "quality"} <= roles:
+            raise ValueError("В детской езде кто-то должен оценивать технику, а кто-то — качество езды (или весь лист).")
+    existing = {p.letter: p for p in program.judge_positions.all()}
+    for letter, pos in existing.items():
+        if letter not in seen:
+            if pos.sheets.exists():
+                raise ValueError(f"У судьи {letter} уже есть оценки — позицию нельзя убрать.")
+            pos.delete()
+    out = []
+    for c in clean:
+        pos = existing.get(c["letter"])
+        if pos and pos.sheets.exists() and (pos.role != c["role"]):
+            raise ValueError(f"У судьи {c['letter']} уже есть оценки — роль менять нельзя.")
+        if pos:
+            for k, v in c.items():
+                setattr(pos, k, v)
+            pos.save()
+        else:
+            pos = JudgePosition.objects.create(program=program, **c)
+        out.append(pos)
+    audit(user, "dressage.panel", program, panel=[(c["letter"], c["role"], c["user"].pk, c["judge_name"]) for c in clean])
+    return out
+
+
+def dressage_queue(program):
+    """Пары езды в стартовом порядке (если он есть), иначе — в порядке заявок."""
+    slots = {s.entry_id: s for s in StartSlot.objects.filter(program=program)}
+    items = _entries(program)
+    items.sort(key=lambda e: (slots[e.pk].position if e.pk in slots else 10_000, e.pk))
+    return [(e, slots.get(e.pk)) for e in items if not (e.pk in slots and slots[e.pk].status in ROUND_STATUS)]
+
+
+def jump_queue(program, stage):
+    """Пары гита в стартовом порядке: основной гит — все, кроме снятых; следующие — прошедшие по результатам."""
+    slots = list(StartSlot.objects.filter(program=program).select_related("entry__tclass").order_by("position"))
+    rounds = {(r.entry_id): r for r in JumpRound.objects.filter(entry__program=program, round=stage)}
+    first = J.rounds_of(program.route, program.variant)[0].key
+    if stage == first:
+        allowed = None
+    else:
+        allowed = {e.pk for e in next_stage_candidates(program, stage)}
+    out = []
+    for s in slots:
+        if s.entry.decision != Entry.Decision.ACCEPTED:
+            continue
+        if allowed is not None and s.entry_id not in allowed and s.entry_id not in rounds:
+            continue
+        if allowed is None and s.status in ROUND_STATUS:
+            continue
+        out.append((s, rounds.get(s.entry_id)))
+    return out

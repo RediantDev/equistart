@@ -14,7 +14,7 @@ from apps.tournaments.disciplines import RESULT_FIELDS
 from apps.tournaments.models import ProgramItem, Tournament, TournamentClass
 from apps.tournaments.services import can_manage
 
-from . import services
+from . import scoring, services
 from .models import Result, ResultPublication, StartListPublication, StartSlot
 
 
@@ -90,14 +90,47 @@ def program(request, pk, program_id):
     in_list = {s.entry_id for s in slots}
     outside = [(e, services.eligible(e)) for e in Entry.objects.filter(program=p).exclude(pk__in=in_list).exclude(decision__in=[Entry.Decision.CANCELLED, Entry.Decision.REJECTED])]
     classes = []
-    for c in p.classes.all():
+    for c in p.classes.filter(merged_into__isnull=True):
         last = c.result_publications.first()
-        classes.append({"c": c, "published": last, "count": Entry.objects.filter(tclass=c, result__isnull=False).count()})
-    return render(request, "conduct/program.html", {
+        classes.append({"c": c, "published": last, "count": Entry.objects.filter(tclass__in=[c, *c.merged.all()], result__isnull=False).count()})
+    ctx = {
         "t": t, "p": p, "slots": slots, "outside": outside, "classes": classes,
         "published": p.start_publications.first(),
         "fields": [(f, RESULT_FIELDS.get(f, f)) for f in p.result_fields], "statuses": Result.Status.choices,
-    })
+        "auto": not p.is_manual,
+    }
+    if not p.is_manual:
+        for s in slots:
+            s.cells = scoring.result_cells(p, s.result) if s.result else []
+        ctx["columns"] = scoring.result_columns(p)
+        ctx["standings"] = _standings_tables(p)
+    if p.is_jumping and not p.route.manual:
+        from apps.sport import jumping as J
+
+        c = scoring.course(p)
+        ctx["course"] = c
+        ctx["course_rounds"] = [{"spec": r, "data": c["rounds"].get(r.key, {}), "params": scoring.round_params(p, r.key)}
+                                for r in J.rounds_of(p.route, p.variant)]
+    if p.is_dressage and p.test_snapshot:
+        ctx["has_panel"], ctx["panel"] = True, scoring.panel(p)
+        ctx["my_letters"] = [x.letter for x in ctx["panel"] if x.user_id == request.user.pk and not x.is_scorer]
+        ctx["is_scorer"] = scoring.is_scorer(request.user, p)
+    return render(request, "conduct/program.html", ctx)
+
+
+def _standings_tables(p):
+    """Текущие места по классификациям (зачёт + высота) — для судьи, до публикации."""
+    groups = {}
+    for e in Entry.objects.filter(program=p, decision=Entry.Decision.ACCEPTED, result__isnull=False).select_related("result", "tclass"):
+        key = scoring.group_key(e)
+        groups.setdefault(key, []).append(e)
+    out = []
+    for (cid, height), items in groups.items():
+        c = TournamentClass.objects.get(pk=cid)
+        items.sort(key=lambda e: (e.result.place is None, e.result.place or 0, e.athlete_snapshot.get("name", "")))
+        out.append({"title": c.name + (f" · {height} см" if height and len(p.heights) > 1 else ""),
+                    "rows": [{"e": e, "r": e.result, "cells": scoring.result_cells(p, e.result)} for e in items]})
+    return out
 
 
 @login_required
@@ -151,6 +184,15 @@ def program_action(request, pk, program_id, action):
 def live(request, pk, program_id):
     """Экран судьи у поля: текущий участник, следующие, быстрый ввод результата."""
     p = _program(request, pk, program_id)
+    if p.is_jumping and not p.route.manual:
+        return redirect("conduct:jump_live", pk=pk, program_id=p.pk)
+    if p.is_dressage and p.test_snapshot:
+        mine = [x for x in scoring.panel(p) if x.user_id == request.user.pk]
+        if any(x.is_scorer for x in mine):
+            return redirect("conduct:scorer", pk=pk, program_id=p.pk)
+        if mine:
+            return redirect("conduct:judge_sheet", pk=pk, program_id=p.pk, letter=mine[0].letter)
+        return redirect(reverse("conduct:program", args=[pk, p.pk]) + "#panel")
     slots = list(p.slots.select_related("entry", "entry__result").order_by("position"))
     current = next((s for s in slots if s.status == StartSlot.Status.STARTED), None) or next((s for s in slots if s.status == StartSlot.Status.WAITING), None)
     upcoming = [s for s in slots if s.status == StartSlot.Status.WAITING and s != current][:4]

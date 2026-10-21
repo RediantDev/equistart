@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Судья-подсчёт · {{ p.name }} — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← {{ p.name }}</a>
+    <h1 class="h1">Судья-подсчёт</h1>
+    <p class="muted">{{ test.name }}. Итог пары — среднее процентов судей, когда все листы подписаны. Расхождение 5 % и больше между судьями — повод проверить лист; вернуть лист можно с причиной, судья увидит её.</p>
+  </div>
+  <form method="post" action="{% url 'conduct:scorer_action' t.pk p.pk 'approve_all' %}">{% csrf_token %}<button class="btn btn--dark">Утвердить все готовые</button></form>
+</div>
+
+{% if not poss %}<div class="alert alert--warning">Бригада не назначена. <a href="{% url 'conduct:panel' t.pk p.pk %}">Назначить</a></div>{% endif %}
+
+<div class="table-wrap">
+  <table class="table scorer">
+    <thead><tr><th>Пара</th>{% for x in poss %}<th class="num">{{ x.letter }}</th>{% endfor %}<th class="num">Ош.</th><th class="num">Итог, %</th><th class="num">Место</th><th>Действия</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+        <tr id="e{{ r.e.pk }}"{% if r.warn %} class="is-warning"{% endif %}>
+          <td><strong>{{ r.e.athlete_snapshot.name }}</strong><span class="table__sub">{{ r.e.horse_snapshot.name }} · {{ r.e.class_name }}</span>{% if r.warn %}<span class="chip chip--warning">расхождение {{ r.spread|floatformat:2 }} %</span>{% endif %}</td>
+          {% for c in r.cells %}
+            <td class="num">{% if c.signed %}{% if c.pct is not None %}{{ c.pct|floatformat:3 }}{% else %}✓{% endif %}{% elif c.returned %}<span class="chip chip--warning" title="{{ c.returned }}">возвращён</span>{% elif c.started %}<span class="chip">заполняет</span>{% else %}<span class="table__sub">—</span>{% endif %}</td>
+          {% endfor %}
+          <td class="num">{% if r.flags.eliminated %}<span class="chip chip--danger" title="{{ r.flags.reason }}">искл.</span>{% else %}{{ r.flags.errors|default:"" }}{% endif %}</td>
+          <td class="num"><strong>{% if r.res and r.res.pct is not None %}{{ r.res.pct|floatformat:3 }}{% else %}—{% endif %}</strong></td>
+          <td class="num">{{ r.place|default:"—" }}</td>
+          <td>
+            <div class="inline-row">
+              {% if r.res and not r.approved and not r.flags.eliminated %}<form method="post" action="{% url 'conduct:scorer_action' t.pk p.pk 'approve' %}">{% csrf_token %}<input type="hidden" name="entry" value="{{ r.e.pk }}"><button class="btn btn--primary btn--sm">Утвердить</button></form>{% elif r.approved %}<span class="chip chip--success">утверждено</span>{% endif %}
+            </div>
+            <details><summary class="table__sub" style="cursor: pointer;">Вернуть лист · норматив</summary>
+              <form method="post" action="{% url 'conduct:scorer_action' t.pk p.pk 'return' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="entry" value="{{ r.e.pk }}">
+                <select name="letter" aria-label="Чей лист">{% for c in r.cells %}{% if c.signed %}<option>{{ c.letter }}</option>{% endif %}{% endfor %}</select>
+                <input name="reason" type="text" placeholder="Причина" aria-label="Причина возврата" required><button class="btn btn--ghost btn--sm">Вернуть</button></form>
+              <form method="post" action="{% url 'conduct:scorer_action' t.pk p.pk 'norm' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="entry" value="{{ r.e.pk }}">
+                <input name="norm" type="text" value="{{ r.flags.norm|default:'' }}" placeholder="Норматив: 2ю, 1…" aria-label="Выполненный норматив"><button class="btn btn--ghost btn--sm">Сохранить</button></form>
+            </details>
+          </td>
+        </tr>
+      {% empty %}<tr><td colspan="9" class="muted">Принятых выступлений нет.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<section class="card" style="margin-top: var(--space-4);">
+  <h2 class="h3">Публикация</h2>
+  <p class="muted">Публикуются утверждённые результаты. Исправление после публикации — новая версия протокола.</p>
+  <ul class="list">{% for r in classes %}
+    <li class="list__row"><span style="flex: 1;"><strong>{{ r.c.label }}</strong></span>{% if r.published %}<span class="chip chip--info">Опубликовано v{{ r.published.version }}</span>{% endif %}
+      <form method="post" action="{% url 'conduct:action' t.pk p.pk 'publish_results' %}">{% csrf_token %}<input type="hidden" name="tclass" value="{{ r.c.pk }}"><input type="hidden" name="next" value="{% url 'conduct:scorer' t.pk p.pk %}"><button class="btn btn--primary btn--sm"{% if not r.ready %} disabled{% endif %}>{% if r.published %}Опубликовать исправление{% else %}Опубликовать{% endif %}</button></form></li>
+  {% endfor %}</ul>
+</section>
+{% endblock %}

@@ -43,7 +43,8 @@
 - `apps/tournaments`: Venue, Tournament (рабочая копия + снимок публикации `snapshot`/`pub_*`), ProgramItem, TournamentClass, TeamMember; `services.py` — права (`roles_of`, `can_manage`), submit/approve/return/cancel.
 - `apps/profiles`: Athlete (один управляющий, делегаты, связь с аккаунтом), Horse (управляет только создатель), документы лошади, Offer.
 - `apps/entries`: Application (идемпотентность), Entry, ChangeProposal.
-- `apps/conduct`: StartSlot, StartListPublication, Result, ResultPublication. В порядок — принятые+допущенные+`stables.stable_dependency_ok`. Публика видит только опубликованные версии.
+- `apps/sport`: справочники — типы маршрутов и формулы конкура (`jumping.py`), подсчёт выездки (`dressage.py`), езды и шаблоны зачётов, предупреждения Правил (`rules.py`), конструктор своей езды.
+- `apps/conduct`: StartSlot, StartListPublication, Result, ResultPublication, JumpRound, JudgePosition, DressageSheet, DressageFlags; `scoring.py` — ввод у поля, листы судей, пересчёт Result; `judging.py` — экраны судьи у поля, судьи на букве, судьи-подсчёта. В порядок — принятые+допущенные+`stables.stable_dependency_ok`. Публика видит только опубликованные версии.
 - `apps/stables`: StableCategory, Booking (вместимость под `select_for_update` категории), Service, ServiceOrder, Delivery.
 - `apps/accounts`: телефон-логин, `verification.py` + `sms.py` (console/smsru), `PhoneVerificationMiddleware`, команды `set_moderator`, `set_password`.
 - Юридические тексты — `templates/legal/`; реквизиты оператора — настройки `OPERATOR_*`.

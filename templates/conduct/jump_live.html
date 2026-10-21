@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Судья у поля · {{ p.name }} — EquiStart{% endblock %}
+{% block content %}
+<div class="live" id="jump-live" data-queue-key="eq-queue-{{ p.pk }}">
+  <div class="live__head">
+    <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← Порядок и результаты</a>
+    <h1 class="h3" style="margin: 0;">{{ p.name }}</h1>
+    <div class="table__sub">{{ p.program_type_name }} · {{ p.article_label }}</div>
+  </div>
+
+  {% if stages|length > 1 %}
+    <nav class="segmented segmented--wrap" aria-label="Гит" style="margin-top: var(--space-3);">
+      {% for s in stages %}<a class="segmented__item{% if s.key == stage.key %} is-active{% endif %}" href="?stage={{ s.key }}">{{ s.title }}{% if counts|get:s.key %} · {{ counts|get:s.key }}{% endif %}</a>{% endfor %}
+    </nav>
+  {% endif %}
+  <p class="table__sub" style="margin: var(--space-2) 0 0;">Табл. {{ stage.table }}{% if stage.timed %} · на время{% else %} · без учёта времени{% endif %}{% if stage.time_allowed %} · норма {{ stage.time_allowed|num }} с{% endif %}{% if stage.limit %} · лимит {{ stage.limit|num }} с{% endif %}{% if course.indoor %} · в помещении{% endif %}
+    {% if not stage.time_allowed and stage.table != "C" %}<br><a href="{% url 'conduct:program' t.pk p.pk %}#course" style="color: var(--danger); font-weight: 600;">Внесите норму времени маршрута</a> — без неё штраф за время не посчитать.{% endif %}</p>
+
+  <div class="offline-bar" id="offline-bar" hidden role="status"></div>
+
+  {% if last %}
+    <div class="alert alert--success" role="status" style="margin-top: var(--space-3);">
+      <strong>{{ last.key.athlete_snapshot.name }}</strong> — {% if last.place %}{{ last.place }} место{% else %}{{ last.status }}{% endif %}{% if last.total is not None %} · {{ last.total|num }} ш/о{% endif %}
+    </div>
+  {% endif %}
+
+  {% if current %}
+    {% with s=current.0 jr=current.1 %}
+    <section class="live__current">
+      <div class="live__meta"><span class="caption" style="color: var(--accent);">{{ stage.title|upper }} · № {{ s.position }}{% if s.start_time and stage.key == stages.0.key %} · {{ s.start_time|time:"H:i" }}{% endif %}{% if jr %} · ИСПРАВЛЕНИЕ{% endif %}</span></div>
+      <div class="live__name">{{ s.entry.athlete_snapshot.name }}</div>
+      <div class="live__horse">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}{% if s.entry.height %} · {{ s.entry.height }} см{% endif %}</div>
+
+      <form method="post" action="{% url 'conduct:jump_save' t.pk p.pk %}" class="live__form" id="jump-form" data-pair="{{ s.entry.athlete_snapshot.name }} / {{ s.entry.horse_snapshot.name }}">
+        {% csrf_token %}
+        <input type="hidden" name="entry" value="{{ s.entry_id }}"><input type="hidden" name="stage" value="{{ stage.key }}">
+        <input type="hidden" name="client_key" value="{{ client_key }}">
+        <div class="counters">
+          <div class="counter"><span class="counter__label">Повалы</span><button type="button" class="counter__btn" data-step="-1" data-for="kd" aria-label="Повалов меньше">−</button><input id="kd" name="knockdowns" type="number" min="0" max="20" value="{{ jr.knockdowns|default:0 }}" inputmode="numeric" class="counter__val"><button type="button" class="counter__btn" data-step="1" data-for="kd" aria-label="Повалов больше">+</button></div>
+          <div class="counter"><span class="counter__label">Неповиновения</span><button type="button" class="counter__btn" data-step="-1" data-for="rf" aria-label="Неповиновений меньше">−</button><input id="rf" name="refusals" type="number" min="0" max="3" value="{{ jr.refusals|default:0 }}" inputmode="numeric" class="counter__val"><button type="button" class="counter__btn" data-step="1" data-for="rf" aria-label="Неповиновений больше">+</button></div>
+          {% if with_corrections %}<div class="counter"><span class="counter__label">Неповиновение с разрушением, +6 с</span><button type="button" class="counter__btn" data-step="-1" data-for="cr" aria-label="Меньше">−</button><input id="cr" name="corrections" type="number" min="0" max="5" value="{{ jr.corrections|default:0 }}" inputmode="numeric" class="counter__val"><button type="button" class="counter__btn" data-step="1" data-for="cr" aria-label="Больше">+</button></div>{% endif %}
+        </div>
+        {% if stage.timed or stage.time_allowed or stage.table == "C" %}
+          <label class="field"><span class="field__label">Время, с{% if course.timing == "manual" %} (ручной, до 0,1){% endif %}</span><input name="time" type="text" class="live__input" inputmode="decimal" autocomplete="off" placeholder="например 38,41" value="{% if jr.time is not None %}{{ jr.time|num }}{% endif %}"></label>
+        {% else %}
+          <label class="field"><span class="field__label">Время, с <span class="field__optional">для протокола</span></span><input name="time" type="text" class="live__input" inputmode="decimal" autocomplete="off" value="{% if jr.time is not None %}{{ jr.time|num }}{% endif %}"></label>
+        {% endif %}
+        <input type="hidden" name="status" value="ok">
+        <button class="btn btn--primary btn--block btn--lg">Сохранить{% if not jr %} и следующий{% endif %}</button>
+        <details class="live__more"{% if jr and jr.status != "ok" %} open{% endif %}>
+          <summary>Исключение, падение, сошёл</summary>
+          <label class="field"><span class="field__label">Причина исключения</span><select name="reason">{% for r in reasons %}<option{% if jr.reason == r %} selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+          <div class="inline-row">
+            <button class="btn btn--danger" name="status" value="eliminated" data-status>Исключён</button>
+            <button class="btn btn--ghost" name="status" value="retired" data-status>Сошёл</button>
+          </div>
+        </details>
+      </form>
+    </section>
+    {% endwith %}
+  {% else %}
+    <div class="card empty" style="margin-top: var(--space-3);"><h2 class="h3">{% if queue %}В этом гите все пары прошли{% else %}В этом гите пока нет пар{% endif %}</h2>
+      <p class="muted">{% if next_stage %}Следующий гит откроется для прошедших пар.{% else %}Проверьте места и опубликуйте результаты по зачётам.{% endif %}</p>
+      {% if next_stage %}<a class="btn btn--dark" href="?stage={{ next_stage }}">Следующий гит</a>{% endif %}
+      <a class="btn btn--primary" href="{% url 'conduct:program' t.pk p.pk %}">К результатам</a></div>
+  {% endif %}
+
+  {% if queue %}
+    <div class="caption muted" style="margin-top: var(--space-4);">ПОРЯДОК · {{ stage.title|lower }}</div>
+    <div class="list-cards" style="margin-top: var(--space-2);">{% for s, jr in queue %}
+      {% with st=places|get:s.entry_id %}
+      <a class="row-card row-card--link{% if current and current.0.pk == s.pk %} is-current{% endif %}" style="padding: 10px 14px;" href="?stage={{ stage.key }}&entry={{ s.entry_id }}">
+        <span class="numeric">{{ s.position }}</span>
+        <span style="flex: 1; min-width: 0;">{{ s.entry.athlete_snapshot.name }}<span class="table__sub">{{ s.entry.horse_snapshot.name }}</span></span>
+        {% if jr %}<span class="table__sub" style="text-align: right;">{% if jr.status != "ok" %}{{ jr.get_status_display }}{% else %}{{ jr.knockdowns }} пов. · {{ jr.refusals }} неп.{% if jr.time %} · {{ jr.time|num }} с{% endif %}{% endif %}{% if st.place %}<br><strong>{{ st.place }} место</strong>{% endif %}</span>{% else %}<span class="chip">ждёт</span>{% endif %}
+      </a>
+      {% endwith %}
+    {% endfor %}</div>
+  {% endif %}
+</div>
+<script>
+(function () {
+  var root = document.getElementById("jump-live");
+  document.querySelectorAll(".counter__btn").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var i = document.getElementById(b.dataset.for), v = (parseInt(i.value, 10) || 0) + parseInt(b.dataset.step, 10);
+      i.value = Math.max(+i.min || 0, Math.min(+i.max || 99, v));
+    });
+  });
+  // Офлайн-очередь (SCR-02): если связи нет, ввод сохраняется на устройстве и отправляется, когда связь вернётся.
+  var KEY = root.dataset.queueKey, bar = document.getElementById("offline-bar"), form = document.getElementById("jump-form");
+  function load() { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { return []; } }
+  function store(q) { try { localStorage.setItem(KEY, JSON.stringify(q)); } catch (e) {} }
+  function show() {
+    var q = load();
+    bar.hidden = !q.length;
+    bar.textContent = q.length ? "Нет связи с сервером. Не отправлено: " + q.length + " (" + q.map(function (x) { return x.pair; }).join(", ") + "). Отправим автоматически." : "";
+  }
+  function send(item) {
+    var fd = new FormData();
+    item.data.forEach(function (kv) { fd.append(kv[0], kv[1]); });
+    return fetch(item.url, { method: "POST", body: fd, headers: { "X-Requested-With": "fetch" }, credentials: "same-origin" })
+      .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); });
+  }
+  function flush() {
+    var q = load();
+    if (!q.length) return;
+    send(q[0]).then(function (res) {
+      q.shift(); store(q); show();
+      if (!res.body.ok) alert("Не сохранено (" + q.length + " в очереди): " + res.body.error);
+      if (q.length) flush(); else location.reload();
+    }).catch(show);
+  }
+  if (form) {
+    var clicked = null;
+    form.querySelectorAll("[data-status]").forEach(function (b) { b.addEventListener("click", function () { clicked = b.value; }); });
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var fd = new FormData(form);
+      if (clicked) fd.set("status", clicked);
+      fd.set("client_key", (window.crypto && crypto.randomUUID) ? crypto.randomUUID().replace(/-/g, "") : String(Date.now()) + Math.random().toString(16).slice(2));
+      var data = []; fd.forEach(function (v, k) { data.push([k, v]); });
+      var item = { url: form.action, data: data, pair: form.dataset.pair };
+      form.querySelector("button.btn--primary").disabled = true;
+      send(item).then(function (res) {
+        if (res.body.ok) { location.href = res.body.next; return; }
+        form.querySelector("button.btn--primary").disabled = false;
+        alert(res.body.error);
+      }).catch(function () {
+        var q = load(); q.push(item); store(q); show();
+        form.reset(); form.querySelector("button.btn--primary").disabled = false;
+      });
+    });
+  }
+  show(); flush();
+  window.addEventListener("online", flush);
+  setInterval(flush, 15000);
+})();
+</script>
+{% endblock %}
