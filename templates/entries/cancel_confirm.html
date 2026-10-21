@@ -9,7 +9,6 @@
     <ul class="list">{% for e in entries %}
       <li class="list__row"><input type="hidden" name="entry" value="{{ e.pk }}"><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}"><span style="flex: 1;"><strong>{{ e.athlete_snapshot.name }}</strong> на {{ e.horse_snapshot.name }}<span class="table__sub">{{ e.program_name }} · {{ e.class_name }}</span></span></li>
     {% endfor %}</ul>
-    <p class="field__help">Возврат взноса — по условиям организатора.</p>
     <div class="form-actions"><a class="btn btn--ghost" href="{% url 'entries:application' app.pk %}">Не отменять</a><button class="btn btn--danger">Отменить {{ entries|length }}</button></div>
   </form>
 </div></section>

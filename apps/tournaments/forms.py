@@ -144,9 +144,7 @@ class RubField(forms.CharField):
 
 
 class ClassForm(forms.ModelForm):
-    """Шаг 3: зачёт и цена."""
-
-    fee = RubField(label="Стартовый взнос, ₽", help_text="0 — бесплатно.")
+    """Зачёт и условия участия."""
 
     class Meta:
         model = TournamentClass
@@ -157,9 +155,6 @@ class ClassForm(forms.ModelForm):
     def __init__(self, program, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.program = program
-        if self.instance.pk:
-            k = self.instance.fee_kopecks
-            self.fields["fee"].initial = f"{k // 100}" + (f",{k % 100:02d}" if k % 100 else "")
         for f in ("min_age", "max_age", "limit"):
             self.fields[f].required = False
 
@@ -173,7 +168,6 @@ class ClassForm(forms.ModelForm):
     def save(self, commit=True):
         obj = super().save(commit=False)
         obj.program = self.program
-        obj.fee_kopecks = self.cleaned_data["fee"]
         if commit:
             obj.save()
         return obj

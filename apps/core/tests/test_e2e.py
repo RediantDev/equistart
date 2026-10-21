@@ -4,14 +4,11 @@ import datetime
 
 from django.test import override_settings
 from django.urls import reverse
-from django.utils import timezone
 
 from apps.conduct import services as cs
 from apps.conduct.models import StartSlot
 from apps.entries import services as es
 from apps.entries.tests.test_entries import TMP, Base, mkuser
-from apps.finance import services as fs
-from apps.finance.models import Charge
 from apps.stables import services as ss
 from apps.stables.models import Service, StableCategory
 from apps.tournaments.models import TeamMember, Tournament
@@ -24,13 +21,13 @@ class EndToEndTests(Base):
         # публичная страница в календаре
         self.assertContains(self.client.get(reverse("core:calendar")), "Кубок")
         # команда турнира
-        cashier, groom = mkuser("+79990003001"), mkuser("+79990003002")
-        for u, role in ((cashier, "cashier"), (groom, "stable")):
+        groom = mkuser("+79990003002")
+        for u, role in ((groom, "stable"),):
             TeamMember.objects.create(tournament=t, phone=u.phone, user=u, role=role, state="accepted", invited_by=self.org)
         # денники и услуги
-        cat = StableCategory.objects.create(tournament=t, name="Конюшня", price_kopecks=200000, available_from=self.start - datetime.timedelta(days=1),
+        cat = StableCategory.objects.create(tournament=t, name="Конюшня", available_from=self.start - datetime.timedelta(days=1),
                                             available_to=self.start + datetime.timedelta(days=1), capacity=5)
-        sawdust = Service.objects.create(tournament=t, name="Опилки", unit="мешок", price_kopecks=40000)
+        sawdust = Service.objects.create(tournament=t, name="Опилки", unit="мешок")
         # групповая заявка тренера
         app = self.submit(self.coach, [es.Line(self.a1, self.h1, self.c_kids), es.Line(self.a2, self.h1, self.c_open)])
         e1, e2 = app.entries.order_by("pk")
@@ -58,30 +55,10 @@ class EndToEndTests(Base):
         cs.save_result(self.judge, e1.pk, {"penalties": "0"}, "1", "")
         cs.publish_results(self.judge, self.c_kids.pk)
         self.assertContains(self.client.get(reverse("tournaments:public", args=[t.pk]) + "?tab=results"), "Смирнова Лиза")
-        # деньги: взнос 1500 + денник 2×2000 + опилки 2×400 = 6300 ₽; отклонённое — снято
-        charges = Charge.objects.filter(tournament=t, payer=self.coach)
-        self.assertEqual(fs.totals(charges)["amount"], 630000)
-        today = timezone.localdate()
-        fs.record_payment(cashier, t, self.coach.pk, 500000, "cash", today, [c.pk for c in charges], "e2e-p1")
-        ch_entry = Charge.objects.get(entry=e1)
-        fs.adjust(cashier, ch_entry.pk, 100000, "скидка юниорам")
-        ch_box = Charge.objects.get(source_key=f"booking:{b.pk}")
-        ref = fs.create_refund(cashier, ch_entry.pk, 50000, "переплата после скидки")
-        fs.complete_refund(cashier, ref.pk, "cash", today)
-        charges = Charge.objects.filter(tournament=t, payer=self.coach)
-        tot = fs.totals(charges)
-        self.assertEqual((tot["amount"], tot["paid"], tot["refunded"]), (580000, 500000, 50000))
-        self.assertEqual(tot["balance"], 130000)
-        self.client.force_login(self.coach)
-        my = self.client.get(reverse("finance:my"))
-        self.assertContains(my, "скидка юниорам")
-        self.assertContains(my, "1 300 ₽")
-        # выдача, оплата остатка, завершение
+        # выдача и завершение
         ss.deliver(groom, o.pk, 2)
-        fs.record_payment(cashier, t, self.coach.pk, 130000, "transfer", today, [c.pk for c in charges], "e2e-p2")
         self.client.force_login(self.org)
         ov = self.client.get(reverse("conduct:overview", args=[t.pk]))
-        self.assertNotContains(ov, "Неоплаченные начисления")
         self.client.post(reverse("conduct:finish", args=[t.pk]), {"confirm": "1"})
         t.refresh_from_db()
         self.assertEqual(t.publication, Tournament.Publication.FINISHED)

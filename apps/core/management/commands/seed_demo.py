@@ -16,8 +16,6 @@ from apps.accounts.models import User
 from apps.conduct import services as cs
 from apps.entries import services as es
 from apps.entries.models import Application
-from apps.finance import services as fs
-from apps.finance.models import Charge
 from apps.profiles.models import Athlete, Horse
 from apps.stables import services as ss
 from apps.stables.models import Service, StableCategory
@@ -32,7 +30,7 @@ ACCOUNTS = [
     ("+79990000003", "Соколова", "Мария", {"is_coach": True}, "Тренер: ведёт спортсменов и лошадей"),
     ("+79990000004", "Смирнова", "Лиза", {"is_athlete": True}, "Спортсмен, связан с профилем у тренера"),
     ("+79990000005", "Петрова", "Ольга", {}, "Судья турнира"),
-    ("+79990000006", "Кузнецов", "Павел", {}, "Касса турнира"),
+    ("+79990000006", "Кузнецов", "Павел", {}, "Второй судья турнира"),
     ("+79990000007", "Морозова", "Наталья", {}, "Конюшня и услуги"),
 ]
 
@@ -60,7 +58,7 @@ class Command(BaseCommand):
             user.phone_verified_at = now
             user.save()
             u[phone[-1]] = user
-        org, mod, coach, kid, judge, cashier, groom = (u[str(i)] for i in range(1, 8))
+        org, mod, coach, kid, judge, judge2, groom = (u[str(i)] for i in range(1, 8))
 
         start = timezone.localdate() + datetime.timedelta(days=21)
         while start.weekday() != 5:
@@ -71,20 +69,20 @@ class Command(BaseCommand):
         t = Tournament.objects.create(owner=org, title="Кубок «Белая роща» по конкуру, 3-й этап", starts_on=start, ends_on=end, venue=venue,
                                       timezone="Europe/Moscow", organizer_name="КСК «Белая роща»", contact="+7 999 000-00-01",
                                       entry_deadline=start - datetime.timedelta(days=4),
-                                      cancel_terms="Отмена до окончания приёма заявок — взнос возвращается полностью. Позже — по решению организатора.")
+                                      cancel_terms="Отмена выступления — до окончания приёма заявок.")
         t.regulation.save("polozhenie.pdf", ContentFile(PDF))
         progs = [
-            (start, datetime.time(10, 0), "jumping", "Маршрут №1 · 60 см", "jumping_clear", ["penalties"], [("Дети до 14 лет", 150000, 0, 14), ("Любители", 200000, 18, None)]),
-            (start, datetime.time(11, 30), "jumping", "Маршрут №2 · 80 см", "jumping_clear_time", ["penalties", "time"], [("Любители", 200000, 18, None), ("Открытый", 250000, None, None)]),
-            (end, datetime.time(10, 0), "jumping", "Маршрут №3 · 100 см", "jumping_jumpoff", ["penalties", "time", "jumpoff_penalties", "jumpoff_time"], [("Открытый", 300000, None, None)]),
-            (end, datetime.time(13, 0), "dressage", "Езда «Предварительный приз. Дети»", "dressage_test", ["percent"], [("Дети", 150000, 10, 14)]),
+            (start, datetime.time(10, 0), "jumping", "Маршрут №1 · 60 см", "jumping_clear", ["penalties"], [("Дети до 14 лет", 0, 14), ("Любители", 18, None)]),
+            (start, datetime.time(11, 30), "jumping", "Маршрут №2 · 80 см", "jumping_clear_time", ["penalties", "time"], [("Любители", 18, None), ("Открытый", None, None)]),
+            (end, datetime.time(10, 0), "jumping", "Маршрут №3 · 100 см", "jumping_jumpoff", ["penalties", "time", "jumpoff_penalties", "jumpoff_time"], [("Открытый", None, None)]),
+            (end, datetime.time(13, 0), "dressage", "Езда «Предварительный приз. Дети»", "dressage_test", ["percent"], [("Дети", 10, 14)]),
         ]
         classes = {}
         for i, (day, tm, disc, name, ptype, fields, cls) in enumerate(progs):
             p = ProgramItem.objects.create(tournament=t, day=day, start_time=tm, discipline=disc, name=name, program_type=ptype, result_fields=fields, position=i, slot_minutes=3)
-            for j, (cname, fee, amin, amax) in enumerate(cls):
-                classes[(i, cname)] = TournamentClass.objects.create(program=p, name=cname, fee_kopecks=fee, min_age=amin, max_age=amax, position=j)
-        for user, role in ((judge, "judge"), (cashier, "cashier"), (groom, "stable")):
+            for j, (cname, amin, amax) in enumerate(cls):
+                classes[(i, cname)] = TournamentClass.objects.create(program=p, name=cname, min_age=amin, max_age=amax, position=j)
+        for user, role in ((judge, "judge"), (judge2, "judge"), (groom, "stable")):
             TeamMember.objects.create(tournament=t, phone=user.phone, user=user, role=role, state="accepted", invited_by=org)
         t.min_rest_minutes = 20
         t.save()
@@ -117,22 +115,20 @@ class Command(BaseCommand):
         es.decide(judge, t.pk, [(e.pk, e.revision) for e in entries[:5]], "accept_admit")
         # шестая остаётся «на рассмотрении» — чтобы было что решить судье
 
-        cat = StableCategory.objects.create(tournament=t, name="Денник в конюшне", price_kopecks=250000, available_from=start - datetime.timedelta(days=1),
+        cat = StableCategory.objects.create(tournament=t, name="Денник в конюшне", available_from=start - datetime.timedelta(days=1),
                                             available_to=end + datetime.timedelta(days=1), capacity=12, checkin_time=datetime.time(12, 0),
                                             checkout_time=datetime.time(18, 0), conditions="Первая подстилка (опилки) включена.")
-        StableCategory.objects.create(tournament=t, name="Летний денник", price_kopecks=400000, price_mode="period", available_from=start - datetime.timedelta(days=1),
+        StableCategory.objects.create(tournament=t, name="Летний денник", available_from=start - datetime.timedelta(days=1),
                                       available_to=end + datetime.timedelta(days=1), capacity=20)
-        sawdust = Service.objects.create(tournament=t, name="Опилки", unit="мешок", price_kopecks=45000, limit=200)
-        Service.objects.create(tournament=t, name="Сено", unit="тюк", price_kopecks=60000)
-        Service.objects.create(tournament=t, name="Электричество для коневоза", unit="сутки", price_kopecks=80000, recipient="trailer")
+        sawdust = Service.objects.create(tournament=t, name="Опилки", unit="мешок", limit=200)
+        Service.objects.create(tournament=t, name="Сено", unit="тюк")
+        Service.objects.create(tournament=t, name="Электричество для коневоза", unit="сутки", recipient="trailer")
         b1 = ss.book(coach, cat.pk, baron, cat.available_from, cat.available_to, "demo-b1", required=True, contact_phone=coach.phone)
         ss.decide(groom, b1.pk, True)
         ss.assign_box(groom, b1.pk, "А-3")
         ss.book(coach, cat.pk, granit, cat.available_from, cat.available_to, "demo-b2")
         ss.order(coach, sawdust.pk, 4, "demo-o1", horse=baron)
 
-        charges = list(Charge.objects.filter(tournament=t, payer=coach))
-        fs.record_payment(cashier, t, coach.pk, 300000, "cash", timezone.localdate(), [c.pk for c in charges], "demo-pay-1", "предоплата на месте")
 
         p1 = t.programs.get(position=0)
         p2 = t.programs.get(position=1)

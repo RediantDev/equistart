@@ -21,7 +21,7 @@
           <div class="table__sub">{% if t.starts_on %}{% daterange t.starts_on t.ends_on %}{% else %}Даты не указаны{% endif %}{% if t.venue %} · {{ t.venue.name }}, {{ t.venue.settlement }}{% endif %}</div>
           {% if t.is_published %}<div class="chips" style="margin-top: 8px;">
             {% if 'organizer' in r.roles or 'judge' in r.roles %}<a class="tag tag--sky" href="{% url 'entries:manage' t.pk %}">Заявки</a><a class="tag tag--mint" href="{% url 'conduct:overview' t.pk %}">Проведение</a>{% endif %}
-            {% if 'organizer' in r.roles or 'cashier' in r.roles %}<a class="tag tag--peach" href="{% url 'finance:cash' t.pk %}">Касса</a>{% endif %}
+            
             {% if 'organizer' in r.roles or 'stable' in r.roles %}{% url 'stables:manage' t.pk as stables_url %}{% if stables_url %}<a class="tag tag--lemon" href="{{ stables_url }}">Денники и услуги</a>{% endif %}{% endif %}
           </div>{% endif %}
         </div>

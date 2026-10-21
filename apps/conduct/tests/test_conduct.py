@@ -80,7 +80,7 @@ class DrawTests(ConductBase):
 
     def test_conflicts_by_horse_interval(self):
         p2 = ProgramItem.objects.create(tournament=self.t, day=self.start, start_time=datetime.time(10, 5), discipline="jumping", name="Маршрут №2", program_type="jumping_clear", result_fields=["penalties"])
-        c2 = TournamentClass.objects.create(program=p2, name="Открытый-2", fee_kopecks=0)
+        c2 = TournamentClass.objects.create(program=p2, name="Открытый-2")
         app = self.submit(self.coach, [eservices.Line(self.a2, self.h1, c2)], key="k3")
         self.accept(app.entries.get())
         services.draw(self.judge, self.p1.pk)

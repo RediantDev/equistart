@@ -33,7 +33,7 @@
         <tr{% if not e.is_active %} class="is-muted"{% endif %}>
           <td><input type="checkbox" name="entry" value="{{ e.pk }}" aria-label="Выбрать {{ e.athlete_snapshot.name }}"{% if e.decision == "cancelled" %} disabled{% endif %}><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}"></td>
           <td><strong>{{ e.athlete_snapshot.name }}</strong><span class="table__sub">{{ e.athlete_snapshot.birth_date|isodate|default:"дата рождения не указана" }} · {{ e.athlete_snapshot.rank }} · {{ e.athlete_snapshot.club }}</span><span class="table__sub">{{ e.horse_snapshot.name }} · {{ e.horse_snapshot.birth_year }} · {{ e.horse_snapshot.sex }}</span></td>
-          <td>{{ e.program_name }}<span class="table__sub">{{ e.day|date:"j E" }} · {{ e.class_name }} · {{ e.fee_kopecks|rub }}</span></td>
+          <td>{{ e.program_name }}<span class="table__sub">{{ e.day|date:"j E" }} · {{ e.class_name }}</span></td>
           <td>{% include "entries/_entry_chips.html" %}</td>
           <td><a href="{% url 'entries:application' e.application_id %}">№{{ e.application_id }}</a><span class="table__sub">{{ e.application.contact_name }}</span><span class="table__sub num">{{ e.application.contact_phone|phone }}</span></td>
         </tr>

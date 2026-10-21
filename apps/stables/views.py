@@ -67,16 +67,14 @@ def book(request, pk):
                 phone = normalize_phone(form["contact_phone"])
                 if not phone:
                     raise ValueError("Телефон: мобильный номер России, Казахстана или Беларуси.")
-            amount = c.price_for(arrive, depart)
             if request.POST.get("confirm") == "1":
-                services.book(request.user, c.pk, h, arrive, depart, form["key"], form["required"], phone, form["comment"],
-                              expected_amount=request.POST.get("amount"))
+                services.book(request.user, c.pk, h, arrive, depart, form["key"], form["required"], phone, form["comment"])
                 messages.success(request, "Бронь отправлена. Конюшня подтвердит её и назначит номер денника.")
                 return redirect("stables:my")
             free = services.free_for(c, arrive, depart)
             if free < 1:
                 raise ValueError("На эти даты свободных денников этой категории нет.")
-            preview = {"c": c, "h": h, "arrive": arrive, "depart": depart, "nights": (depart - arrive).days, "amount": amount, "free": free}
+            preview = {"c": c, "h": h, "arrive": arrive, "depart": depart, "nights": (depart - arrive).days, "free": free}
         except services.Conflict as e:
             errors.append(str(e))
         except ValueError as e:
@@ -238,7 +236,7 @@ def service_edit(request, pk, svc_id=None):
             obj.save()
             from apps.core.models import audit
 
-            audit(request.user, "service.save", obj, name=obj.name, price=obj.price_kopecks)
+            audit(request.user, "service.save", obj, name=obj.name)
             messages.success(request, "Услуга сохранена.")
             return redirect(reverse("stables:manage", args=[t.pk]) + "?tab=setup")
     return render(request, "stables/form.html", {"t": t, "form": form, "title": "Услуга" if not s else s.name})

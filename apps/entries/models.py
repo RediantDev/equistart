@@ -63,7 +63,6 @@ class Entry(models.Model):
     program_name = models.CharField(max_length=200)
     class_name = models.CharField(max_length=200)
     day = models.DateField()
-    fee_kopecks = models.BigIntegerField()
 
     decision = models.CharField(max_length=12, choices=Decision.choices, default=Decision.PENDING)
     decision_reason = models.TextField("причина (не публикуется)", blank=True)

@@ -8,7 +8,6 @@ from django.urls import reverse
 from apps.conduct import services as cs
 from apps.entries import services as eservices
 from apps.entries.tests.test_entries import TMP, Base, mkuser
-from apps.finance.models import Charge
 from apps.profiles.models import Horse
 from apps.stables import services
 from apps.stables.models import Booking, Service, ServiceOrder, StableCategory
@@ -23,7 +22,7 @@ class StableBase(Base):
         TeamMember.objects.create(tournament=self.t, phone=self.groom.phone, user=self.groom, role="stable", state="accepted", invited_by=self.org)
         self.d0 = self.start - datetime.timedelta(days=1)
         self.d1 = self.start + datetime.timedelta(days=1)
-        self.cat = StableCategory.objects.create(tournament=self.t, name="Летний", price_kopecks=300000, available_from=self.d0, available_to=self.d1, capacity=1)
+        self.cat = StableCategory.objects.create(tournament=self.t, name="Летний", available_from=self.d0, available_to=self.d1, capacity=1)
         self.h3 = Horse.objects.create(name="Гранит", birth_year=2012, color="grey", sex="gelding", breed="орловская", manager=self.coach)
 
     def book(self, horse, key, user=None, **kw):
@@ -31,9 +30,8 @@ class StableBase(Base):
 
 
 class BookingTests(StableBase):
-    def test_price_and_capacity(self):
+    def test_capacity(self):
         b = self.book(self.h1, "b1")
-        self.assertEqual(b.amount_kopecks, 600000)
         with self.assertRaises(services.Conflict):
             self.book(self.h3, "b2")
         self.assertEqual(self.book(self.h1, "b1").pk, b.pk)  # повтор — та же бронь
@@ -56,8 +54,6 @@ class BookingTests(StableBase):
         b1, b2 = self.book(self.h1, "b1"), self.book(self.h3, "b2")
         services.decide(self.groom, b1.pk, True)
         services.decide(self.groom, b2.pk, True)
-        ch = Charge.objects.get(source_key=f"booking:{b1.pk}")
-        self.assertEqual((ch.amount, ch.direction, ch.payer), (600000, "stable", self.coach))
         services.assign_box(self.groom, b1.pk, "a-1")
         with self.assertRaises(services.Conflict):
             services.assign_box(self.groom, b2.pk, "A-1")
@@ -65,7 +61,7 @@ class BookingTests(StableBase):
 
     def test_cannot_shrink_capacity_below_bookings(self):
         self.book(self.h1, "b1")
-        data = {f: getattr(self.cat, f) for f in ["name", "price_kopecks", "price_mode", "available_from", "available_to", "capacity", "checkin_time", "checkout_time", "conditions", "is_active"]}
+        data = {f: getattr(self.cat, f) for f in ["name", "available_from", "available_to", "capacity", "checkin_time", "checkout_time", "conditions", "is_active"]}
         data["capacity"] = 0
         with self.assertRaises(ValueError):
             services.save_category(self.groom, self.t, data, self.cat)
@@ -93,19 +89,17 @@ class BookingTests(StableBase):
         b = self.book(self.h1, "b1")
         services.decide(self.groom, b.pk, True)
         services.cancel_booking(self.coach, b.pk)
-        self.assertTrue(Charge.objects.get(source_key=f"booking:{b.pk}").source_cancelled)
         self.book(self.h3, "b2")  # место освободилось
 
 
 class ServiceTests(StableBase):
     def setUp(self):
         super().setUp()
-        self.sawdust = Service.objects.create(tournament=self.t, name="Опилки", unit="мешок", price_kopecks=50000, limit=5)
-        self.power = Service.objects.create(tournament=self.t, name="Электричество", unit="сутки", price_kopecks=100000, recipient="trailer")
+        self.sawdust = Service.objects.create(tournament=self.t, name="Опилки", unit="мешок", limit=5)
+        self.power = Service.objects.create(tournament=self.t, name="Электричество", unit="сутки", recipient="trailer")
 
     def test_order_limit_and_partial_delivery(self):
         o = services.order(self.coach, self.sawdust.pk, 3, "o1", horse=self.h1)
-        self.assertEqual(Charge.objects.get(source_key=f"order:{o.pk}").amount, 150000)
         with self.assertRaises(services.Conflict):
             services.order(self.coach, self.sawdust.pk, 3, "o2", horse=self.h1)
         services.deliver(self.groom, o.pk, 2)
@@ -122,19 +116,18 @@ class ServiceTests(StableBase):
             services.order(self.coach, self.power.pk, 1, "t1")
         o = services.order(self.coach, self.power.pk, 2, "t2", trailer="А123ВС")
         services.cancel_order(self.coach, o.pk)
-        self.assertEqual(Charge.objects.get(source_key=f"order:{o.pk}").amount, 0)
 
 
 class ViewTests(StableBase):
-    def test_book_flow_shows_sum_before_order(self):
+    def test_book_flow_confirm_before_order(self):
         self.client.force_login(self.coach)
         data = {"category": self.cat.pk, "horse": self.h1.pk, "arrive": self.d0.isoformat(), "depart": self.d1.isoformat(), "key": "kk"}
         r = self.client.post(reverse("stables:book", args=[self.t.pk]), data)
-        self.assertContains(r, "Забронировать за 6")
+        self.assertContains(r, "ПРОВЕРЬТЕ БРОНЬ")
         self.assertFalse(Booking.objects.exists())
-        r = self.client.post(reverse("stables:book", args=[self.t.pk]), {**data, "confirm": "1", "amount": "600000"})
+        r = self.client.post(reverse("stables:book", args=[self.t.pk]), {**data, "confirm": "1"})
         self.assertRedirects(r, reverse("stables:my"))
-        self.client.post(reverse("stables:book", args=[self.t.pk]), {**data, "confirm": "1", "amount": "600000"})
+        self.client.post(reverse("stables:book", args=[self.t.pk]), {**data, "confirm": "1"})
         self.assertEqual(Booking.objects.count(), 1)
 
     def test_staff_access(self):
@@ -181,7 +174,7 @@ class LastBoxRaceTests(TransactionTestCase):
         base._testMethodName = "x"
         Base.setUp(base)
         start = base.start
-        cat = StableCategory.objects.create(tournament=base.t, name="Последний", price_kopecks=100, available_from=start, available_to=start + datetime.timedelta(days=1), capacity=1)
+        cat = StableCategory.objects.create(tournament=base.t, name="Последний", available_from=start, available_to=start + datetime.timedelta(days=1), capacity=1)
         horses = [Horse.objects.create(name=f"Л{i}", birth_year=2010, color="bay", sex="mare", breed="x", manager=base.coach) for i in range(4)]
         barrier = threading.Barrier(4)
         results = []

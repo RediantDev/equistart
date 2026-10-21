@@ -18,7 +18,7 @@ from apps.tournaments.services import roles_of
 
 from . import services
 from .models import Application, ChangeProposal, Entry
-from .services import Conflict, Line, PriceChanged
+from .services import Conflict, Line
 
 MAX_PARTNERS = 3
 
@@ -49,7 +49,6 @@ def _load_lines(cart):
                 Athlete.objects.get(pk=raw["a"]), Horse.objects.get(pk=raw["h"]),
                 TournamentClass.objects.select_related("program").get(pk=raw["c"]),
                 partners=[(Athlete.objects.get(pk=a), Horse.objects.get(pk=h)) for a, h in raw.get("p", [])],
-                fee_seen=raw.get("fee"),
             )
         except (Athlete.DoesNotExist, Horse.DoesNotExist, TournamentClass.DoesNotExist):
             continue
@@ -107,7 +106,7 @@ def apply(request, pk):
                 if any((r["a"], r["h"], r["c"], tuple(tuple(x) for x in r.get("p", []))) == line.key() for r in cart["lines"]):
                     errors.append("Такое выступление уже есть в заявке.")
             if not errors:
-                cart["lines"].append({"a": line.athlete.pk, "h": line.horse.pk, "c": line.tclass.pk, "p": [[a.pk, h.pk] for a, h in line.partners], "fee": line.tclass.fee_kopecks})
+                cart["lines"].append({"a": line.athlete.pk, "h": line.horse.pk, "c": line.tclass.pk, "p": [[a.pk, h.pk] for a, h in line.partners]})
                 _save_cart(request, t, late, cart)
                 messages.success(request, "Выступление добавлено в заявку.")
                 return redirect(_apply_url(t, late))
@@ -122,12 +121,6 @@ def apply(request, pk):
                     request.user, t.pk, lines, cart["key"], contact_name=request.POST.get("contact_name", "").strip(),
                     contact_phone=phone, comment=request.POST.get("comment", "").strip(), late=late,
                 )
-            except PriceChanged as pc:
-                for raw in cart["lines"]:
-                    raw["fee"] = classes[raw["c"]].fee_kopecks if raw["c"] in classes else raw.get("fee")
-                _save_cart(request, t, late, cart)
-                messages.error(request, "Организатор изменил цену некоторых зачётов. Проверьте суммы и отправьте заявку ещё раз.")
-                return redirect(_apply_url(t, late))
             except ValueError as e:
                 errors = e.args[0] if isinstance(e.args[0], list) else [str(e)]
             except Conflict as e:
@@ -140,11 +133,10 @@ def apply(request, pk):
                 return redirect("entries:application", pk=app.pk)
 
     lines = _load_lines(cart)
-    total = sum(l.tclass.fee_kopecks for l in lines)
     return render(
         request, "entries/apply.html",
         {
-            "t": t, "s": t.snapshot, "late": late, "lines": list(enumerate(lines)), "total": total, "errors": errors,
+            "t": t, "s": t.snapshot, "late": late, "lines": list(enumerate(lines)), "errors": errors,
             "athletes": athletes, "horses": horses, "class_groups": class_groups, "add": add_values,
             "partner_range": range(1, MAX_PARTNERS + 1), "key": cart["key"],
         },
@@ -238,16 +230,9 @@ def application(request, pk):
     for e in entries:
         e.pending_proposal = next((p for p in e.proposals.all() if p.state == ChangeProposal.State.PENDING), None)
     history = AuditLog.objects.filter(Q(target_type="application", target_id=app.pk) | Q(target_type="entry", target_id__in=[e.pk for e in entries])).select_related("actor")[:50]
-    charges = None
-    try:
-        from apps.finance.services import application_balance
-
-        charges = application_balance(app)
-    except ImportError:
-        pass
     return render(request, "entries/application.html", {
         "app": app, "t": app.tournament, "entries": entries, "owner": owner, "judge": judge,
-        "summary": services.summarize(entries), "history": history if (owner or judge) else [], "charges": charges,
+        "summary": services.summarize(entries), "history": history if (owner or judge) else [],
         "show_contacts": owner or judge,
     })
 

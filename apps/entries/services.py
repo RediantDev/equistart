@@ -43,15 +43,6 @@ def require_judge(user, tournament):
         raise PermissionDenied
 
 
-def money_hook(name, *args):
-    """Связь с учётом денег (этап 4) без жёсткой зависимости модулей."""
-    try:
-        from apps.finance import hooks
-    except ImportError:
-        return
-    getattr(hooks, name)(*args)
-
-
 # ---------------- проверка строки заявки ----------------
 
 @dataclass
@@ -60,7 +51,6 @@ class Line:
     horse: Horse
     tclass: TournamentClass
     partners: list = field(default_factory=list)  # [(Athlete, Horse)]
-    fee_seen: int | None = None
 
     def key(self):
         return (self.athlete.pk, self.horse.pk, self.tclass.pk, tuple((a.pk, h.pk) for a, h in self.partners))
@@ -160,20 +150,15 @@ def submit(user, tournament_id, lines: list[Line], key: str, contact_name="", co
     list(TournamentClass.objects.select_for_update().filter(pk__in={l.tclass.pk for l in lines}).order_by("pk"))
     allowed = set(athletes_for_entry(user).values_list("pk", flat=True))
     errors, seen = [], set()
-    price_changed = []
     for l in lines:
         l.tclass.refresh_from_db()
         if l.key() in seen:
             errors.append(f"Выступление «{l.athlete.public_name} / {l.horse.name}» добавлено дважды.")
         seen.add(l.key())
         errors += check_line(user, t, l, late=late, allowed_athletes=allowed)
-        if l.fee_seen is not None and l.fee_seen != l.tclass.fee_kopecks:
-            price_changed.append(l)
     errors += _capacity_errors(lines)
     if errors:
         raise ValueError(errors)
-    if price_changed:
-        raise PriceChanged(price_changed)
     app = Application.objects.create(
         tournament=t, submitted_by=user, contact_name=contact_name or user.full_name, contact_phone=contact_phone or user.phone,
         comment=comment, late=late, idempotency_key=key, content_hash=h,
@@ -183,23 +168,16 @@ def submit(user, tournament_id, lines: list[Line], key: str, contact_name="", co
             application=app, tournament=t, program=l.tclass.program, tclass=l.tclass, athlete=l.athlete, horse=l.horse,
             athlete_snapshot=l.athlete.private_snapshot(), horse_snapshot=l.horse.public_snapshot(),
             partners_snapshot=[{"athlete": a.private_snapshot(), "horse": hh.public_snapshot()} for a, hh in l.partners],
-            program_name=l.tclass.program.name, class_name=l.tclass.name, day=l.tclass.program.day, fee_kopecks=l.tclass.fee_kopecks,
+            program_name=l.tclass.program.name, class_name=l.tclass.name, day=l.tclass.program.day,
             decision=Entry.Decision.ACCEPTED if late else Entry.Decision.PENDING,
             decided_by=user if late else None, decided_at=timezone.now() if late else None,
         )
         for i, (a, hh) in enumerate(l.partners, start=1):
             EntryPartner.objects.create(entry=e, athlete=a, horse=hh, position=i)
-        money_hook("entry_created", e, user)
     audit(user, "application.submit", app, tournament=t.pk, entries=len(lines), late=late)
     judges = _judges(t)
     notify(judges, f"Новая заявка №{app.pk} на «{t.pub_title}»: выступлений {len(lines)}", reverse("entries:manage", args=[t.pk]), "application")
     return app
-
-
-class PriceChanged(Exception):
-    def __init__(self, lines):
-        self.lines = lines
-        super().__init__("price changed")
 
 
 def _judges(t):
@@ -275,8 +253,6 @@ def _apply_action(user, e, action, reason):
     if action in ("accept", "accept_admit"):
         if e.decision == Entry.Decision.ACCEPTED and action == "accept":
             raise ValueError("уже принято")
-        if e.decision == Entry.Decision.REJECTED:
-            money_hook("entry_restored", e, user)
         e.decision, e.decided_by, e.decided_at, e.decision_reason = Entry.Decision.ACCEPTED, user, now, ""
         if action == "accept_admit":
             e.admission, e.admission_by, e.admission_at = Entry.Admission.ADMITTED, user, now
@@ -284,11 +260,9 @@ def _apply_action(user, e, action, reason):
         return "Принято"
     if action == "reject":
         e.decision, e.decided_by, e.decided_at, e.decision_reason = Entry.Decision.REJECTED, user, now, reason.strip()
-        money_hook("entry_cancelled", e, user, "Отклонено судьёй")
         return "Отклонено"
     if action == "cancel":
         e.decision, e.cancelled_by, e.cancelled_at, e.cancel_reason = Entry.Decision.CANCELLED, user, now, reason.strip()
-        money_hook("entry_cancelled", e, user, "Отменено судьёй")
         return "Отменено судьёй"
     if action in ("admit", "not_admit"):
         if e.decision == Entry.Decision.REJECTED:
@@ -320,7 +294,6 @@ def cancel_by_representative(user, application_id, items: list[tuple[int, str]])
                 e.revision += 1
                 e.save()
                 ChangeProposal.objects.filter(entry=e, state=ChangeProposal.State.PENDING).update(state=ChangeProposal.State.WITHDRAWN)
-                money_hook("entry_cancelled", e, user, "Отменено представителем")
                 audit(user, "entry.cancel_by_representative", e)
             results.append(RowResult(entry_id, True, "Отменено"))
         except (Conflict, ValueError) as ex:
@@ -383,19 +356,16 @@ def decide_proposal(user, proposal_id, accept: bool, reason: str = "") -> Change
             errors += _capacity_errors([line])
         if errors:
             raise ValueError(errors[0])
-        old_fee = e.fee_kopecks
         if p.athlete_id:
             e.athlete, e.athlete_snapshot = p.athlete, p.athlete.private_snapshot()
         if p.horse_id:
             e.horse, e.horse_snapshot = p.horse, p.horse.public_snapshot()
         if p.tclass_id:
             e.tclass, e.program = new_class, new_class.program
-            e.program_name, e.class_name, e.day, e.fee_kopecks = new_class.program.name, new_class.name, new_class.program.day, new_class.fee_kopecks
+            e.program_name, e.class_name, e.day = new_class.program.name, new_class.name, new_class.program.day
         e.admission, e.admission_by, e.admission_at = Entry.Admission.UNCONFIRMED, None, None
         e.revision += 1
         e.save()
-        if e.fee_kopecks != old_fee:
-            money_hook("entry_fee_changed", e, user, old_fee)
         p.state = ChangeProposal.State.ACCEPTED
     else:
         p.state = ChangeProposal.State.REJECTED

@@ -6,7 +6,7 @@ from .models import Application, ChangeProposal, Entry
 class EntryInline(admin.TabularInline):
     model = Entry
     extra = 0
-    fields = ("program_name", "class_name", "decision", "admission", "fee_kopecks")
+    fields = ("program_name", "class_name", "decision", "admission")
     readonly_fields = fields
 
 

@@ -297,7 +297,7 @@ def class_save(request, pk, program_id, class_id=None):
             obj.save()
             locked.mark_changed()
             locked.save()
-            audit(request.user, "class.save", locked, tclass=obj.pk, name=obj.name, fee_kopecks=obj.fee_kopecks)
+            audit(request.user, "class.save", locked, tclass=obj.pk, name=obj.name)
     except Conflict:
         messages.error(request, CONFLICT_MSG)
         return redirect("tournaments:step", pk=pk, step=3)
@@ -634,7 +634,6 @@ def public_detail(request, pk):
             "open": t.public_entries_open(), "card": _card(t),
             "can_manage": request.user.is_authenticated and services.can_manage(request.user, t),
             "can_judge": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "judge"}),
-            "can_cash": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "cashier"}),
             "can_stable": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "stable"}),
             "has_stables": t.stable_categories.filter(is_active=True).exists() or t.services.filter(is_active=True).exists(),
             **_public_tabs(request, t),

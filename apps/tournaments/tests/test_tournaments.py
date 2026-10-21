@@ -46,7 +46,7 @@ class Base(TestCase):
         )
         t.regulation.save("p.pdf", SimpleUploadedFile("p.pdf", PDF, "application/pdf"))
         p = ProgramItem.objects.create(tournament=t, day=self.start, discipline="jumping", name="Маршрут №1 · 80 см", program_type="jumping_clear_time", result_fields=["penalties", "time"])
-        TournamentClass.objects.create(program=p, name="Любители", fee_kopecks=250000)
+        TournamentClass.objects.create(program=p, name="Любители")
         return t
 
     def publish(self, t):
@@ -104,7 +104,7 @@ class WizardTests(Base):
         resp = self.client.get(reverse("tournaments:step", args=[t.pk, 4]))
         self.assertRedirects(resp, reverse("tournaments:step", args=[t.pk, 1]))
 
-    def test_program_and_class_flow_with_price_in_kopecks(self):
+    def test_program_and_class_flow(self):
         t = self.make_ready()
         self.client.force_login(self.org)
         resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), {
@@ -116,10 +116,10 @@ class WizardTests(Base):
         self.assertEqual(p.result_fields, ["penalties", "time", "jumpoff_penalties", "jumpoff_time"])
         t.refresh_from_db()
         resp = self.client.post(reverse("tournaments:class_add", args=[t.pk, p.pk]), {
-            "revision": t.revision, "name": "Взрослые", "fee": "3 000,50", "composition": "single", "min_age": "18", "max_age": "",
+            "revision": t.revision, "name": "Взрослые", "composition": "single", "min_age": "18", "max_age": "",
         })
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(TournamentClass.objects.get(name="Взрослые").fee_kopecks, 300050)
+        self.assertEqual(TournamentClass.objects.get(name="Взрослые").min_age, 18)
 
     def test_program_type_must_match_discipline(self):
         t = self.make_ready()
@@ -137,15 +137,6 @@ class WizardTests(Base):
             "revision": t.revision, "day": (self.start + datetime.timedelta(days=9)).isoformat(), "discipline": "jumping", "name": "Х", "program_type": "jumping_clear",
         })
         self.assertEqual(resp.status_code, 422)
-
-    def test_negative_and_bad_fee(self):
-        t = self.make_ready()
-        p = t.programs.first()
-        self.client.force_login(self.org)
-        for fee in ["-1", "abc", "10,123"]:
-            with self.subTest(fee=fee):
-                resp = self.client.post(reverse("tournaments:class_add", args=[t.pk, p.pk]), {"revision": t.revision, "name": "Z", "fee": fee, "composition": "single"})
-                self.assertEqual(resp.status_code, 422)
 
     def test_stale_revision_conflict(self):
         t = self.make_ready()
@@ -240,7 +231,7 @@ class ModerationTests(Base):
         self.client.logout()
         resp = self.client.get(reverse("tournaments:public", args=[t.pk]))
         self.assertContains(resp, "Кубок «Белая роща»")
-        self.assertContains(resp, "2 500 ₽")
+        self.assertContains(resp, "Любители")
         self.assertNotContains(resp, self.org.phone)
         actions = list(AuditLog.objects.filter(target_type="tournament", target_id=t.pk).values_list("action", flat=True))
         for a in ["tournament.submit", "tournament.return", "tournament.approve"]:
@@ -275,17 +266,18 @@ class ModerationTests(Base):
         t = self.publish(self.make_ready())
         c = TournamentClass.objects.get()
         self.client.force_login(self.org)
-        self.client.post(reverse("tournaments:class_save", args=[t.pk, c.program_id, c.pk]), {"revision": t.revision, "name": "Любители", "fee": "9999", "composition": "single"})
+        self.client.post(reverse("tournaments:class_save", args=[t.pk, c.program_id, c.pk]), {"revision": t.revision, "name": "Любители 2", "composition": "single"})
         t.refresh_from_db()
         self.assertEqual(t.status, Tournament.Status.DRAFT)
         self.assertEqual(t.publication, Tournament.Publication.PUBLISHED)
+        self.client.get(reverse("tournaments:public", args=[t.pk]))  # сообщение «Зачёт сохранён»
         resp = self.client.get(reverse("tournaments:public", args=[t.pk]))
-        self.assertContains(resp, "2 500 ₽")
-        self.assertNotContains(resp, "9 999")
+        self.assertContains(resp, "Любители")
+        self.assertNotContains(resp, "Любители 2")
         services.submit(self.org, t.pk, t.revision)
         t.refresh_from_db()
         services.approve(self.mod, t.pk, t.revision)
-        self.assertContains(self.client.get(reverse("tournaments:public", args=[t.pk])), "9 999 ₽")
+        self.assertContains(self.client.get(reverse("tournaments:public", args=[t.pk])), "Любители 2")
 
     def test_new_regulation_does_not_replace_published_until_approved(self):
         t = self.publish(self.make_ready())

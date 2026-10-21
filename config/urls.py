@@ -14,7 +14,6 @@ urlpatterns = [
     path("", include("apps.profiles.urls")),
     path("", include("apps.entries.urls")),
     path("", include("apps.conduct.urls")),
-    path("", include("apps.finance.urls")),
     path("", include("apps.stables.urls")),
     path("", include("apps.accounts.urls")),
     path("", include("apps.core.urls")),

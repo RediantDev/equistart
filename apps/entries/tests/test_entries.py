@@ -58,8 +58,8 @@ class Base(TestCase):
                                       organizer_name="КСК", entry_deadline=self.start - datetime.timedelta(days=2))
         t.regulation.save("p.pdf", SimpleUploadedFile("p.pdf", PDF))
         p = ProgramItem.objects.create(tournament=t, day=self.start, discipline="jumping", name="Маршрут №1", program_type="jumping_clear", result_fields=["penalties"], limit=3)
-        TournamentClass.objects.create(program=p, name="Дети", fee_kopecks=150000, min_age=10, max_age=14)
-        TournamentClass.objects.create(program=p, name="Открытый", fee_kopecks=250000, limit=2)
+        TournamentClass.objects.create(program=p, name="Дети", min_age=10, max_age=14)
+        TournamentClass.objects.create(program=p, name="Открытый", limit=2)
         tservices.submit(self.org, t.pk, t.revision)
         t.refresh_from_db()
         tservices.approve(self.mod, t.pk, t.revision)
@@ -175,7 +175,6 @@ class SubmitTests(Base):
         self.assertEqual(app.entries.count(), 2)
         self.assertTrue(app.is_group)
         e = app.entries.get(athlete=self.a1)
-        self.assertEqual(e.fee_kopecks, 150000)
         self.assertEqual(e.decision, Entry.Decision.PENDING)
         self.assertEqual(e.athlete_snapshot["birth_year"], self.a1.birth_year)
         self.assertTrue(Notification.objects.filter(user=self.org).exists())
@@ -234,19 +233,11 @@ class SubmitTests(Base):
         with self.assertRaises(ValueError):
             self.submit(self.coach, [services.Line(self.a2, self.h1, self.c_open)], key="late2", late=True)
 
-    def test_price_change_requires_reconfirmation(self):
-        line = services.Line(self.a2, self.h1, self.c_open, fee_seen=250000)
-        TournamentClass.objects.filter(pk=self.c_open.pk).update(fee_kopecks=300000)
-        with self.assertRaises(services.PriceChanged):
-            self.submit(self.coach, [line])
-        self.assertEqual(Application.objects.count(), 0)
-
     def test_apply_page_flow(self):
         self.client.force_login(self.coach)
         url = reverse("entries:apply", args=[self.t.pk])
         self.client.post(url, {"action": "add", "athlete": self.a1.pk, "horse": self.h1.pk, "tclass": self.c_kids.pk})
         resp = self.client.get(url)
-        self.assertContains(resp, "1 500 ₽")
         resp = self.client.post(url, {"action": "submit", "contact_name": "Мария", "contact_phone": "+7 999 000-10-03"})
         app = Application.objects.get()
         self.assertRedirects(resp, reverse("entries:application", args=[app.pk]))

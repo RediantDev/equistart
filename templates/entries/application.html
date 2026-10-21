@@ -44,7 +44,6 @@
               </div>
               <div class="entry-row__side">
                 {% include "entries/_entry_chips.html" %}
-                <span class="num" style="font-weight: 700;">{{ e.fee_kopecks|rub }}</span>
                 {% if owner and e.is_active and not e.is_started and not e.pending_proposal %}<a class="btn btn--ghost btn--sm" href="{% url 'entries:propose' e.pk %}">Предложить замену</a>{% endif %}
               </div>
             </article>
@@ -86,7 +85,6 @@
       {% endif %}
     </section>
     {% endif %}
-    {% if charges %}{% include "finance/_balance.html" %}{% endif %}
   </aside>
 </div>
 {% endblock %}

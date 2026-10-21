@@ -198,7 +198,6 @@ class TournamentClass(models.Model):
 
     program = models.ForeignKey(ProgramItem, on_delete=models.CASCADE, related_name="classes")
     name = models.CharField("название зачёта", max_length=200, help_text="Например: «Любители», «Дети до 14 лет»")
-    fee_kopecks = models.BigIntegerField("стартовый взнос, коп.")
     composition = models.CharField("состав", max_length=8, choices=Composition.choices, default=Composition.SINGLE)
     min_age = models.PositiveSmallIntegerField("возраст от", null=True, blank=True)
     max_age = models.PositiveSmallIntegerField("возраст до", null=True, blank=True)
@@ -211,7 +210,6 @@ class TournamentClass(models.Model):
         verbose_name_plural = "зачёты"
         ordering = ["position", "id"]
         constraints = [
-            models.CheckConstraint(condition=models.Q(fee_kopecks__gte=0), name="class_fee_non_negative"),
             models.CheckConstraint(
                 condition=models.Q(min_age__isnull=True) | models.Q(max_age__isnull=True) | models.Q(max_age__gte=models.F("min_age")),
                 name="class_age_range",
@@ -242,7 +240,6 @@ class TeamMember(models.Model):
         ORGANIZER = "organizer", "Организатор"
         JUDGE = "judge", "Судья"
         STABLE = "stable", "Конюшня и услуги"
-        CASHIER = "cashier", "Касса"
 
     class State(models.TextChoices):
         PENDING = "pending", "Приглашение отправлено"

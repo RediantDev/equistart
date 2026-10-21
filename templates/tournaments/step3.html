@@ -2,7 +2,7 @@
 {% load tournaments %}
 {% block step %}
 <div class="wizard-main">
-  <p class="muted">В каждой программе — один или несколько зачётов со своими условиями и стартовым взносом. Цена показывается отдельно от названия.</p>
+  <p class="muted">В каждой программе — один или несколько зачётов со своими условиями участия.</p>
   {% for p in programs %}
     <section class="card" id="program-{{ p.pk }}">
       <div class="section-head">
@@ -16,7 +16,7 @@
       {% if p.classes.all %}
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th>Зачёт</th><th>Состав</th><th>Условия</th><th class="num">Лимит</th><th class="num">Взнос</th>{% if not t.is_locked %}<th><span class="visually-hidden">Действия</span></th>{% endif %}</tr></thead>
+            <thead><tr><th>Зачёт</th><th>Состав</th><th>Условия</th><th class="num">Лимит</th>{% if not t.is_locked %}<th><span class="visually-hidden">Действия</span></th>{% endif %}</tr></thead>
             <tbody>
               {% for c in p.classes.all %}
                 <tr>
@@ -24,7 +24,6 @@
                   <td>{{ c.get_composition_display }}</td>
                   <td>{{ c.conditions|default:"—" }}</td>
                   <td class="num">{{ c.limit|default:"—" }}</td>
-                  <td class="num">{{ c.fee_kopecks|rub }}</td>
                   {% if not t.is_locked %}
                   <td style="white-space: nowrap; text-align: right;">
                     <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:class_edit' t.pk p.pk c.pk %}#program-{{ p.pk }}">Изменить</a>
@@ -51,7 +50,6 @@
           <input type="hidden" name="revision" value="{{ t.revision }}">
           <div class="grid-3">
             {% include "partials/field.html" with field=p.form.name %}
-            {% include "partials/field.html" with field=p.form.fee %}
             {% include "partials/field.html" with field=p.form.composition %}
           </div>
           <div class="grid-3">

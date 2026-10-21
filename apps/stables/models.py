@@ -9,14 +9,8 @@ User = settings.AUTH_USER_MODEL
 
 
 class StableCategory(models.Model):
-    class PriceMode(models.TextChoices):
-        PER_DAY = "day", "за сутки"
-        PER_PERIOD = "period", "за весь период"
-
     tournament = models.ForeignKey("tournaments.Tournament", on_delete=models.CASCADE, related_name="stable_categories")
     name = models.CharField("название", max_length=120, help_text="Например: «Летний денник», «Денник в конюшне»")
-    price_kopecks = models.BigIntegerField("цена")
-    price_mode = models.CharField("цена указана", max_length=6, choices=PriceMode.choices, default=PriceMode.PER_DAY)
     available_from = models.DateField("первый заезд")
     available_to = models.DateField("последний выезд")
     capacity = models.PositiveIntegerField("вместимость")
@@ -39,10 +33,6 @@ class StableCategory(models.Model):
             d += datetime.timedelta(days=1)
         return out
 
-    def price_for(self, arrive, depart) -> int:
-        n = (depart - arrive).days
-        return self.price_kopecks * n if self.price_mode == self.PriceMode.PER_DAY else self.price_kopecks
-
 
 class Booking(models.Model):
     class State(models.TextChoices):
@@ -60,7 +50,6 @@ class Booking(models.Model):
     requested_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="bookings")
     arrive = models.DateField("заезд")
     depart = models.DateField("выезд")
-    amount_kopecks = models.BigIntegerField()
     required = models.BooleanField("без денника выступления невозможны", default=False)
     contact_phone = models.CharField("телефон для связи по брони", max_length=13, blank=True)
     comment = models.CharField("комментарий", max_length=500, blank=True)
@@ -94,7 +83,6 @@ class Service(models.Model):
     tournament = models.ForeignKey("tournaments.Tournament", on_delete=models.CASCADE, related_name="services")
     name = models.CharField("название", max_length=120, help_text="Опилки, сено, электричество для коневоза…")
     unit = models.CharField("единица", max_length=30, help_text="мешок, тюк, сутки")
-    price_kopecks = models.BigIntegerField("цена за единицу")
     recipient = models.CharField("получатель", max_length=8, choices=Recipient.choices, default=Recipient.HORSE)
     available_from = models.DateField("с", null=True, blank=True)
     available_to = models.DateField("по", null=True, blank=True)
@@ -122,7 +110,6 @@ class ServiceOrder(models.Model):
     for_date = models.DateField("на дату", null=True, blank=True)
     quantity = models.PositiveIntegerField()
     delivered = models.PositiveIntegerField(default=0)
-    unit_price_kopecks = models.BigIntegerField()
     state = models.CharField(max_length=10, choices=State.choices, default=State.ORDERED)
     comment = models.CharField(max_length=300, blank=True)
     idempotency_key = models.CharField(max_length=64, unique=True)
@@ -130,10 +117,6 @@ class ServiceOrder(models.Model):
 
     class Meta:
         ordering = ["for_date", "id"]
-
-    @property
-    def amount_kopecks(self):
-        return self.unit_price_kopecks * self.quantity
 
     @property
     def delivery_state(self):

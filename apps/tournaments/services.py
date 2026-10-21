@@ -118,7 +118,6 @@ def build_snapshot(t: Tournament) -> dict:
                 "classes": [
                     {
                         "name": c.name,
-                        "fee_kopecks": c.fee_kopecks,
                         "composition": c.composition,
                         "composition_name": c.get_composition_display(),
                         "conditions": c.conditions,
@@ -236,12 +235,6 @@ def cancel(user, tournament_id: int, revision, reason: str) -> Tournament:
     t.revision += 1
     t.save()
     audit(user, "tournament.cancel", t, reason=reason)
-    try:
-        from apps.finance.services import tournament_cancelled
-    except ImportError:
-        pass
-    else:
-        tournament_cancelled(t, user)
     return t
 
 

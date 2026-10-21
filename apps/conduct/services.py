@@ -304,7 +304,7 @@ def finish_warnings(tournament) -> list[str]:
     waiting = StartSlot.objects.filter(program__tournament=tournament, status__in=[StartSlot.Status.WAITING, StartSlot.Status.STARTED]).count()
     if waiting:
         out.append(f"Выступлений без итогового статуса: {waiting}")
-    for mod in ("apps.finance.services", "apps.stables.services"):
+    for mod in ("apps.stables.services",):
         try:
             m = __import__(mod, fromlist=["finish_warnings"])
         except ImportError:

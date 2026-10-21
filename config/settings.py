@@ -74,7 +74,6 @@ INSTALLED_APPS = [
     "apps.profiles",
     "apps.entries",
     "apps.conduct",
-    "apps.finance",
     "apps.stables",
 ]
 

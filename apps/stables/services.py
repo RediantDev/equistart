@@ -37,14 +37,6 @@ def _staff(t):
     return list(get_user_model().objects.filter(pk__in=ids))
 
 
-def _money(name, *args, **kwargs):
-    try:
-        from apps.finance import services as fin
-    except ImportError:
-        return None
-    return getattr(fin, name)(*args, **kwargs)
-
-
 def _days(a, b):
     d = a
     while d < b:
@@ -85,7 +77,7 @@ def booking_open(t) -> bool:
 # ---------------- брони ----------------
 
 @transaction.atomic
-def book(user, category_id, horse, arrive, depart, key, required=False, contact_phone="", comment="", expected_amount=None) -> Booking:
+def book(user, category_id, horse, arrive, depart, key, required=False, contact_phone="", comment="") -> Booking:
     """LOD-02/03: вся проверка вместимости — в одной транзакции под блокировкой категории."""
     existing = Booking.objects.filter(idempotency_key=key).first()
     if existing:
@@ -99,18 +91,15 @@ def book(user, category_id, horse, arrive, depart, key, required=False, contact_
     if horse.manager_id != user.pk:
         raise PermissionDenied
     check_period(c, arrive, depart)
-    amount = c.price_for(arrive, depart)
-    if expected_amount is not None and int(expected_amount) != amount:
-        raise ValueError("Цена изменилась — проверьте сумму и подтвердите ещё раз.")
     if Booking.objects.filter(tournament=t, horse=horse, state__in=Booking.HOLDING, arrive__lt=depart, depart__gt=arrive).exists():
         raise ValueError(f"У лошади «{horse.name}» уже есть бронь на эти даты.")
     if free_for(c, arrive, depart) < 1:
         raise Conflict("Свободных денников на эти даты нет — последний только что забронировали.")
     b = Booking.objects.create(
-        tournament=t, category=c, horse=horse, horse_name=horse.name, requested_by=user, arrive=arrive, depart=depart, amount_kopecks=amount,
+        tournament=t, category=c, horse=horse, horse_name=horse.name, requested_by=user, arrive=arrive, depart=depart,
         required=bool(required), contact_phone=contact_phone or "", comment=(comment or "").strip()[:500], idempotency_key=key,
     )
-    audit(user, "booking.create", b, category=c.pk, arrive=str(arrive), depart=str(depart), amount=amount, required=b.required)
+    audit(user, "booking.create", b, category=c.pk, arrive=str(arrive), depart=str(depart), required=b.required)
     notify(_staff(t), f"Новая бронь: {c.name}, {horse.name}, {arrive:%d.%m}–{depart:%d.%m}", reverse("stables:manage", args=[t.pk]) + "?tab=bookings", "booking")
     return b
 
@@ -136,12 +125,6 @@ def decide(user, booking_id, accept: bool, reason="", revision=None) -> Booking:
     b.revision += 1
     b.save()
     audit(user, "booking.confirm" if accept else "booking.reject", b, reason=reason)
-    if accept:
-        _money("create_charge", **{
-            "tournament": b.tournament, "payer": b.requested_by, "direction": "stable", "kind": "booking", "source_key": f"booking:{b.pk}",
-            "title": f"Денник: {b.category.name}", "subtitle": f"{b.horse_name} · {b.arrive:%d.%m}–{b.depart:%d.%m}, суток: {b.nights}",
-            "amount": b.amount_kopecks, "by": user,
-        })
     text = "подтверждена" if accept else f"отклонена: {reason}"
     notify([b.requested_by], f"Бронь денника ({b.horse_name}, {b.arrive:%d.%m}–{b.depart:%d.%m}) {text}", reverse("stables:my"), "booking")
     return b
@@ -179,13 +162,10 @@ def cancel_booking(user, booking_id, reason="") -> Booking:
     reason = (reason or "").strip()
     if staff and b.requested_by_id != user.pk and not reason:
         raise ValueError("Укажите причину отмены.")
-    was_confirmed = b.state == Booking.State.CONFIRMED
     b.state, b.reason = Booking.State.CANCELLED, (reason or "Отменено представителем")[:300]
     b.revision += 1
     b.save()
     audit(user, "booking.cancel", b, reason=b.reason)
-    if was_confirmed:
-        _money("source_cancelled", f"booking:{b.pk}", user, f"Бронь отменена: {b.reason}")
     if b.requested_by_id != user.pk:
         notify([b.requested_by], f"Бронь денника ({b.horse_name}) отменена: {b.reason}", reverse("stables:my"), "booking")
     else:
@@ -269,13 +249,8 @@ def order(user, service_id, quantity, key, horse=None, trailer="", for_date=None
     if s.limit is not None and ordered_total(s) + quantity > s.limit:
         raise Conflict(f"Осталось только {max(0, s.limit - ordered_total(s))} {s.unit}.")
     o = ServiceOrder.objects.create(service=s, tournament=t, ordered_by=user, horse=horse, recipient_label=label, for_date=for_date, quantity=quantity,
-                                    unit_price_kopecks=s.price_kopecks, comment=(comment or "").strip()[:300], idempotency_key=key)
+                                    comment=(comment or "").strip()[:300], idempotency_key=key)
     audit(user, "service_order.create", o, service=s.pk, quantity=quantity)
-    _money("create_charge", **{
-        "tournament": t, "payer": user, "direction": "stable", "kind": "service", "source_key": f"order:{o.pk}",
-        "title": f"{s.name}", "subtitle": f"{label} · {quantity} {s.unit}" + (f" · {for_date:%d.%m}" if for_date else ""),
-        "amount": o.amount_kopecks, "by": user,
-    })
     notify(_staff(t), f"Заказ услуги: {s.name} × {quantity} ({label})", reverse("stables:manage", args=[t.pk]) + "?tab=orders", "booking")
     return o
 
@@ -289,12 +264,10 @@ def cancel_order(user, order_id, reason="") -> ServiceOrder:
     if o.state != ServiceOrder.State.ORDERED:
         raise Conflict("Заказ уже отменён.")
     if o.delivered:
-        raise ValueError("Часть заказа уже выдана — отменить нельзя, касса может скорректировать начисление.")
+        raise ValueError("Часть заказа уже выдана — отменить нельзя.")
     o.state = ServiceOrder.State.CANCELLED
     o.save(update_fields=["state"])
     audit(user, "service_order.cancel", o, reason=reason)
-    # ничего не выдано — начисление снимается
-    _money("source_cancelled", f"order:{o.pk}", user, "Заказ отменён", True, True)
     return o
 
 
