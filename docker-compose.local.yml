@@ -1,0 +1,48 @@
+# Локальный просмотр на своём компьютере: сайт на http://localhost:8000 с тестовыми данными.
+# Запуск:  docker compose -f docker-compose.local.yml up --build
+# Остановка: Ctrl+C (или docker compose -f docker-compose.local.yml down). Данные сохраняются между запусками.
+# Сайт виден только на этом компьютере. Не для продакшна — для него docker-compose.yml.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: equistart
+      POSTGRES_USER: equistart
+      POSTGRES_PASSWORD: equistart
+    volumes:
+      - local_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U equistart -d equistart"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build: .
+    environment:
+      DJANGO_ENV: development
+      DJANGO_SECRET_KEY: local-preview-only
+      DATABASE_URL: postgresql://equistart:equistart@db:5432/equistart
+      APP_ORIGIN: http://localhost:8000
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      PHONE_VERIFICATION_REQUIRED: "false"
+      SMS_BACKEND: console
+      STAND_BANNER: "Локальный просмотр · тестовые данные · пароль всех аккаунтов Demo-Pass-2026"
+      MEDIA_ROOT: /app/media
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py createcachetable &&
+             python manage.py seed_demo --password Demo-Pass-2026 &&
+             echo '' && echo '>>> Сайт готов: откройте http://localhost:8000' && echo '' &&
+             python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - local_media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  local_pgdata:
+  local_media:

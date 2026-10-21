@@ -8,7 +8,11 @@
 
 Python 3.13, Django 5.2, PostgreSQL 16, HTMX, WhiteNoise, Gunicorn, Docker Compose.
 
-## Локальный запуск
+## Посмотреть на своём компьютере без настройки
+
+См. `docs/LOCAL.md`: Docker Desktop и одна команда `docker compose -f docker-compose.local.yml up --build`.
+
+## Локальный запуск (разработка)
 
 ```bash
 python -m venv .venv

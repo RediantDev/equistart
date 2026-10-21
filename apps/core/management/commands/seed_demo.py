@@ -31,8 +31,8 @@ ACCOUNTS = [
     ("+79990000002", "Иванов", "Иван", {"is_moderator": True}, "Модератор"),
     ("+79990000003", "Соколова", "Мария", {"is_coach": True}, "Тренер: ведёт спортсменов и лошадей"),
     ("+79990000004", "Смирнова", "Лиза", {"is_athlete": True}, "Спортсмен, связан с профилем у тренера"),
-    ("+79990000005", "Петрова", "Ольга", {}, "Судья турнира"),
-    ("+79990000006", "Кузнецов", "Павел", {}, "Второй судья турнира"),
+    ("+79990000005", "Петрова", "Ольга", {}, "Судья: конкур у поля; выездка — буквы C и E"),
+    ("+79990000006", "Кузнецов", "Павел", {}, "Второй судья: выездка — буква B и судья-подсчёт"),
     ("+79990000007", "Морозова", "Наталья", {}, "Конюшня и услуги"),
 ]
 
@@ -148,6 +148,15 @@ class Command(BaseCommand):
         cs.draw(judge, p1.pk)
         cs.draw(judge, p2.pk)
         cs.publish_start_list(judge, p2.pk)
+        # параметры маршрутов (как в день старта) и порядок езды — чтобы экраны судей можно было сразу попробовать
+        from apps.conduct import scoring
+
+        scoring.save_course(judge, p1, {"main_length": "300", "main_speed": "325"})
+        scoring.save_course(judge, p2, {"main_length": "420", "main_speed": "350"})
+        p3 = t.programs.get(position=2)
+        scoring.save_course(judge, p3, {"main_length": "450", "main_speed": "350", "jo1_length": "300", "jo1_speed": "350"})
+        cs.draw(judge, p3.pk)
+        cs.draw(judge, t.programs.get(position=3).pk)
         self.stdout.write(self.style.SUCCESS("Тестовые данные созданы."))
         self.print_accounts()
 
