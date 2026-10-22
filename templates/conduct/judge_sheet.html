@@ -56,7 +56,7 @@
           {% ifchanged r.collective %}{% if r.collective and not part.list.0.collective %}<div class="caption muted sheet__sep">ОБЩИЕ ОЦЕНКИ</div>{% endif %}{% endifchanged %}
           <div class="mark-row{% if r.value is None %} is-empty{% endif %}" data-step="{{ r.step }}">
             <div class="mark-row__text"><span class="mark-row__n">{{ r.n }}</span>{% if r.letters %}<span class="mark-row__letters">{{ r.letters }}</span>{% endif %}<span>{{ r.text }}</span>{% if r.coef != 1 %}<span class="chip chip--warning">×{{ r.coef }}</span>{% endif %}</div>
-            <input class="mark-row__val" name="m_{{ r.part }}_{{ r.i }}" data-part="{{ r.part }}" data-i="{{ r.i }}" inputmode="decimal" autocomplete="off" value="{{ r.value|default_if_none:'' }}" aria-label="Оценка: {{ r.text }}" placeholder="—">
+            <input class="mark-row__val" name="m_{{ r.part }}_{{ r.i }}" data-part="{{ r.part }}" data-i="{{ r.i }}" inputmode="decimal" autocomplete="off" value="{% if r.value is not None %}{{ r.value|num }}{% endif %}" aria-label="Оценка: {{ r.text }}" placeholder="—">
             <div class="mark-keys" role="group" aria-label="Оценка кнопками">
               {% for v in "0,1,2,3,4,5,6,7,8,9,10"|split:"," %}<button type="button" class="mark-key" data-v="{{ v }}">{{ v }}</button>{% endfor %}
               {% if r.step == "0.1" %}<button type="button" class="mark-key mark-key--fine" data-add="-0.1">−0,1</button><button type="button" class="mark-key mark-key--fine" data-add="0.1">+0,1</button>

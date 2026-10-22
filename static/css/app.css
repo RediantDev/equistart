@@ -467,7 +467,7 @@ a.chip, a.tag { text-decoration: none; }
 .pcard__no { flex: none; min-width: 28px; font-weight: 800; font-size: 18px; text-align: center; }
 .pcard__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
 .pcard__horse { font-weight: 600; }
-.pcard__side { flex: none; font-weight: 800; font-size: 16px; text-align: right; max-width: 45%; overflow-wrap: anywhere; }
+.pcard__side { flex: none; font-weight: 800; font-size: 15px; text-align: right; max-width: 36%; overflow-wrap: anywhere; }
 .pcard.medal-1 .pcard__no { color: #b8860b; } .pcard.medal-2 .pcard__no { color: #7d8790; } .pcard.medal-3 .pcard__no { color: #a0522d; }
 @media (max-width: 400px) { .tabs__item { padding: 10px 9px; font-size: 15px; } }
 @media print { .pcards.only-narrow { display: none !important; } .table-wrap.only-wide { display: block !important; } }
@@ -528,3 +528,4 @@ a.chip, a.tag { text-decoration: none; }
 .signed-marks__text { min-width: 0; overflow-wrap: anywhere; }
 .signed-marks__v { font-size: 18px; font-variant-numeric: tabular-nums; }
 @media (min-width: 900px) { .mark-keys { grid-template-columns: repeat(12, minmax(0, 1fr)); } }
+.table--grid-cards .chip, .scorer .chip { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }

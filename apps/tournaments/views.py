@@ -709,13 +709,15 @@ def _mobile_summary(fields, cells):
             if pen not in (None, "") and not is_num and tm in (None, ""):
                 parts.append(str(pen))  # «Искл.», «Сошёл» — без подписи гита
             elif pen not in (None, "") or tm not in (None, ""):
-                parts.append(f"{name.capitalize()}: {_num(pen)}" + (f" / {_num(tm)} с" if tm not in (None, "") else ""))
+                value = f"{_num(pen)} ш/о" + (f" · {_num(tm)} с" if tm not in (None, "") else "")
+                parts.append(value if name == "маршрут" else f"{name.capitalize()}: {value}")
             i += 2
             continue
         if i < len(cells) and cells[i] not in (None, ""):
             parts.append(f"{f}: {_num(cells[i])}")
         i += 1
-    return (parts[0] if parts else ""), " · ".join(parts[1:])
+    # главное — последний решающий результат (перепрыжка, 2-я фаза, итог), остальное — строкой ниже
+    return (parts[-1] if parts else ""), " · ".join(parts[:-1])
 
 
 def _public_tabs(request, t):
