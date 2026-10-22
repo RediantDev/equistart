@@ -503,7 +503,7 @@ a.chip, a.tag { text-decoration: none; }
 
 /* Судья-подсчёт на телефоне: строка пары — карточка с сеткой «судья → %» */
 .cell-off { background: var(--warning-soft); color: var(--warning); font-weight: 700; }
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   .table--grid-cards thead { display: none; }
   .table--grid-cards, .table--grid-cards tbody { display: block; }
   .table--grid-cards tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); padding: 12px; margin-bottom: 8px; }
