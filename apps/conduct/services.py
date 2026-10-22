@@ -358,3 +358,49 @@ def finish_warnings(tournament) -> list[str]:
             continue
         out += m.finish_warnings(tournament)
     return out
+
+
+@transaction.atomic
+def merge_classes(user, class_id, into_id) -> TournamentClass:
+    """APP-12: объединить зачёт с другим зачётом того же маршрута (например, при малом числе пар) до публикации протокола.
+    Выступления остаются в своих зачётах, места считаются по объединённому; представители получают уведомление."""
+    c = TournamentClass.objects.select_for_update().select_related("program__tournament").get(pk=class_id)
+    into = TournamentClass.objects.select_for_update().get(pk=into_id)
+    p = c.program
+    require_judge(user, p.tournament)
+    if into.program_id != p.pk or into.pk == c.pk:
+        raise ValueError("Объединять можно только зачёты одного маршрута или езды.")
+    if c.merged_into_id or into.merged_into_id:
+        raise ValueError("Один из зачётов уже объединён — сначала отмените прежнее объединение.")
+    if c.merged.exists():
+        raise ValueError(f"С зачётом «{c.label}» уже объединены другие — объединяйте их с «{into.label}» по одному.")
+    if p.start_publications.exists():
+        raise ValueError("Стартовый протокол уже опубликован — объединять зачёты можно только до публикации.")
+    if (c.height or None) != (into.height or None) and c.height and into.height:
+        raise ValueError("Зачёты разных высот объединить нельзя.")
+    c.merged_into = into
+    c.save(update_fields=["merged_into"])
+    entries = list(Entry.objects.filter(tclass=c).exclude(decision=Entry.Decision.CANCELLED).select_related("application", "athlete"))
+    audit(user, "class.merge", p.tournament, tclass=c.pk, into=into.pk, entries=len(entries))
+    users = {e.application.submitted_by for e in entries} | {e.athlete.linked_user for e in entries if e.athlete.linked_user_id}
+    notify(list(users), f"«{p.tournament.pub_title}», {p.name}: зачёт «{c.label}» объединён с «{into.label}» — места будут общими.",
+           reverse("tournaments:public", args=[p.tournament_id]), "merge")
+    scoring.recompute(p)
+    return c
+
+
+@transaction.atomic
+def unmerge_class(user, class_id) -> TournamentClass:
+    c = TournamentClass.objects.select_for_update().select_related("program__tournament").get(pk=class_id)
+    p = c.program
+    require_judge(user, p.tournament)
+    if not c.merged_into_id:
+        raise ValueError("Зачёт не объединён.")
+    if p.start_publications.exists():
+        raise ValueError("Стартовый протокол уже опубликован — объединение не отменить.")
+    into = c.merged_into
+    c.merged_into = None
+    c.save(update_fields=["merged_into"])
+    audit(user, "class.unmerge", p.tournament, tclass=c.pk, into=into.pk)
+    scoring.recompute(p)
+    return c

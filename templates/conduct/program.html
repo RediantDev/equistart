@@ -128,6 +128,28 @@
 </section>
 {% endif %}
 
+{% if all_classes|length > 1 %}
+<section class="card" style="margin-top: var(--space-4);" id="merge">
+  <h2 class="h3">Объединение зачётов</h2>
+  <p class="muted">Если в зачёте мало пар, его можно объединить с другим зачётом этого маршрута — места будут общими. Только до публикации стартового протокола; представители получат уведомление.</p>
+  <ul class="list">
+    {% for c in all_classes %}
+      <li class="list__row"><span style="flex: 1;"><strong>{{ c.label }}</strong><span class="table__sub">пар: {{ entries_by_class|get:c.pk|default:0 }}{% if c.min_pairs %} · минимум для открытия: {{ c.min_pairs }}{% endif %}{% if c.merged_into %} · объединён с «{{ c.merged_into.label }}»{% endif %}</span></span>
+        {% if not published %}
+          {% if c.merged_into %}
+            <form method="post" action="{% url 'conduct:action' t.pk p.pk 'unmerge' %}">{% csrf_token %}<input type="hidden" name="tclass" value="{{ c.pk }}"><input type="hidden" name="next" value="{{ request.path }}#merge"><button class="btn btn--ghost btn--sm">Отменить объединение</button></form>
+          {% elif not c.merged.exists %}
+            <form method="post" action="{% url 'conduct:action' t.pk p.pk 'merge' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="tclass" value="{{ c.pk }}"><input type="hidden" name="next" value="{{ request.path }}#merge">
+              <select name="into" aria-label="С каким зачётом объединить">{% for o in all_classes %}{% if o.pk != c.pk and not o.merged_into %}<option value="{{ o.pk }}">с «{{ o.label }}»</option>{% endif %}{% endfor %}</select>
+              <button class="btn btn--ghost btn--sm">Объединить</button></form>
+          {% endif %}
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 <section class="card" style="margin-top: var(--space-4);">
   <h2 class="h3">Публикация результатов по зачётам</h2>
   <p class="muted">Сохранённые результаты не видны публике до публикации. Исправление после публикации — новая версия.</p>

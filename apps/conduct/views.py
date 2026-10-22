@@ -12,6 +12,8 @@ from apps.entries.models import Entry
 from apps.entries.services import require_judge
 from apps.tournaments.disciplines import RESULT_FIELDS
 from apps.tournaments.models import ProgramItem, Tournament, TournamentClass
+from django.db.models import Count
+
 from apps.tournaments.services import can_manage
 
 from . import scoring, services
@@ -100,6 +102,8 @@ def program(request, pk, program_id):
     in_list = {s.entry_id for s in slots}
     outside = [(e, services.eligible(e, blocked)) for e in Entry.objects.filter(program=p).exclude(pk__in=in_list).exclude(decision__in=[Entry.Decision.CANCELLED, Entry.Decision.REJECTED])]
     classes = []
+    all_classes = list(p.classes.all())
+    merged = [c for c in all_classes if c.merged_into_id]
     for c in p.classes.filter(merged_into__isnull=True):
         last = c.result_publications.first()
         classes.append({"c": c, "published": last, "count": Entry.objects.filter(tclass__in=[c, *c.merged.all()], result__isnull=False).count()})
@@ -108,6 +112,8 @@ def program(request, pk, program_id):
         "published": p.start_publications.first(),
         "fields": [(f, RESULT_FIELDS.get(f, f)) for f in p.result_fields], "statuses": Result.Status.choices,
         "auto": not p.is_manual,
+        "merged": merged, "all_classes": all_classes,
+        "entries_by_class": {cid: n for cid, n in Entry.objects.filter(program=p).exclude(decision__in=[Entry.Decision.CANCELLED, Entry.Decision.REJECTED]).values_list("tclass_id").annotate(n=Count("id"))},
         "can_publish": not (p.is_dressage and not p.is_manual) or scoring.is_scorer(request.user, p) or can_manage(request.user, t),
     }
     if not p.is_manual:
@@ -175,6 +181,12 @@ def program_action(request, pk, program_id, action):
             p.save(update_fields=["slot_minutes", "start_times"])
             services._recompute_times(p)
             messages.success(request, "Время стартов пересчитано." if p.timed_starts else "Время стартов не рассчитывается — в протоколе будет только порядок.")
+        elif action == "merge":
+            c = services.merge_classes(request.user, int(request.POST["tclass"]), int(request.POST["into"]))
+            messages.success(request, f"Зачёт «{c.label}» объединён с «{c.merged_into.label}». Представители получили уведомление.")
+        elif action == "unmerge":
+            c = services.unmerge_class(request.user, int(request.POST["tclass"]))
+            messages.success(request, f"Объединение зачёта «{c.label}» отменено.")
         elif action == "publish":
             pub = services.publish_start_list(request.user, p.pk)
             messages.success(request, f"Стартовый протокол опубликован (версия {pub.version}).")

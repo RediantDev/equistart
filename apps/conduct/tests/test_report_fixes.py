@@ -92,3 +92,40 @@ class ReportFixesTests(ConductBase):
         c.force_login(self.coach)
         resp = c.post(reverse("profiles:athlete_new"), {"last_name": "Х"})
         self.assertContains(resp, "Страница устарела", status_code=403)
+
+
+@override_settings(MEDIA_ROOT=TMP)
+class MergeClassesTests(ConductBase):
+    def test_merge_shares_places_notifies_and_locks_after_publication(self):
+        from apps.core.models import Notification
+
+        self.p1.program_type, self.p1.table, self.p1.result_fields = "clear_speed", "A", []
+        self.p1.save()
+        services.merge_classes(self.judge, self.c_kids.pk, self.c_open.pk)
+        self.c_kids.refresh_from_db()
+        self.assertEqual(self.c_kids.merged_into_id, self.c_open.pk)
+        self.assertEqual(scoring.group_key(Entry.objects.get(pk=self.e1.pk)), scoring.group_key(Entry.objects.get(pk=self.e2.pk)))
+        self.assertTrue(Notification.objects.filter(kind="merge", user=self.coach).exists())
+        services.draw(self.judge, self.p1.pk)
+        scoring.save_course(self.judge, self.p1, {"main_length": "350", "main_speed": "350"})
+        scoring.save_round(self.judge, self.e1.pk, "main", rnd(0, 0, "55"))
+        scoring.save_round(self.judge, self.e2.pk, "main", rnd(0, 0, "50"))
+        places = dict(Result.objects.filter(entry__in=[self.e1, self.e2]).values_list("entry_id", "place"))
+        self.assertEqual(places, {self.e2.pk: 1, self.e1.pk: 2})  # общие места
+        with self.assertRaises(ValueError):
+            services.publish_results(self.judge, self.c_kids.pk)  # публикуется объединённый зачёт
+        services.publish_start_list(self.judge, self.p1.pk)
+        with self.assertRaisesMessage(ValueError, "уже опубликован"):
+            services.unmerge_class(self.judge, self.c_kids.pk)
+
+    def test_merge_rules_and_permissions(self):
+        with self.assertRaises(Exception):
+            services.merge_classes(self.other, self.c_kids.pk, self.c_open.pk)
+        with self.assertRaisesMessage(ValueError, "одного маршрута"):
+            services.merge_classes(self.judge, self.c_kids.pk, self.c_kids.pk)
+        self.client.force_login(self.judge)
+        resp = self.client.post(reverse("conduct:action", args=[self.t.pk, self.p1.pk, "merge"]), {"tclass": self.c_kids.pk, "into": self.c_open.pk})
+        self.assertEqual(resp.status_code, 302)
+        self.client.post(reverse("conduct:action", args=[self.t.pk, self.p1.pk, "unmerge"]), {"tclass": self.c_kids.pk})
+        self.c_kids.refresh_from_db()
+        self.assertIsNone(self.c_kids.merged_into_id)
