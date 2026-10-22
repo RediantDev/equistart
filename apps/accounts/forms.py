@@ -162,7 +162,7 @@ class LoginForm(forms.Form):
 
 
 class AddRoleForm(forms.Form):
-    category = forms.ChoiceField(label="Роль", choices=Category.choices)
+    category = forms.ChoiceField(label="Роль", choices=Category.choices, widget=forms.RadioSelect)
 
     def __init__(self, user: User, *args, **kwargs):
         super().__init__(*args, **kwargs)

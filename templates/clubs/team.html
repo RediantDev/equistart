@@ -9,12 +9,12 @@
 
 <div class="list-cards">
   <article class="row-card">
-    <div style="flex: 1; min-width: 0;"><div class="h3">{{ club.manager.full_name }}</div><div class="table__sub">{{ club.manager.phone_display }}</div></div>
+    <div style="flex: 1 1 180px; min-width: 0;"><div class="h3">{{ club.manager.full_name }}</div><div class="table__sub">{{ club.manager.phone_display }}</div></div>
     <span class="tag tag--lemon">Владелец</span>
   </article>
   {% for m in members %}
     <article class="row-card">
-      <div style="flex: 1; min-width: 0;">
+      <div style="flex: 1 1 180px; min-width: 0;">
         <div class="h3">{% if m.user %}{{ m.user.full_name }}{% else %}{{ m.phone }}{% endif %}</div>
         <div class="table__sub">{% if m.state == "pending" %}ждёт ответа — примет приглашение в кабинете{% else %}{{ m.user.phone_display }}{% endif %}</div>
       </div>

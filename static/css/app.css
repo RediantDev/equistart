@@ -555,7 +555,7 @@ a.chip, a.tag { text-decoration: none; }
   .chip, .tag { white-space: normal; overflow-wrap: anywhere; text-align: left; }
   .topnav__link:not(.topnav__link--home):not(.topnav__link--desk) { min-height: 40px; display: inline-flex; align-items: center; }
   a.tag, a.chip { min-height: 36px; padding-top: 6px; padding-bottom: 6px; }
-  .table input, .table select, .table textarea, input, select, textarea { font-size: 16px; }
+  .table input, .table select, .table textarea, input:not([type=checkbox]):not([type=radio]), select, textarea { font-size: 16px; }
 }
 .row-card__open { flex: none; }
 @media (max-width: 600px) { .row-card__open { display: none; } }
@@ -563,3 +563,24 @@ a.chip, a.tag { text-decoration: none; }
 @media (max-width: 480px) { .facts:not(.facts--money) { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 8px var(--space-3); } }
 @media (max-width: 899px) { .filters__body > .filters__actions { grid-column: 1 / -1; } .filters__body > .filters__actions .btn { min-width: 160px; } }
 @media (max-width: 1023px) { .topbar__user { display: none; } }
+@media (max-width: 480px) { .search { flex-wrap: wrap; } .search input { flex: 1 1 100%; } .search select { flex: 1 1 auto; } }
+.narrow-only { display: none; }
+@media (max-width: 600px) {
+  .table--sheet .wide-only { display: none; }
+  .table--sheet .narrow-only { display: block; margin-top: 2px; }
+  .table--sheet td, .table--sheet th { padding-left: 8px; padding-right: 8px; }
+}
+/* Таблица → карточки на телефоне: подписи из data-label */
+@media (max-width: 600px) {
+  .table--stack thead { display: none; }
+  .table--stack, .table--stack tbody { display: block; }
+  .table--stack tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); padding: 12px; margin-bottom: 8px; }
+  .table--stack td { display: block; border: 0; padding: 0; text-align: left; white-space: normal !important; min-width: 0; }
+  .table--stack td.stack-full { grid-column: 1 / -1; }
+  .table--stack td:empty { display: none; }
+  .table--stack td[data-label]::before { content: attr(data-label); display: block; font-size: 12px; color: var(--text-muted); font-weight: 600; }
+  .table--stack .chip { white-space: normal; }
+  .table-wrap:has(.table--stack) { overflow: visible; border: 0; background: none; }
+  .table--stack tr.is-muted { opacity: .7; }
+}
+@media (max-width: 600px) { .table--stack td.num { text-align: left; } .table--stack td[data-label="№"]::before, .table--stack td[data-label="Время"]::before { display: inline; margin-right: 6px; } }

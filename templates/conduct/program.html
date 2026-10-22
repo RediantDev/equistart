@@ -61,23 +61,23 @@
 
 {% if slots %}
 <div class="table-wrap">
-  <table class="table">
+  <table class="table table--stack table--order">
     <thead><tr><th class="num">№</th>{% if p.timed_starts %}<th class="num">Время</th>{% endif %}<th>Всадник / лошадь</th><th>Состояние</th><th>Результат</th><th>Порядок</th></tr></thead>
     <tbody>
       {% for s in slots %}
         <tr{% if s.status == "withdrawn" or s.status == "no_show" %} class="is-muted"{% endif %} id="slot-{{ s.pk }}">
-          <td class="num"><strong>{{ s.position }}</strong></td>
-          {% if p.timed_starts %}<td class="num">{{ s.start_time|time:"H:i"|default:"—" }}</td>{% endif %}
-          <td><strong>{{ s.entry.athlete_snapshot.name }}</strong><span class="table__sub">{{ s.entry.athlete_snapshot.birth_year|default:"" }}{% if s.entry.athlete_snapshot.rank %} · {{ s.entry.athlete_snapshot.rank }}{% endif %}{% if s.entry.athlete_snapshot.club %} · {{ s.entry.athlete_snapshot.club }}{% endif %}</span><span class="table__sub">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}</span>
+          <td class="num" data-label="№"><strong>{{ s.position }}</strong></td>
+          {% if p.timed_starts %}<td class="num" data-label="Время">{{ s.start_time|time:"H:i"|default:"—" }}</td>{% endif %}
+          <td class="stack-full"><strong>{{ s.entry.athlete_snapshot.name }}</strong><span class="table__sub">{{ s.entry.athlete_snapshot.birth_year|default:"" }}{% if s.entry.athlete_snapshot.rank %} · {{ s.entry.athlete_snapshot.rank }}{% endif %}{% if s.entry.athlete_snapshot.club %} · {{ s.entry.athlete_snapshot.club }}{% endif %}</span><span class="table__sub">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}</span>
             {% for c in s.conflicts %}<span class="table__sub" style="color: {% if s.exception_reason %}var(--text-muted){% else %}var(--danger){% endif %}; font-weight: 600;">⚠ {{ c }}</span>{% endfor %}
             {% if s.conflicts %}<details><summary class="table__sub" style="cursor: pointer;">{% if s.exception_reason %}Исключение: {{ s.exception_reason }}{% else %}Оставить как исключение…{% endif %}</summary>
               <form method="post" action="{% url 'conduct:action' t.pk p.pk 'exception' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="slot" value="{{ s.pk }}"><input name="reason" value="{{ s.exception_reason }}" placeholder="Причина" aria-label="Причина исключения"><button class="btn btn--ghost btn--sm">Сохранить</button></form></details>{% endif %}
             {% if not s.still_eligible and s.status == "waiting" %}<span class="chip chip--danger">Выступление больше не принято — отметьте «Снят»</span>{% endif %}
           </td>
-          <td><span class="chip{% if s.status == 'finished' %} chip--success{% elif s.status == 'started' %} chip--warning{% elif s.status != 'waiting' %} chip--danger{% endif %}">{{ s.get_status_display }}</span>
+          <td class="stack-full"><span class="chip{% if s.status == 'finished' %} chip--success{% elif s.status == 'started' %} chip--warning{% elif s.status != 'waiting' %} chip--danger{% endif %}">{{ s.get_status_display }}</span>
             {% if s.status == "waiting" %}<form method="post" action="{% url 'conduct:action' t.pk p.pk 'status' %}" class="inline-row" style="margin-top: 6px;">{% csrf_token %}<input type="hidden" name="slot" value="{{ s.pk }}"><button class="btn btn--ghost btn--sm" name="status" value="started">На поле</button><button class="btn btn--ghost btn--sm" name="status" value="withdrawn">Снят</button><button class="btn btn--ghost btn--sm" name="status" value="no_show">Не явился</button></form>{% endif %}
           </td>
-          <td>
+          <td class="stack-full" data-label="Результат">
             {% if auto %}
               {% if s.result %}<span class="table__sub">{% for v in s.cells %}{% if v != "" and v is not None %}{{ v }}{% if not forloop.last %} · {% endif %}{% endif %}{% endfor %}</span>{% if s.result.place %}<strong>{{ s.result.place }} место</strong>{% endif %}{% if s.result.status %} <span class="chip chip--danger">{{ s.result.get_status_display }}</span>{% endif %}{% if s.result.values.pending %}<span class="table__sub">листы подписаны: {{ s.result.values.signed }} из {{ s.result.values.of }}</span>{% endif %}{% else %}<span class="table__sub">—</span>{% endif %}
             {% else %}
@@ -91,7 +91,7 @@
             </details>
             {% endif %}
           </td>
-          <td style="white-space: nowrap;">
+          <td class="stack-full" style="white-space: nowrap;">
             {% if not s.locked %}
               <form method="post" action="{% url 'conduct:action' t.pk p.pk 'move' %}" class="order-ctl">{% csrf_token %}<input type="hidden" name="slot" value="{{ s.pk }}"><input type="hidden" name="next" value="{{ request.path }}#slot-{{ s.pk }}">
                 <button class="icon-btn" name="position" value="{{ s.position|add:'-1' }}" aria-label="Выше"{% if forloop.first %} disabled{% endif %}>↑</button>

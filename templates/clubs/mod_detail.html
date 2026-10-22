@@ -46,7 +46,7 @@
 <section class="card stack" style="margin-top: var(--space-4);">
   <h2 class="h2">Новости клуба</h2>
   {% for n in news %}
-    <article class="row-card"><div style="flex: 1; min-width: 0;"><strong>{{ n.title }}</strong><div class="table__sub">{{ n.published_at|date:"j E Y" }}{% if n.hidden %} · скрыта: {{ n.hidden_reason }}{% endif %}</div><p class="table__sub">{{ n.text|truncatechars:200 }}</p></div>
+    <article class="row-card"><div style="flex: 1 1 180px; min-width: 0;"><strong>{{ n.title }}</strong><div class="table__sub">{{ n.published_at|date:"j E Y" }}{% if n.hidden %} · скрыта: {{ n.hidden_reason }}{% endif %}</div><p class="table__sub">{{ n.text|truncatechars:200 }}</p></div>
       {% if not n.hidden %}<form method="post" class="form">{% csrf_token %}<input type="hidden" name="news" value="{{ n.pk }}"><input name="reason" placeholder="Причина" aria-label="Причина скрытия" required><button class="btn btn--ghost btn--sm" name="decision" value="hide_news">Скрыть</button></form>{% endif %}
     </article>
   {% endfor %}

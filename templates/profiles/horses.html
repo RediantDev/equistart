@@ -16,7 +16,7 @@
   <div class="list-cards">
     {% for h in horses %}
       <article class="row-card">
-        <div style="flex: 1; min-width: 0;">
+        <div style="flex: 1 1 180px; min-width: 0;">
           <a class="h3 row-card__title" href="{% url 'profiles:horse' h.pk %}">{{ h.name }}</a>
           <div class="table__sub">{{ h.summary }}{% if h.fksr_number %} · ФКСР {{ h.fksr_number }}{% endif %}</div>
         </div>

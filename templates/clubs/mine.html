@@ -82,7 +82,7 @@
   {% if news %}
     <div class="list-cards">{% for n in news %}
       <article class="row-card">
-        <div style="flex: 1; min-width: 0;"><span class="h3 row-card__title">{{ n.title }}</span>
+        <div style="flex: 1 1 180px; min-width: 0;"><span class="h3 row-card__title">{{ n.title }}</span>
           <div class="table__sub">{{ n.published_at|date:"j E Y" }}{% if n.tournament %} · {{ n.tournament.pub_title|default:n.tournament.title }}{% endif %}{% if n.photos.all %} · фото: {{ n.photos.all|length }}{% endif %}</div>
           {% if n.hidden %}<div class="alert alert--error" style="margin-top: var(--space-2);">Скрыта модератором: {{ n.hidden_reason }}</div>{% endif %}</div>
         <a class="btn btn--ghost btn--sm" href="{% url 'clubs:news_edit' n.pk %}">Изменить</a>

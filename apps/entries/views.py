@@ -14,6 +14,7 @@ from apps.core.models import AuditLog
 from apps.profiles.models import Athlete, Horse
 from apps.profiles.services import athletes_for_entry
 from apps.tournaments.models import Tournament, TournamentClass
+from apps.tournaments import services as tservices
 from apps.tournaments.services import roles_of
 
 from . import services
@@ -435,6 +436,7 @@ def manage(request, pk):
         "t": t, "entries": entries, "page": page, "total": page.paginator.count, "params": params, "f": f,
         "programs": t.programs.all(), "actions": services.ACTIONS, "decisions": Entry.Decision.choices,
         "counts": services.summarize(Entry.objects.filter(tournament=t)),
+        "is_manager": tservices.can_manage(request.user, t),
     })
 
 

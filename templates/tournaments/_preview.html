@@ -8,14 +8,14 @@
   </div>
   {% if preview.programs %}
     <div class="table-wrap">
-      <table class="table">
+      <table class="table table--stack">
         <thead><tr><th>День</th><th class="num">Начало</th><th>Маршрут / езда</th><th>Зачёт</th><th>Условия</th></tr></thead>
         <tbody>
           {% for p in preview.programs %}
             {% for c in p.classes %}
-              <tr><td>{% if forloop.first %}{{ p.day|isodate:False }}{% endif %}</td><td class="num">{% if forloop.first %}{{ p.start_time }}{% endif %}</td><td>{% if forloop.first %}{{ p.name }}<span class="table__sub">{{ p.discipline_name }} · {{ p.program_type_name }}{% if p.article %} · {{ p.article }}{% endif %}</span>{% endif %}</td><td>{{ c.label }}</td><td>{{ c.conditions|default:"—" }}{% if c.note %}<span class="table__sub">{{ c.note }}</span>{% endif %}</td></tr>
+              <tr><td{% if forloop.first %} data-label="День"{% endif %}>{% if forloop.first %}{{ p.day|isodate:False }}{% endif %}</td><td class="num"{% if forloop.first and p.start_time %} data-label="Начало"{% endif %}>{% if forloop.first %}{{ p.start_time }}{% endif %}</td><td class="stack-full">{% if forloop.first %}{{ p.name }}<span class="table__sub">{{ p.discipline_name }} · {{ p.program_type_name }}{% if p.article %} · {{ p.article }}{% endif %}</span>{% endif %}</td><td data-label="Зачёт">{{ c.label }}</td><td data-label="Условия">{{ c.conditions|default:"—" }}{% if c.note %}<span class="table__sub">{{ c.note }}</span>{% endif %}</td></tr>
             {% empty %}
-              <tr><td>{{ p.day|isodate:False }}</td><td class="num">{{ p.start_time }}</td><td>{{ p.name }}</td><td colspan="3"><span class="chip chip--danger">Нет зачётов</span></td></tr>
+              <tr><td data-label="День">{{ p.day|isodate:False }}</td><td class="num" data-label="Начало">{{ p.start_time }}</td><td class="stack-full">{{ p.name }}</td><td colspan="3" class="stack-full"><span class="chip chip--danger">Нет зачётов</span></td></tr>
             {% endfor %}
           {% endfor %}
         </tbody>

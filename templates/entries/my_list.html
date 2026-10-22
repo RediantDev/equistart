@@ -19,7 +19,7 @@
 {% if rows %}
   <div class="list-cards">{% for r in rows %}
     <article class="row-card">
-      <div style="flex: 1; min-width: 0;">
+      <div style="flex: 1 1 180px; min-width: 0;">
         <a class="h3 row-card__title" href="{% url 'entries:application' r.app.pk %}">№{{ r.app.pk }} · {{ r.app.tournament.pub_title }}</a>
         <div class="table__sub">{% daterange r.app.tournament.pub_starts_on r.app.tournament.pub_ends_on %} · выступлений: {{ r.count }}</div>
       </div>

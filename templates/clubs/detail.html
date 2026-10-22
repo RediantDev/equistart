@@ -39,7 +39,7 @@
   <h2 class="h2">Турниры в клубе</h2>
   {% if upcoming %}
     <div class="list-cards">{% for t in upcoming %}
-      <article class="row-card"><div style="flex: 1; min-width: 0;"><a class="h3 row-card__title" href="{% url 'tournaments:public' t.pk %}">{{ t.pub_title }}</a>
+      <article class="row-card"><div style="flex: 1 1 180px; min-width: 0;"><a class="h3 row-card__title" href="{% url 'tournaments:public' t.pk %}">{{ t.pub_title }}</a>
         <div class="table__sub">{% daterange t.pub_starts_on t.pub_ends_on %}{% if t.publication == "cancelled" %} · <span class="chip chip--danger">Отменён</span>{% endif %}</div></div>
         <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:public' t.pk %}">Подробнее</a></article>
     {% endfor %}</div>

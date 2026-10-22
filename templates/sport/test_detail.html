@@ -16,9 +16,9 @@
 {% for part in parts %}
   <section class="card">
     <h2 class="h3">{{ part.p.title }} <span class="table__sub">максимум {{ part.max }} · шаг {{ part.p.step|default:"0.5" }}</span></h2>
-    <div class="table-wrap"><table class="table">
-      <thead><tr><th class="num">№</th><th>Буквы</th><th>Упражнение / оценка</th><th class="num">Коэф.</th></tr></thead>
-      <tbody>{% for it in part.items %}<tr><td class="num">{{ it.n|default:"" }}</td><td>{{ it.letters|default:"" }}</td><td>{{ it.text }}</td><td class="num">{{ it.coef }}</td></tr>{% endfor %}</tbody>
+    <div class="table-wrap"><table class="table table--sheet">
+      <thead><tr><th class="num">№</th><th class="wide-only">Буквы</th><th>Упражнение / оценка</th><th class="num">Коэф.</th></tr></thead>
+      <tbody>{% for it in part.items %}<tr><td class="num">{{ it.n|default:"" }}</td><td class="wide-only">{{ it.letters|default:"" }}</td><td>{{ it.text }}{% if it.letters %}<span class="narrow-only table__sub">{{ it.letters }}</span>{% endif %}</td><td class="num">{{ it.coef }}</td></tr>{% endfor %}</tbody>
     </table></div>
   </section>
 {% endfor %}

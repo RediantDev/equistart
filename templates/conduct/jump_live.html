@@ -71,7 +71,7 @@
       {% with st=places|get:s.entry_id %}
       <a class="row-card row-card--link{% if current and current.0.pk == s.pk %} is-current{% endif %}" style="padding: 10px 14px;" href="?stage={{ stage.key }}&entry={{ s.entry_id }}">
         <span class="numeric">{{ s.position }}</span>
-        <span style="flex: 1; min-width: 0;">{{ s.entry.athlete_snapshot.name }}<span class="table__sub">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}{% if s.entry.height and p.heights|length > 1 %} · {{ s.entry.height }} см{% endif %}</span></span>
+        <span style="flex: 1 1 180px; min-width: 0;">{{ s.entry.athlete_snapshot.name }}<span class="table__sub">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}{% if s.entry.height and p.heights|length > 1 %} · {{ s.entry.height }} см{% endif %}</span></span>
         {% if jr %}<span class="table__sub" style="text-align: right;">{% if jr.status != "ok" %}{{ jr.get_status_display }}{% else %}{{ jr.knockdowns }} пов. · {{ jr.refusals }} неп.{% if jr.time %} · {{ jr.time|num }} с{% endif %}{% endif %}{% if st.place %}<br><strong>{{ st.place }} место</strong> <span class="table__sub" style="display:inline">в зачёте</span>{% endif %}</span>{% else %}<span class="chip">ждёт</span>{% endif %}
       </a>
       {% endwith %}

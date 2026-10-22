@@ -50,10 +50,10 @@
 
 {% else %}
   <div class="section-head"><h2 class="h2">Категории денников</h2><a class="btn btn--dark btn--sm" href="{% url 'stables:category_new' t.pk %}">+ Категория</a></div>
-  {% if cats %}<div class="list-cards">{% for c in cats %}<a class="row-card row-card--link" href="{% url 'stables:category_edit' t.pk c.pk %}"><div style="flex: 1; min-width: 0;"><strong>{{ c.name }}</strong><span class="table__sub">{{ c.available_from|date:"j E" }} — {{ c.available_to|date:"j E" }} · вместимость {{ c.capacity }} · броней {{ c.used }}</span></div>{% if not c.is_active %}<span class="chip">Приём закрыт</span>{% endif %}</a>{% endfor %}</div>
+  {% if cats %}<div class="list-cards">{% for c in cats %}<a class="row-card row-card--link" href="{% url 'stables:category_edit' t.pk c.pk %}"><div style="flex: 1 1 180px; min-width: 0;"><strong>{{ c.name }}</strong><span class="table__sub">{{ c.available_from|date:"j E" }} — {{ c.available_to|date:"j E" }} · вместимость {{ c.capacity }} · броней {{ c.used }}</span></div>{% if not c.is_active %}<span class="chip">Приём закрыт</span>{% endif %}</a>{% endfor %}</div>
   {% else %}<p class="muted">Добавьте категорию: название, цена, даты и вместимость.</p>{% endif %}
   <div class="section-head" style="margin-top: var(--space-5);"><h2 class="h2">Услуги</h2><a class="btn btn--dark btn--sm" href="{% url 'stables:service_new' t.pk %}">+ Услуга</a></div>
-  {% if svcs %}<div class="list-cards">{% for s in svcs %}<a class="row-card row-card--link" href="{% url 'stables:service_edit' t.pk s.pk %}"><div style="flex: 1; min-width: 0;"><strong>{{ s.name }}</strong><span class="table__sub">{{ s.unit }} · {{ s.get_recipient_display|lower }} · заказано {{ s.used }}{% if s.limit %} из {{ s.limit }}{% endif %}</span></div>{% if not s.is_active %}<span class="chip">Приём закрыт</span>{% endif %}</a>{% endfor %}</div>
+  {% if svcs %}<div class="list-cards">{% for s in svcs %}<a class="row-card row-card--link" href="{% url 'stables:service_edit' t.pk s.pk %}"><div style="flex: 1 1 180px; min-width: 0;"><strong>{{ s.name }}</strong><span class="table__sub">{{ s.unit }} · {{ s.get_recipient_display|lower }} · заказано {{ s.used }}{% if s.limit %} из {{ s.limit }}{% endif %}</span></div>{% if not s.is_active %}<span class="chip">Приём закрыт</span>{% endif %}</a>{% endfor %}</div>
   {% else %}<p class="muted">Например: опилки (мешок), сено (тюк), электричество для коневоза (сутки).</p>{% endif %}
 {% endif %}
 {% endblock %}

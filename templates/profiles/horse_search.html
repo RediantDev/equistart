@@ -16,7 +16,7 @@
 {% if q %}
   {% if results %}
     <div class="list-cards">{% for h in results %}
-      <article class="row-card"><div style="flex: 1; min-width: 0;"><span class="h3">{{ h.name }}</span><div class="table__sub">{{ h.summary }}{% if h.fksr_number %} · ФКСР {{ h.fksr_number }}{% endif %}</div></div>
+      <article class="row-card"><div style="flex: 1 1 180px; min-width: 0;"><span class="h3">{{ h.name }}</span><div class="table__sub">{{ h.summary }}{% if h.fksr_number %} · ФКСР {{ h.fksr_number }}{% endif %}</div></div>
       {% if next %}<form method="post" action="{{ next }}">{% csrf_token %}<input type="hidden" name="horse" value="{{ h.pk }}"><button class="btn btn--dark btn--sm" name="pick_horse" value="1">Выбрать</button></form>{% endif %}</article>
     {% endfor %}</div>
   {% else %}<div class="card empty"><h2 class="h3">Ничего не найдено</h2><p class="muted">Проверьте кличку или номер. Если лошади нет в сервисе — добавьте её.</p></div>{% endif %}

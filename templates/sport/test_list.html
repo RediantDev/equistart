@@ -12,13 +12,13 @@
   <h2 class="h3">Официальные</h2>
   <div class="list-cards">
     {% for x in official %}
-      <a class="row-card row-card--link" href="{% url 'sport:test_detail' x.pk %}"><div style="flex: 1; min-width: 0;"><strong>{{ x.name }}</strong><span class="table__sub">{{ x.get_kind_display }} · {{ x.get_arena_display }}{% if x.level %} · {{ x.level }}{% endif %}</span></div></a>
+      <a class="row-card row-card--link" href="{% url 'sport:test_detail' x.pk %}"><div style="flex: 1 1 180px; min-width: 0;"><strong>{{ x.name }}</strong><span class="table__sub">{{ x.get_kind_display }} · {{ x.get_arena_display }}{% if x.level %} · {{ x.level }}{% endif %}</span></div></a>
     {% empty %}<p class="muted">Пока нет.</p>{% endfor %}
   </div>
   <h2 class="h3">Мои езды</h2>
   <div class="list-cards">
     {% for x in own %}
-      <a class="row-card row-card--link" href="{% url 'sport:test_detail' x.pk %}"><div style="flex: 1; min-width: 0;"><strong>{{ x.name }}</strong><span class="table__sub">{{ x.get_kind_display }} · {{ x.get_arena_display }}</span></div></a>
+      <a class="row-card row-card--link" href="{% url 'sport:test_detail' x.pk %}"><div style="flex: 1 1 180px; min-width: 0;"><strong>{{ x.name }}</strong><span class="table__sub">{{ x.get_kind_display }} · {{ x.get_arena_display }}</span></div></a>
     {% empty %}<p class="muted">Своих езд нет. Можно создать с нуля или скопировать официальную и поправить.</p>{% endfor %}
   </div>
 </section>

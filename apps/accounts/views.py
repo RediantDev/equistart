@@ -194,6 +194,8 @@ def change_password(request):
     from apps.core.models import audit
 
     form = PasswordChangeForm(request.user, request.POST or None)
+    form.fields["new_password1"].help_text = "Не короче 8 символов, не только цифры и не похож на телефон или имя."
+    form.fields["new_password2"].help_text = ""
     if request.method == "POST" and form.is_valid():
         user = form.save()
         update_session_auth_hash(request, user)
