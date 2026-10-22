@@ -584,3 +584,4 @@ a.chip, a.tag { text-decoration: none; }
   .table--stack tr.is-muted { opacity: .7; }
 }
 @media (max-width: 600px) { .table--stack td.num { text-align: left; } .table--stack td[data-label="№"]::before, .table--stack td[data-label="Время"]::before { display: inline; margin-right: 6px; } }
+@media (min-width: 641px) and (max-width: 900px) { .table--grid-cards tr { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
