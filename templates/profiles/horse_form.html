@@ -7,7 +7,7 @@
     <h1 class="h1">{% if horse %}Изменить лошадь{% else %}Новая лошадь{% endif %}</h1>
     {% if similar %}
       <div class="alert alert--warning" role="alert">
-        В сервисе уже есть лошади с такой кличкой. Возможно, это она — тогда выберите её в заявке через поиск, а не создавайте дубль.
+        В сервисе уже есть лошадь с такой кличкой и тем же годом рождения. Если это она — не создавайте вторую: выберите её в заявке через «Найти лошадь в сервисе». Если это другая лошадь — просто сохраните.
         <ul class="list" style="margin-top: var(--space-2);">{% for s in similar %}<li class="list__row"><strong>{{ s.name }}</strong><span class="table__sub">{{ s.summary }}{% if s.fksr_number %} · ФКСР {{ s.fksr_number }}{% endif %}</span></li>{% endfor %}</ul>
       </div>
     {% endif %}

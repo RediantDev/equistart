@@ -93,6 +93,16 @@ def cabinet(request):
                             .values_list("tournament_id", "tournament__pub_title").distinct()):
             cnt = Booking.objects.filter(tournament_id=t_id, state=Booking.State.PENDING).count()
             actions.append((f"Брони денников ждут подтверждения: {title}", cnt, ("stables:manage", t_id)))
+    from apps.entries.models import ApplicationDraft
+
+    own = Athlete.objects.filter(linked_user=user, archived=False).first()
+    if own and not own.birth_date:
+        actions.append(("Профиль спортсмена: укажите дату рождения — без неё недоступны зачёты с возрастом", None, ("profiles:athlete_edit", own.pk)))
+
+    for d in ApplicationDraft.objects.filter(user=user, tournament__publication=Tournament.Publication.PUBLISHED).select_related("tournament"):
+        n = len(d.data.get("lines", []))
+        actions.append((f"Незавершённая заявка: {d.tournament.pub_title} — продолжить", n,
+                        ("entries:apply", d.tournament_id) if not d.late else None))
     if user.is_moderator:
         n = Tournament.objects.filter(status=Tournament.Status.REVIEW).count()
         if n:

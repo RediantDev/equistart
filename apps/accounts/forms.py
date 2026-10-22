@@ -15,9 +15,8 @@ class PhoneField(forms.CharField):
         kwargs.setdefault("label", "Телефон")
         kwargs.setdefault("max_length", 32)
         super().__init__(**kwargs)
-        self.widget.attrs.update(
-            {"type": "tel", "inputmode": "tel", "autocomplete": "tel", "placeholder": "+7 900 000-00-00"}
-        )
+        self.widget.input_type = "tel"  # без дубля атрибута type — иначе на телефоне не открывается цифровая клавиатура
+        self.widget.attrs.update({"inputmode": "tel", "autocomplete": "tel", "placeholder": "+7 900 000-00-00"})
 
     def clean(self, value):
         value = super().clean(value)
@@ -58,6 +57,11 @@ class RegistrationForm(forms.Form):
         label="Даю согласие на обработку персональных данных",
         error_messages={"required": "Без согласия регистрация невозможна."},
     )
+    publication_consent = forms.BooleanField(
+        label="Спортсмен: согласен на публикацию фамилии, имени и года рождения в стартовых протоколах и результатах",
+        required=False,
+        help_text="Нужно, чтобы подавать заявки за себя. Для несовершеннолетнего согласие даёт законный представитель.",
+    )
 
     def clean_phone(self):
         phone = self.cleaned_data["phone"]
@@ -70,6 +74,9 @@ class RegistrationForm(forms.Form):
         p1, p2 = cleaned.get("password1"), cleaned.get("password2")
         if p1 and p2 and p1 != p2:
             self.add_error("password2", "Пароли не совпадают.")
+        if "athlete" in (cleaned.get("categories") or []) and not cleaned.get("publication_consent"):
+            self.add_error("publication_consent", "Отметьте согласие на публикацию — без него вас нельзя включить в протоколы. "
+                                                  "Если не хотите — снимите роль «Спортсмен», её можно добавить позже.")
         if p1 and not self.has_error("password2"):
             probe = User(
                 phone=cleaned.get("phone", ""),
@@ -98,6 +105,12 @@ class RegistrationForm(forms.Form):
             user.add_category(cat)
         user.set_password(data["password1"])
         user.save()
+        if "athlete" in data["categories"]:
+            # Профиль спортсмена сразу из данных регистрации: остаётся дописать дату рождения и разряд (отчёт 22.10.2026)
+            from apps.profiles.models import Athlete
+
+            Athlete.objects.create(last_name=user.last_name, first_name=user.first_name, middle_name=user.middle_name,
+                                   manager=user, linked_user=user, consent_confirmed_at=timezone.now())
         return user
 
 
@@ -117,9 +130,8 @@ class LoginForm(forms.Form):
         self.request = request
         self.user_cache = None
         super().__init__(*args, **kwargs)
-        self.fields["phone"].widget.attrs.update(
-            {"type": "tel", "inputmode": "tel", "autocomplete": "username", "placeholder": "+7 900 000-00-00"}
-        )
+        self.fields["phone"].widget.input_type = "tel"
+        self.fields["phone"].widget.attrs.update({"inputmode": "tel", "autocomplete": "username", "placeholder": "+7 900 000-00-00"})
 
     def clean(self):
         raw_phone = self.cleaned_data.get("phone")

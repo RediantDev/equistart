@@ -32,7 +32,7 @@
   <div class="list-cards">
     {% for a in actions %}
       {% if a.url %}<a class="row-card row-card--link" href="{{ a.url }}">{% else %}<div class="row-card">{% endif %}
-        <div style="flex: 1; min-width: 0;">{{ a.label }}</div><span class="count-pill">{{ a.count }}</span>
+        <div style="flex: 1; min-width: 0;">{{ a.label }}</div>{% if a.count %}<span class="count-pill">{{ a.count }}</span>{% endif %}
       {% if a.url %}</a>{% else %}</div>{% endif %}
     {% endfor %}
   </div>

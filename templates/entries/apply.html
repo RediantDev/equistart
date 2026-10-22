@@ -27,52 +27,52 @@
 <div class="wizard-grid">
   <div class="wizard-main">
     {% for pair in pairs %}
-      <section class="card" id="pair-{{ pair.a.pk }}-{{ pair.h.pk }}">
+      <section class="card pair{% if not pair.open %} pair--closed{% endif %}" id="pair-{{ pair.a.pk }}-{{ pair.h.pk }}">
         <div class="section-head">
           <div style="min-width: 0;">
             <h2 class="h3" style="margin: 0;">{{ pair.a.public_name }} / {{ pair.h.name }}</h2>
             <span class="table__sub">{{ pair.a.summary|default:"разряд и год рождения не указаны" }} · {{ pair.h.summary }}{% if pair.h.is_pony %} · пони{% if pair.h.height_cm %} {{ pair.h.height_cm }} см{% endif %}{% endif %}</span>
           </div>
-          <form method="post">{% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="a" value="{{ pair.a.pk }}"><input type="hidden" name="h" value="{{ pair.h.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="pair_remove">Убрать пару</button></form>
+          <div class="chips">
+            {% if not pair.open %}<a class="btn btn--dark btn--sm" href="?{% if late %}late=1&{% endif %}open={{ pair.a.pk }}-{{ pair.h.pk }}#pair-{{ pair.a.pk }}-{{ pair.h.pk }}">{% if pair.count %}Изменить{% else %}Выбрать маршруты{% endif %}</a>{% endif %}
+            <form method="post">{% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="a" value="{{ pair.a.pk }}"><input type="hidden" name="h" value="{{ pair.h.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="pair_remove">Убрать пару</button></form>
+          </div>
         </div>
-        {% for row in pair.programs %}
-          <div class="pair-prog">
-            <div class="pair-prog__head">
-              <span class="tag tag--{{ row.p.discipline_color }}">{{ row.p.day|date:"j E" }}{% if row.p.start_time %} · {{ row.p.start_time|time:"H:i" }}{% endif %}</span>
-              <strong>{{ row.p.name }}</strong>
-              <span class="table__sub">{{ row.p.program_type_name }}{% if row.p.heights %} · {{ row.p.heights_label }}{% endif %}</span>
-            </div>
-            {% for i, l in row.added %}
-              <div class="pair-prog__added">
-                <span class="chip chip--success">✓ {{ l.tclass.label }}{% if l.height and not l.tclass.height %} · {{ l.height }} см{% endif %}</span>
-                <form method="post">{% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="index" value="{{ i }}"><button class="btn btn--ghost btn--sm" name="action" value="remove" aria-label="Убрать {{ l.tclass.label }}">Убрать</button></form>
+        {% if not pair.open %}
+          {% if pair.mine %}<ul class="pair-summary">{% for i, l in pair.mine %}<li><span class="chip chip--success">✓</span> {{ l.tclass.program.name }} — {{ l.tclass.label }}{% if l.height and not l.tclass.height %} · {{ l.height }} см{% endif %}</li>{% endfor %}</ul>
+          {% else %}<p class="table__sub">Маршруты ещё не выбраны.</p>{% endif %}
+        {% else %}
+          <form method="post" class="pair-form">
+            {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="a" value="{{ pair.a.pk }}"><input type="hidden" name="h" value="{{ pair.h.pk }}"><input type="hidden" name="open" value="{{ pair.a.pk }}-{{ pair.h.pk }}">
+            <p class="table__sub">Выберите зачёт в нужных маршрутах и нажмите «Добавить выбранные». Недоступные зачёты показаны с причиной.</p>
+            {% for row in pair.programs %}
+              <div class="pair-prog">
+                <div class="pair-prog__head">
+                  <span class="tag tag--{{ row.p.discipline_color }}">{{ row.p.day|date:"j E" }}{% if row.p.start_time %} · {{ row.p.start_time|time:"H:i" }}{% endif %}</span>
+                  <strong>{{ row.p.name }}</strong>
+                  <span class="table__sub">{{ row.p.program_type_name }}{% if row.p.heights %} · {{ row.p.heights_label }}{% endif %}</span>
+                </div>
+                {% for i, l in row.added %}
+                  <div class="pair-prog__added"><span class="chip chip--success">✓ {{ l.tclass.label }}{% if l.height and not l.tclass.height %} · {{ l.height }} см{% endif %}</span>
+                    <button class="btn btn--ghost btn--sm" name="remove" value="{{ i }}" aria-label="Убрать {{ l.tclass.label }}">Убрать</button></div>
+                {% endfor %}
+                {% if row.opts %}
+                  <select name="sel_{{ row.p.pk }}" aria-label="Зачёт: {{ row.p.name }}" class="pair-prog__select">
+                    <option value="">— не участвует —</option>
+                    {% for o in row.opts %}<option value="{{ o.value }}"{% if o.why %} disabled{% endif %}>{{ o.label }}{% if o.why %} — {{ o.why|join:"; " }}{% elif o.conditions %} · {{ o.conditions }}{% endif %}</option>{% endfor %}
+                  </select>
+                  {% if not row.has_ok %}<p class="table__sub">Паре не подходит ни один зачёт этого маршрута.</p>{% endif %}
+                  {% if row.never %}<label class="check"><input type="checkbox" name="confirm_{{ row.p.pk }}" value="1"><span>Подтверждаю: не выполнял норматив, указанный в зачёте</span></label>{% endif %}
+                {% else %}<p class="table__sub">Зачётов нет.</p>{% endif %}
               </div>
             {% endfor %}
-            {% if row.opts %}
-              <form method="post" class="pair-prog__form">
-                {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="a" value="{{ pair.a.pk }}"><input type="hidden" name="h" value="{{ pair.h.pk }}">
-                <select name="tclass" aria-label="Зачёт">
-                  <option value="">— зачёт —</option>
-                  {% for o in row.opts %}
-                    <option value="{{ o.c.pk }}"{% if o.why %} disabled{% endif %}>{{ o.c.label }}{% if o.why %} — {{ o.why|join:"; " }}{% elif o.c.conditions %} · {{ o.c.conditions }}{% endif %}</option>
-                  {% endfor %}
-                </select>
-                {% if row.p.heights|length > 1 %}
-                  <select name="height" aria-label="Высота"><option value="">высота</option>{% for h in row.p.heights %}<option value="{{ h }}">{{ h }} см</option>{% endfor %}</select>
-                {% endif %}
-                {% if row.never %}<label class="check" title="Для зачётов «не выполнявшие норматив»"><input type="checkbox" name="confirm" value="1"><span>не выполнял норматив, указанный в зачёте</span></label>{% endif %}
-                <button class="btn btn--dark btn--sm" name="action" value="add">+ Добавить</button>
-              </form>
-            {% else %}
-              <p class="table__sub">Зачётов нет.</p>
-            {% endif %}
-          </div>
-        {% endfor %}
+            <div class="pair-form__actions"><button class="btn btn--primary btn--lg" name="action" value="add_many">Добавить выбранные</button></div>
+          </form>
+        {% endif %}
       </section>
     {% empty %}
       <section class="card empty"><h2 class="h3">Добавьте первую пару</h2><p class="muted">Всадник и лошадь — затем выберете маршруты и езды для этой пары.</p></section>
     {% endfor %}
-
     <section class="card" id="add">
       <h2 class="h3">Добавить пару «всадник + лошадь»</h2>
       {% if not athletes %}

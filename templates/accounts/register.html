@@ -1,5 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Регистрация — EquiStart{% endblock %}
+{% block title %}Регистрация — EquiStart<script>
+(function () {
+  var box = document.getElementById("pub-consent"), cb = document.querySelector('input[name="categories"][value="athlete"]');
+  if (!box || !cb) return;
+  function sync() { box.hidden = !cb.checked && !box.querySelector(".field__error"); }
+  cb.addEventListener("change", sync); sync();
+})();
+</script>
+{% endblock %}
 {% block content %}
 <section class="auth">
   <div class="card auth__card auth__card--wide">
@@ -30,6 +38,7 @@
 
       <div class="form__group">
         {% include "partials/field.html" with field=form.categories %}
+        <div id="pub-consent">{% include "partials/field.html" with field=form.publication_consent %}</div>
       </div>
 
       {% include "partials/field.html" with field=form.pd_consent consent_link=True %}
@@ -38,4 +47,12 @@
     <p class="auth__switch">Уже есть аккаунт? <a href="{% url 'accounts:login' %}">Войти</a></p>
   </div>
 </section>
+<script>
+(function () {
+  var box = document.getElementById("pub-consent"), cb = document.querySelector('input[name="categories"][value="athlete"]');
+  if (!box || !cb) return;
+  function sync() { box.hidden = !cb.checked && !box.querySelector(".field__error"); }
+  cb.addEventListener("change", sync); sync();
+})();
+</script>
 {% endblock %}
