@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Клубы — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="h1">Конные клубы</h1>
+    <p class="muted">Подтверждённые модератором клубы: адреса, контакты, ближайшие турниры.</p>
+  </div>
+</div>
+<form method="get" class="filters" role="search">
+  <div class="filters__row">
+    <div class="field" style="flex: 2; min-width: 0;"><label class="field__label" for="q">Название или город</label>
+      <input id="q" name="q" type="search" value="{{ q }}" placeholder="Например, «Виват» или «Казань»"></div>
+    <div class="field" style="flex: 1; min-width: 0;"><label class="field__label" for="region">Регион</label>
+      <select id="region" name="region"><option value="">Все регионы</option>{% for v, label in regions %}<option value="{{ v }}"{% if v == region %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="filters__actions"><button type="submit" class="btn btn--dark btn--sm">Найти</button>{% if q or region %} <a class="btn btn--ghost btn--sm" href="{% url 'clubs:list' %}">Сбросить</a>{% endif %}</div>
+  </div>
+</form>
+{% if clubs %}
+  <p class="table__sub" style="margin: var(--space-3) 0;">Найдено: {{ clubs|length }}</p>
+  <div class="list-cards">
+    {% for c in clubs %}
+      <article class="row-card">
+        {% if c.logo %}<img class="club-logo" src="{% url 'clubs:file' 'logo' c.pk %}" alt="" loading="lazy">{% else %}<span class="club-logo club-logo--empty" aria-hidden="true">{{ c.public_name|slice:":1" }}</span>{% endif %}
+        <div style="flex: 1; min-width: 0;">
+          <a class="h3 row-card__title" href="{% url 'clubs:detail' c.pk %}">{{ c.public_name }}</a>
+          <div class="table__sub">{{ c.public_region_name }}, {{ c.public_settlement }}{% if c.public_address %}, {{ c.public_address }}{% endif %}</div>
+        </div>
+        <a class="btn btn--ghost btn--sm" href="{% url 'clubs:detail' c.pk %}">Открыть</a>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card empty"><h2 class="h3">Ничего не нашли</h2><p class="muted">{% if q or region %}Попробуйте другое название или уберите регион.{% else %}Клубы появятся здесь после проверки модератором.{% endif %}</p></div>
+{% endif %}
+{% endblock %}

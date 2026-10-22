@@ -572,6 +572,13 @@ def calendar(request):
         qs = qs.filter(pub_disciplines__contains=[discipline])
     if region:
         qs = qs.filter(pub_region=region)
+    club = None
+    if request.GET.get("club", "").isdigit():
+        from apps.clubs.models import Club
+
+        club = Club.objects.filter(pk=int(request.GET["club"]), confirmed_at__isnull=False).first()
+        if club:
+            qs = qs.filter(venue_id=club.venue_id)
     month_label = ""
     if month:
         try:
@@ -595,6 +602,8 @@ def calendar(request):
         active.append(dict(DISCIPLINE_CHOICES).get(discipline, ""))
     if region:
         active.append(REGION_NAMES.get(region, ""))
+    if club:
+        active.append(club.public_name)
     if only_open:
         active.append("Приём открыт")
     if past:
@@ -607,7 +616,7 @@ def calendar(request):
             "cards": cards, "q": q, "discipline": discipline, "region": region, "month": month,
             "only_open": only_open, "past": past, "active": active, "months": months,
             "disciplines": DISCIPLINE_CHOICES, "regions": REGION_CHOICES,
-            "filters_open": bool(discipline or region or month or only_open or past),
+            "filters_open": bool(discipline or region or month or only_open or past), "club": club,
         },
     )
 
@@ -653,6 +662,12 @@ def _card(t):
     }
 
 
+def _club_of(t):
+    from apps.clubs.models import Club
+
+    return Club.objects.filter(venue_id=t.venue_id, confirmed_at__isnull=False).first() if t.venue_id else None
+
+
 def public_detail(request, pk):
     t = get_object_or_404(Tournament, pk=pk, publication__in=PUBLIC_STATES)
     s = t.snapshot
@@ -673,6 +688,7 @@ def public_detail(request, pk):
         "tournaments/public_detail.html",
         {
             "t": t, "s": s, "days": day_list, "deadline": deadline, "days_left": days_left,
+            "club": _club_of(t),
             "open": t.public_entries_open(), "card": _card(t),
             "can_manage": request.user.is_authenticated and services.can_manage(request.user, t),
             "can_judge": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "judge"}),

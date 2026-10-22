@@ -17,7 +17,7 @@
     {% if t.publication == "cancelled" and t.cancelled_reason %}<div class="alert alert--error" style="margin-top: var(--space-3);">Причина отмены: {{ t.cancelled_reason }}</div>{% endif %}
     <div class="summary__grid" style="margin-top: var(--space-4);">
       <div><div class="caption muted">ДАТЫ</div><div class="label lg">{% daterange s.starts_on s.ends_on %}</div><div class="table__sub">{{ s.timezone_label }}</div></div>
-      <div><div class="caption muted">МЕСТО</div><div class="label lg">{{ s.venue.name }}</div><div class="table__sub">{{ s.venue.region_name }}, {{ s.venue.settlement }}{% if s.venue.address %}, {{ s.venue.address }}{% endif %}</div></div>
+      <div><div class="caption muted">МЕСТО</div><div class="label lg">{% if club %}<a href="{% url 'clubs:detail' club.pk %}">{{ s.venue.name }}</a>{% else %}{{ s.venue.name }}{% endif %}</div><div class="table__sub">{{ s.venue.region_name }}, {{ s.venue.settlement }}{% if s.venue.address %}, {{ s.venue.address }}{% endif %}</div></div>
       <div><div class="caption muted">ЗАЯВКИ ДО</div><div class="label lg">{{ deadline|isodate|default:"—" }}, 23:59</div><div class="table__sub">{% if open and days_left is not None %}{% if days_left == 0 %}последний день{% else %}осталось дней: {{ days_left }}{% endif %}{% elif t.publication == "published" %}приём завершён{% endif %}</div></div>
     </div>
   </div>

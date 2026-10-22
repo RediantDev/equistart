@@ -51,6 +51,14 @@
 </div>
 {% endif %}
 
+{% if user.is_club %}{% with mc=user.managed_clubs.first %}
+<h2 class="h2">Мой клуб</h2>
+<div class="tiles" style="margin-bottom: var(--space-5);">
+  <a class="tile tile--link" href="{% url 'clubs:mine' %}"><span class="tag tag--mint" style="align-self: flex-start; margin-bottom: 6px;">{% if not mc %}Новое{% else %}{{ mc.get_status_display }}{% endif %}</span><h3 class="h3">{% if mc %}{{ mc.name }}{% else %}Создать профиль клуба{% endif %}</h3><p class="muted">{% if not mc %}Страница клуба в каталоге: адрес, контакты, фото, новости. После проверки клуб можно выбрать местом проведения.{% elif mc.status == "returned" %}Модератор вернул профиль: {{ mc.moderator_comment|truncatechars:90 }}{% elif mc.status == "draft" %}Заполните и отправьте на проверку.{% else %}Профиль, фото и новости клуба.{% endif %}</p></a>
+  {% if mc.is_public %}<a class="tile tile--link" href="{% url 'clubs:detail' mc.pk %}"><span class="tag tag--sky" style="align-self: flex-start; margin-bottom: 6px;">Страница</span><h3 class="h3">Как видят клуб</h3><p class="muted">Публичная страница с турнирами и новостями.</p></a>{% endif %}
+</div>
+{% endwith %}{% endif %}
+
 {% if user.can_create_tournament or has_team_roles %}
 <h2 class="h2">Мои турниры</h2>
 <div class="tiles" style="margin-bottom: var(--space-5);">
@@ -63,6 +71,7 @@
 <h2 class="h2">Модерация</h2>
 <div class="tiles" style="margin-bottom: var(--space-5);">
   <a class="tile tile--link" href="{% url 'moderation:queue' %}"><span class="tag tag--lemon" style="align-self: flex-start; margin-bottom: 6px;">Модерация</span><h3 class="h3">Турниры на проверке</h3><p class="muted">Положение, даты, место, программа и зачёты перед публикацией.</p></a>
+  <a class="tile tile--link" href="{% url 'moderation:clubs' %}"><span class="tag tag--mint" style="align-self: flex-start; margin-bottom: 6px;">Клубы</span><h3 class="h3">Клубы на проверке</h3><p class="muted">Новые профили клубов и правки названия или адреса.</p></a>
 </div>
 {% endif %}
 {% endblock %}

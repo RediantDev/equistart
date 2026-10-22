@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}{{ club.public_name }} — EquiStart{% endblock %}
+{% block content %}
+<a class="back" href="{% url 'clubs:list' %}">← Все клубы</a>
+{% if not club.is_public %}<div class="alert alert--warning" role="status">Профиль ещё не опубликован — его видите только вы{% if user.is_moderator %} и модераторы{% endif %}.</div>
+{% elif manage and club.status == "review" %}<div class="alert alert--info" role="status">Новое название или адрес на проверке. Пока все видят прежние: «{{ club.pub_name }}», {{ club.pub_settlement }}.</div>{% endif %}
+<section class="hero-card">
+  <div class="hero-card__main">
+    <div class="club-head">
+      {% if club.logo %}<img class="club-logo club-logo--lg" src="{% url 'clubs:file' 'logo' club.pk %}" alt="Логотип {{ club.public_name }}">{% endif %}
+      <div style="min-width: 0;">
+        <h1 class="h1" style="margin: 0;">{{ club.public_name }}</h1>
+        <div class="table__sub">{{ club.public_region_name }}, {{ club.public_settlement }}{% if club.public_address %}, {{ club.public_address }}{% endif %}</div>
+      </div>
+    </div>
+    {% if club.description %}<p style="white-space: pre-line; margin-top: var(--space-4);">{{ club.description }}</p>{% endif %}
+  </div>
+  <div class="hero-card__side">
+    <div class="caption muted">КОНТАКТЫ</div>
+    <ul class="list">
+      {% if club.phone %}<li><a href="tel:{{ club.phone }}">{{ club.phone }}</a></li>{% endif %}
+      {% if club.email %}<li><a href="mailto:{{ club.email }}">{{ club.email }}</a></li>{% endif %}
+      {% if club.site %}<li><a href="{{ club.site }}" rel="noopener nofollow" target="_blank" class="break">{{ club.site }}</a></li>{% endif %}
+      {% for s in club.social_links %}<li><a href="{{ s }}" rel="noopener nofollow" target="_blank" class="break">{{ s }}</a></li>{% endfor %}
+    </ul>
+    {% if manage %}<a class="btn btn--ghost btn--sm" href="{% url 'clubs:mine' %}">Редактировать</a>{% endif %}
+  </div>
+</section>
+
+{% if club.photos.all %}
+<section class="stack" style="margin-top: var(--space-5);">
+  <h2 class="h2">Фото</h2>
+  <div class="photo-grid">{% for p in club.photos.all %}<figure><img src="{% url 'clubs:file' 'photo' p.pk %}" alt="{{ p.caption|default:club.public_name }}" loading="lazy">{% if p.caption %}<figcaption class="table__sub">{{ p.caption }}</figcaption>{% endif %}</figure>{% endfor %}</div>
+</section>
+{% endif %}
+
+<section class="stack" style="margin-top: var(--space-5);">
+  <h2 class="h2">Турниры в клубе</h2>
+  {% if upcoming %}
+    <div class="list-cards">{% for t in upcoming %}
+      <article class="row-card"><div style="flex: 1; min-width: 0;"><a class="h3 row-card__title" href="{% url 'tournaments:public' t.pk %}">{{ t.pub_title }}</a>
+        <div class="table__sub">{% daterange t.pub_starts_on t.pub_ends_on %}{% if t.publication == "cancelled" %} · <span class="chip chip--danger">Отменён</span>{% endif %}</div></div>
+        <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:public' t.pk %}">Подробнее</a></article>
+    {% endfor %}</div>
+    <a class="table__sub" href="{% url 'core:calendar' %}?club={{ club.pk }}">Все турниры клуба в календаре →</a>
+  {% else %}
+    <p class="muted">Ближайших турниров нет.</p>
+  {% endif %}
+  {% if past %}
+    <details><summary class="label" style="cursor: pointer;">Прошедшие: {{ past|length }}</summary>
+      <ul class="list" style="margin-top: var(--space-2);">{% for t in past %}<li class="list__row"><a href="{% url 'tournaments:public' t.pk %}?tab=results">{{ t.pub_title }}</a><span class="table__sub">{% daterange t.pub_starts_on t.pub_ends_on %}</span></li>{% endfor %}</ul>
+    </details>
+  {% endif %}
+</section>
+
+{% if news %}
+<section class="stack" style="margin-top: var(--space-5);">
+  <h2 class="h2">Новости</h2>
+  {% for n in news %}
+    <article class="card news">
+      <h3 class="h3">{{ n.title }}</h3>
+      <div class="table__sub">{{ n.published_at|date:"j E Y" }}{% if n.tournament %} · <a href="{% url 'tournaments:public' n.tournament.pk %}">{{ n.tournament.pub_title|default:n.tournament.title }}</a>{% endif %}</div>
+      <p style="white-space: pre-line;">{{ n.text }}</p>
+      {% if n.photos.all %}<div class="photo-grid">{% for p in n.photos.all %}<img src="{% url 'clubs:file' 'news' p.pk %}" alt="" loading="lazy">{% endfor %}</div>{% endif %}
+    </article>
+  {% endfor %}
+</section>
+{% endif %}
+{% endblock %}

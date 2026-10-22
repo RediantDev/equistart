@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{% if item %}Новость{% else %}Новая новость{% endif %} — EquiStart{% endblock %}
+{% block content %}
+<section class="auth">
+  <div class="card auth__card auth__card--wide">
+    <a class="back" href="{% url 'clubs:mine' %}">← Мой клуб</a>
+    <h1 class="h1">{% if item %}Изменить новость{% else %}Новая новость{% endif %}</h1>
+    {% if item.hidden %}<div class="alert alert--error">Скрыта модератором: {{ item.hidden_reason }}</div>{% endif %}
+    <form method="post" enctype="multipart/form-data" novalidate class="form">
+      {% csrf_token %}
+      {% include "partials/field.html" with field=form.title %}
+      {% include "partials/field.html" with field=form.text %}
+      {% include "partials/field.html" with field=form.tournament %}
+      {% if item.photos.all %}<div class="photo-grid">{% for p in item.photos.all %}<img src="{% url 'clubs:file' 'news' p.pk %}" alt="" loading="lazy">{% endfor %}</div>{% endif %}
+      {% include "partials/field.html" with field=form.photos %}
+      <div class="form__actions"><button type="submit" class="btn btn--primary">{% if item %}Сохранить{% else %}Опубликовать{% endif %}</button></div>
+    </form>
+    {% if item %}<form method="post" action="{% url 'clubs:news_delete' item.pk %}" style="margin-top: var(--space-3);">{% csrf_token %}<button class="btn btn--ghost btn--sm" type="submit">Удалить новость</button></form>{% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -10,6 +10,7 @@ admin.site.index_title = "Модерация и администрировани
 urlpatterns = [
     path("manage/", admin.site.urls),
     path("moderation/", include(moderation_patterns)),
+    path("", include("apps.clubs.urls")),
     path("", include("apps.tournaments.urls")),
     path("", include("apps.profiles.urls")),
     path("", include("apps.entries.urls")),

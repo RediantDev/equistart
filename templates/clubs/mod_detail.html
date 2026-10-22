@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ club.name }} — модерация — EquiStart{% endblock %}
+{% block content %}
+<a class="back" href="{% url 'moderation:clubs' %}">← Клубы на проверке</a>
+<h1 class="h1">{{ club.name }} <span class="chip">{{ club.get_status_display }}</span></h1>
+{% if similar %}
+  <div class="alert alert--warning" role="alert"><strong>Похожие клубы в том же населённом пункте.</strong> Убедитесь, что это не дубль:
+    <ul class="list" style="margin-top: var(--space-2);">{% for s in similar %}<li class="list__row"><a href="{% url 'moderation:club' s.pk %}">{{ s.name }}</a><span class="table__sub">{{ s.address }} · {{ s.get_status_display }}</span></li>{% endfor %}</ul></div>
+{% endif %}
+<section class="card stack">
+  <div class="summary__grid">
+    <div><div class="caption muted">РЕГИОН, ГОРОД</div><div class="label">{{ club.region_name }}, {{ club.settlement }}</div></div>
+    <div><div class="caption muted">АДРЕС</div><div class="label">{{ club.address }}</div></div>
+    <div><div class="caption muted">КОНТАКТЫ</div><div class="label break">{{ club.phone }} {{ club.email }} {{ club.site }}</div></div>
+    <div><div class="caption muted">УПРАВЛЯЮЩИЙ</div><div class="label">{{ club.manager.full_name }} · {{ club.manager.phone }}</div></div>
+  </div>
+  {% if club.is_public and club.substantial_changed %}
+    <div class="alert alert--info">Было опубликовано: «{{ club.pub_name }}», {{ club.pub_settlement }}, {{ club.pub_address }}.</div>
+  {% endif %}
+  {% if club.description %}<p style="white-space: pre-line;">{{ club.description }}</p>{% endif %}
+  <a class="table__sub" href="{% url 'clubs:detail' club.pk %}" target="_blank">Как будет выглядеть страница →</a>
+</section>
+{% if club.status == "review" %}
+<section class="card stack" style="margin-top: var(--space-4);">
+  <h2 class="h2">Решение</h2>
+  <form method="post" class="form">{% csrf_token %}<button class="btn btn--primary" name="decision" value="confirm">Подтвердить и опубликовать</button></form>
+  <form method="post" class="form">{% csrf_token %}
+    <div class="field"><label class="field__label" for="cm">Что исправить</label><textarea id="cm" name="comment" rows="3" placeholder="Например: укажите адрес до дома, телефон не отвечает"></textarea></div>
+    <button class="btn btn--ghost" name="decision" value="return">Вернуть с замечаниями</button></form>
+</section>
+{% endif %}
+{% if news %}
+<section class="card stack" style="margin-top: var(--space-4);">
+  <h2 class="h2">Новости клуба</h2>
+  {% for n in news %}
+    <article class="row-card"><div style="flex: 1; min-width: 0;"><strong>{{ n.title }}</strong><div class="table__sub">{{ n.published_at|date:"j E Y" }}{% if n.hidden %} · скрыта: {{ n.hidden_reason }}{% endif %}</div><p class="table__sub">{{ n.text|truncatechars:200 }}</p></div>
+      {% if not n.hidden %}<form method="post" class="form">{% csrf_token %}<input type="hidden" name="news" value="{{ n.pk }}"><input name="reason" placeholder="Причина" aria-label="Причина скрытия" required><button class="btn btn--ghost btn--sm" name="decision" value="hide_news">Скрыть</button></form>{% endif %}
+    </article>
+  {% endfor %}
+</section>
+{% endif %}
+{% endblock %}

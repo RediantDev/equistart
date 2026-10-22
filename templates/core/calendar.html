@@ -24,6 +24,7 @@
         <select id="discipline" name="discipline"><option value="">Все</option>{% for v, label in disciplines %}<option value="{{ v }}"{% if v == discipline %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
       <div class="field"><label class="field__label" for="region">Регион</label>
         <select id="region" name="region"><option value="">Все регионы</option>{% for v, label in regions %}<option value="{{ v }}"{% if v == region %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      {% if club %}<input type="hidden" name="club" value="{{ club.pk }}">{% endif %}
       <div class="filters__checks">
         <label class="check"><input type="checkbox" name="open" value="1"{% if only_open %} checked{% endif %}><span>Только с открытым приёмом</span></label>
         <label class="check"><input type="checkbox" name="past" value="1"{% if past %} checked{% endif %}><span>Прошедшие</span></label>

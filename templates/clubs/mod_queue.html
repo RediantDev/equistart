@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Клубы на проверке — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head"><div>
+  <a class="back" href="{% url 'moderation:queue' %}">← Турниры на проверке</a>
+  <h1 class="h1">Клубы на проверке</h1>
+  <p class="muted">Проверьте, что клуб существует, адрес и контакты настоящие, название не дублирует другой клуб.</p>
+</div></div>
+<section class="stack">
+  <h2 class="h2">Ждут проверки <span class="tag tag--lemon">{{ waiting|length }}</span></h2>
+  {% if waiting %}
+    <div class="list-cards">{% for c in waiting %}
+      <article class="row-card">
+        <div style="flex: 1; min-width: 0;"><a class="h3 row-card__title" href="{% url 'moderation:club' c.pk %}">{{ c.name }}</a>
+          <div class="table__sub">{{ c.region_name }}, {{ c.settlement }} · {{ c.manager.full_name|default:c.manager.phone }}</div></div>
+        <div class="chips">{% if c.is_public %}<span class="chip chip--info">Правка подтверждённого</span>{% else %}<span class="chip">Новый</span>{% endif %}
+          <span class="table__sub">отправлен {{ c.submitted_at|date:"j E, H:i" }}</span></div>
+        <a class="btn btn--primary btn--sm" href="{% url 'moderation:club' c.pk %}">Проверить</a>
+      </article>
+    {% endfor %}</div>
+  {% else %}
+    <div class="card empty"><h2 class="h3">Очередь пуста</h2><p class="muted">Новые клубы на проверку появятся здесь.</p></div>
+  {% endif %}
+  {% if recent %}
+    <h2 class="h2" style="margin-top: var(--space-6);">Недавние</h2>
+    <div class="table-wrap"><table class="table table--cards">
+      <thead><tr><th>Клуб</th><th>Статус</th><th>Обновлён</th></tr></thead>
+      <tbody>{% for c in recent %}<tr><td data-label="Клуб"><a href="{% url 'moderation:club' c.pk %}">{{ c.name }}</a></td><td data-label="Статус">{{ c.get_status_display }}</td><td data-label="Обновлён">{{ c.updated_at|date:"d.m.Y H:i" }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  {% endif %}
+</section>
+{% endblock %}
