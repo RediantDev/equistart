@@ -12,4 +12,5 @@ P3=$!
 wait $P1; echo "S1 done $(tail -1 s1.log)"
 wait $P3; echo "S3 done $(tail -1 s3.log)"
 python3 -u scenario5.py > s5.log 2>&1; echo "S5 done $(tail -1 s5.log)"
+python3 -u scenario6.py > s6.log 2>&1; echo "S6 done $(grep CHECKS s6.log)"
 echo ALL-DONE

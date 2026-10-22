@@ -274,6 +274,63 @@ check("Тренер без роли «Клуб» — подсказка доба
 r = coachb.get(f"/moderation/clubs/")
 check("Не модератор — 403 на очереди клубов", r.status == 403, str(r.status))
 
+
+# ---------- 11. управляющие клуба ----------
+helper = Person(6301, "+79266003001", level="novice")
+sb.get("/my/club/")
+if not sb.click("Управляющие"):
+    sb.friction("Мой клуб", "Нет входа в список управляющих", "high"); sb.get("/my/club/team/")
+sb.submit(sb.page.form(has_field="phone"), {"phone": "8 (926) 600-30-01"}, button_name="action", button_value="invite")
+check("Приглашение управляющего по телефону (ещё без аккаунта)", any("Приглашение отправлено" in m for m in sb.page.messages()), str(sb.page.messages()[:1]))
+hb = reg_or_login(SC, helper, ["coach"])   # регистрируется как тренер, роли «Клуб» нет
+hb.get("/cabinet/")
+if not hb.click("Приглашение управлять клубом", "Приглашения"):
+    hb.friction("Кабинет", "Не видно приглашения управлять клубом", "high"); hb.get("/cabinet/invitations/")
+f = hb.page.form(action_contains="/my/club/invite/")
+check("Приглашение ждало регистрации и видно в кабинете", f is not None)
+if f:
+    hb.submit(f, button_name="decision", button_value="accept")
+check("Управляющий сразу попадает в «Мой клуб»", "/my/club/" in hb.page.url)
+f = hb.page.form(has_field="settlement")
+hb.submit(f, {"description": "Крытый манеж 20×60, плац, 60 денников. Летом — открытые старты по выездке."})
+check("Управляющий правит профиль", any("Сохранено" in m for m in hb.page.messages()))
+hb.get("/my/club/team/")
+check("Управляющий не может приглашать", hb.page.form(has_field="phone") is None)
+# владелец передаёт клуб
+sb.get("/my/club/team/")
+f = next((x for x in sb.page.forms() if x.find("button", attrs={"value": "transfer"})), None)
+sb.submit(f, button_name="action", button_value="transfer")
+f = sb.page.form(button="Передать")
+check("Передача владения — с подтверждением", f is not None)
+sb.submit(f, button_name="action", button_value="transfer")
+hb.get("/my/club/team/")
+check("Новый владелец может приглашать", hb.page.form(has_field="phone") is not None)
+
+# ---------- 12. модератор объединяет дубль ----------
+dupp = Person(6401, "+79266004001", level="medium")
+db = reg_or_login(SC, dupp, ["club"], " (клуб)")
+db.get("/my/club/")
+f = db.page.form(has_field="settlement")
+sel = f.find("select", attrs={"name": "region"})
+rv = next(o.get("value") for o in sel.find_all("option") if "Краснодарский" in o.get_text())
+db.submit(f, {"name": f"Солнечная долина{SFX}", "region": rv, "settlement": "Краснодар", "address": "Индустриальный, Конная 12", "phone": dupp.phone,
+              "description": "", "email": "", "site": "", "socials": ""}, button_name="submit", button_value="1")
+dup_id = orm_q(f"from apps.clubs.models import Club\nout = Club.objects.get(name='Солнечная долина{SFX}').pk")
+mod.get(f"/moderation/clubs/{dup_id}/")
+check("Модератор видит похожий клуб", "Похожие клубы" in mod.page.text())
+mod.submit(mod.page.form(button="Подтвердить"), button_name="decision", button_value="confirm")  # по ошибке подтвердил
+mod.get(f"/moderation/clubs/{dup_id}/")
+f = mod.page.form(button="Объединить")
+opt = f.find("select", attrs={"name": "main"}).find_all("option")
+mv = next((o.get("value") for o in opt if "Кубань" in o.get_text()), "")
+check("Основной клуб предложен в списке", bool(mv))
+mod.submit(f, {"main": mv}, button_name="decision", button_value="merge")
+check("Дубль объединён", any("объединён" in m for m in mod.page.messages()), str(mod.page.messages()[:1]))
+g.get(f"/clubs/{dup_id}/")
+check("Страница дубля ведёт на основной клуб", f"/clubs/{CID[sun]}/" in g.page.url)
+g.get("/clubs/?q=солнечная")
+check("В каталоге один клуб «Солнечная долина»", g.page.text().count("Солнечная долина") == 1)
+
 ok = sum(1 for c in CHECKS if c[1])
 print(f"CHECKS {ok}/{len(CHECKS)}", flush=True)
 json.dump(dict(checks=CHECKS, clubs=CID, t=pk, t2=pk2), open("/home/claude/sim/s6_meta.json", "w"), ensure_ascii=False)
