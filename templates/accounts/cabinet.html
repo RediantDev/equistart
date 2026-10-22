@@ -51,7 +51,7 @@
 </div>
 {% endif %}
 
-{% if user.is_club %}{% with mc=user.managed_clubs.first %}
+{% if user.is_club or my_club %}{% with mc=my_club %}
 <h2 class="h2">Мой клуб</h2>
 <div class="tiles" style="margin-bottom: var(--space-5);">
   <a class="tile tile--link" href="{% url 'clubs:mine' %}"><span class="tag tag--mint" style="align-self: flex-start; margin-bottom: 6px;">{% if not mc %}Новое{% else %}{{ mc.get_status_display }}{% endif %}</span><h3 class="h3">{% if mc %}{{ mc.name }}{% else %}Создать профиль клуба{% endif %}</h3><p class="muted">{% if not mc %}Страница клуба в каталоге: адрес, контакты, фото, новости. После проверки клуб можно выбрать местом проведения.{% elif mc.status == "returned" %}Модератор вернул профиль: {{ mc.moderator_comment|truncatechars:90 }}{% elif mc.status == "draft" %}Заполните и отправьте на проверку.{% else %}Профиль, фото и новости клуба.{% endif %}</p></a>

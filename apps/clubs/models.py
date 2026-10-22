@@ -36,6 +36,9 @@ class Club(models.Model):
     venue = models.OneToOneField("tournaments.Venue", null=True, blank=True, on_delete=models.SET_NULL, related_name="club",
                                  verbose_name="место проведения")
     confirmed_at = models.DateTimeField(null=True, blank=True)
+    merged_into = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="merged",
+                                    verbose_name="объединён с")
+    merged_at = models.DateTimeField(null=True, blank=True)
     submitted_at = models.DateTimeField(null=True, blank=True)
     revision = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -51,7 +54,7 @@ class Club(models.Model):
 
     @property
     def is_public(self):
-        return bool(self.confirmed_at)
+        return bool(self.confirmed_at) and not self.merged_into_id
 
     @property
     def public_name(self):
@@ -116,3 +119,24 @@ class NewsPhoto(models.Model):
 
     class Meta:
         ordering = ["position", "id"]
+
+
+class ClubMember(models.Model):
+    """Управляющие клубом кроме владельца (владелец — Club.manager). Приглашение по телефону, принимается в кабинете."""
+
+    class State(models.TextChoices):
+        PENDING = "pending", "Ждёт ответа"
+        ACCEPTED = "accepted", "Управляет"
+        DECLINED = "declined", "Отклонено"
+
+    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="members")
+    phone = models.CharField(max_length=20)
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.CASCADE, related_name="club_memberships")
+    state = models.CharField(max_length=10, choices=State.choices, default=State.PENDING)
+    invited_by = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [models.UniqueConstraint(fields=["club", "phone"], name="club_member_unique_phone")]

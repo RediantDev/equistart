@@ -20,7 +20,7 @@ from apps.tournaments.regions import REGION_CHOICES
 
 from . import services
 from .forms import ClubForm, NewsForm
-from .models import Club, ClubNews, ClubPhoto, NewsPhoto
+from .models import Club, ClubMember, ClubNews, ClubPhoto, NewsPhoto
 
 PUBLIC_T = [Tournament.Publication.PUBLISHED, Tournament.Publication.FINISHED, Tournament.Publication.CANCELLED]
 
@@ -30,7 +30,7 @@ PUBLIC_T = [Tournament.Publication.PUBLISHED, Tournament.Publication.FINISHED, T
 def club_list(request):
     q = request.GET.get("q", "").strip()
     region = request.GET.get("region", "")
-    qs = Club.objects.filter(confirmed_at__isnull=False)
+    qs = Club.objects.filter(confirmed_at__isnull=False, merged_into__isnull=True)
     if q:
         qs = qs.filter(Q(pub_name__icontains=q) | Q(pub_settlement__icontains=q))
     if region:
@@ -40,6 +40,8 @@ def club_list(request):
 
 def detail(request, pk):
     club = get_object_or_404(Club, pk=pk)
+    if club.merged_into_id:
+        return redirect("clubs:detail", club.merged_into_id, permanent=True)
     if not services.can_view(request.user, club):
         raise Http404("Клуб ещё не подтверждён модератором.")
     today = timezone.localdate()
@@ -78,16 +80,16 @@ def file(request, kind, pk):
 # ---------------- кабинет клуба ----------------
 
 def _my_club(user):
-    return Club.objects.filter(manager=user).first()
+    return services.club_of(user)
 
 
 @login_required
 @require_http_methods(["GET", "POST"])
 def mine(request):
-    if not request.user.is_club:
+    club = _my_club(request.user)
+    if not club and not request.user.is_club:
         messages.info(request, "Профиль клуба ведёт аккаунт с ролью «Клуб». Добавьте её, если вы представляете клуб.")
         return redirect("accounts:add_role")
-    club = _my_club(request.user)
     form = ClubForm(request.POST or None, request.FILES or None, instance=club)
     form.submitting = "submit" in request.POST
     if request.method == "POST" and form.is_valid():
@@ -96,8 +98,9 @@ def mine(request):
             obj.logo = None
         try:
             services.save(request.user, obj, form.changed_data)
-        except PermissionDenied:
-            raise
+        except ValueError as e:
+            messages.error(request, str(e))
+            return redirect("clubs:mine")
         if "submit" in request.POST:
             try:
                 services.submit(request.user, obj.pk)
@@ -110,7 +113,9 @@ def mine(request):
             messages.success(request, "Сохранено.")
         return redirect("clubs:mine")
     news = club.news.prefetch_related("photos").select_related("tournament") if club else []
+    invites = ClubMember.objects.filter(phone=request.user.phone, state=ClubMember.State.PENDING).select_related("club") if not club else []
     return render(request, "clubs/mine.html", {"club": club, "form": form, "news": news, "missing": services.missing(club) if club else [],
+                                               "invites": invites, "is_owner": club and services.is_owner(request.user, club),
                                                "similar": services.similar(club) if club and not club.is_public and club.settlement else []})
 
 
@@ -183,9 +188,12 @@ def news_delete(request, pk):
 
 @moderator_required
 def mod_queue(request):
-    waiting = Club.objects.filter(status=Club.Status.REVIEW).select_related("manager").order_by("submitted_at")
-    recent = Club.objects.exclude(status__in=[Club.Status.REVIEW, Club.Status.DRAFT]).order_by("-updated_at")[:20]
-    return render(request, "clubs/mod_queue.html", {"waiting": waiting, "recent": recent})
+    waiting = Club.objects.filter(status=Club.Status.REVIEW, merged_into__isnull=True).select_related("manager").order_by("submitted_at")
+    q = request.GET.get("q", "").strip()
+    recent = Club.objects.exclude(status__in=[Club.Status.REVIEW, Club.Status.DRAFT]).select_related("merged_into")
+    if q:
+        recent = recent.filter(Q(name__icontains=q) | Q(settlement__icontains=q) | Q(pk=int(q)) if q.isdigit() else Q(name__icontains=q) | Q(settlement__icontains=q))
+    return render(request, "clubs/mod_queue.html", {"waiting": waiting, "recent": recent.order_by("-updated_at")[:30], "q": q})
 
 
 @moderator_required
@@ -200,10 +208,71 @@ def mod_detail(request, pk):
             elif request.POST.get("decision") == "return":
                 services.return_for_fixes(request.user, club.pk, request.POST.get("comment"))
                 messages.success(request, "Клуб возвращён с замечаниями.")
+            elif request.POST.get("decision") == "merge":
+                main = (request.POST.get("main_id") or request.POST.get("main") or "").strip().lstrip("№#")
+                if not main.isdigit():
+                    raise ValueError("Укажите номер основного клуба.")
+                services.merge(request.user, club.pk, int(main))
+                messages.success(request, "Дубль объединён с основным клубом.")
             elif request.POST.get("decision") == "hide_news":
                 services.hide_news(request.user, int(request.POST.get("news")), request.POST.get("reason"))
                 messages.success(request, "Новость скрыта.")
             return redirect("moderation:clubs")
         except ValueError as e:
             messages.error(request, str(e))
-    return render(request, "clubs/mod_detail.html", {"club": club, "similar": services.similar(club), "news": club.news.all()[:20]})
+    return render(request, "clubs/mod_detail.html", {"club": club, "similar": services.similar(club), "news": club.news.all()[:20],
+                                                     "managers": services.managers(club)})
+
+
+# ---------------- управляющие ----------------
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def team(request):
+    club = _my_club(request.user)
+    if not club:
+        raise Http404
+    owner = services.is_owner(request.user, club)
+    if request.method == "POST":
+        action = request.POST.get("action")
+        try:
+            if action == "invite":
+                services.invite_manager(request.user, club.pk, request.POST.get("phone", ""))
+                messages.success(request, "Приглашение отправлено. Человек примет его в кабинете — после этого сможет править клуб.")
+            elif action == "remove":
+                m = get_object_or_404(ClubMember, pk=request.POST.get("member"), club=club)
+                leaving = m.user_id == request.user.pk
+                services.remove_manager(request.user, m.pk)
+                messages.success(request, "Вы больше не управляете клубом." if leaving else "Управляющий удалён.")
+                if leaving:
+                    return redirect("accounts:cabinet")
+            elif action == "transfer":
+                m = get_object_or_404(ClubMember, pk=request.POST.get("member"), club=club)
+                if request.POST.get("confirm") != "1":
+                    return render(request, "clubs/transfer_confirm.html", {"club": club, "m": m})
+                services.transfer(request.user, club.pk, m.pk)
+                messages.success(request, f"Владелец клуба теперь {m.user.short_name}. Вы остались управляющим.")
+        except ValidationError as e:
+            messages.error(request, " ".join(e.messages))
+        except ValueError as e:
+            messages.error(request, str(e))
+        return redirect("clubs:team")
+    members = club.members.select_related("user").exclude(state=ClubMember.State.DECLINED)
+    return render(request, "clubs/team.html", {"club": club, "owner": owner, "members": members})
+
+
+@login_required
+@require_POST
+def invite_respond(request, pk):
+    try:
+        m = services.respond(request.user, pk, request.POST.get("decision") == "accept")
+    except ClubMember.DoesNotExist:
+        raise Http404
+    except ValueError as e:
+        messages.error(request, str(e))
+        return redirect("tournaments:invitations")
+    if m.state == ClubMember.State.ACCEPTED:
+        messages.success(request, f"Теперь вы управляете клубом «{m.club.name}».")
+        return redirect("clubs:mine")
+    messages.success(request, "Приглашение отклонено.")
+    return redirect("tournaments:invitations")

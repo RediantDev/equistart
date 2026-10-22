@@ -526,8 +526,11 @@ def team_revoke(request, pk, member_id):
 
 @login_required
 def invitations(request):
+    from apps.clubs.models import ClubMember
+
     pending = TeamMember.objects.filter(phone=request.user.phone, state=TeamMember.State.PENDING).select_related("tournament", "invited_by")
-    return render(request, "tournaments/invitations.html", {"pending": pending})
+    clubs = ClubMember.objects.filter(phone=request.user.phone, state=ClubMember.State.PENDING).select_related("club", "invited_by")
+    return render(request, "tournaments/invitations.html", {"pending": pending, "club_invites": clubs})
 
 
 @login_required
@@ -577,6 +580,8 @@ def calendar(request):
         from apps.clubs.models import Club
 
         club = Club.objects.filter(pk=int(request.GET["club"]), confirmed_at__isnull=False).first()
+        if club and club.merged_into_id:
+            club = club.merged_into
         if club:
             qs = qs.filter(venue_id=club.venue_id)
     month_label = ""
@@ -665,7 +670,7 @@ def _card(t):
 def _club_of(t):
     from apps.clubs.models import Club
 
-    return Club.objects.filter(venue_id=t.venue_id, confirmed_at__isnull=False).first() if t.venue_id else None
+    return Club.objects.filter(venue_id=t.venue_id, confirmed_at__isnull=False, merged_into__isnull=True).first() if t.venue_id else None
 
 
 def public_detail(request, pk):

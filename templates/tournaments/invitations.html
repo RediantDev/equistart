@@ -5,9 +5,25 @@
 <div class="page-head">
   <div>
     <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
-    <h1 class="h1">Приглашения в команды турниров</h1>
+    <h1 class="h1">Приглашения</h1>
   </div>
 </div>
+{% if club_invites %}
+  <h2 class="h2">Управлять клубом</h2>
+  <div class="list-cards" style="margin-bottom: var(--space-5);">
+    {% for m in club_invites %}
+      <article class="row-card">
+        <div style="flex: 1; min-width: 0;"><div class="h3 break">{{ m.club.name }}</div><div class="table__sub">приглашает {{ m.invited_by.short_name }} · сможете править профиль, фото и новости</div></div>
+        <form method="post" action="{% url 'clubs:invite_respond' m.pk %}" class="row-card__actions">
+          {% csrf_token %}
+          <button type="submit" name="decision" value="decline" class="btn btn--ghost btn--sm">Отклонить</button>
+          <button type="submit" name="decision" value="accept" class="btn btn--primary btn--sm">Принять</button>
+        </form>
+      </article>
+    {% endfor %}
+  </div>
+  {% if pending %}<h2 class="h2">Команды турниров</h2>{% endif %}
+{% endif %}
 {% if pending %}
   <div class="list-cards">
     {% for m in pending %}
@@ -17,7 +33,7 @@
           <div class="table__sub">{% if m.tournament.starts_on %}{{ m.tournament.starts_on|isodate }} · {% endif %}приглашает {{ m.invited_by.short_name }}</div>
         </div>
         <span class="tag tag--lilac">{{ m.get_role_display }}</span>
-        <form method="post" action="{% url 'tournaments:invitation_respond' m.pk %}" style="display: flex; gap: var(--space-2);">
+        <form method="post" action="{% url 'tournaments:invitation_respond' m.pk %}" class="row-card__actions">
           {% csrf_token %}
           <button type="submit" name="decision" value="decline" class="btn btn--ghost btn--sm">Отклонить</button>
           <button type="submit" name="decision" value="accept" class="btn btn--primary btn--sm">Принять</button>
@@ -25,7 +41,7 @@
       </article>
     {% endfor %}
   </div>
-{% else %}
+{% elif not club_invites %}
   <div class="card empty"><h2 class="h3">Новых приглашений нет</h2><p class="muted">Когда организатор пригласит вас по номеру {{ user.phone_display }}, приглашение появится здесь.</p></div>
 {% endif %}
 {% endblock %}

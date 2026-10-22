@@ -47,6 +47,12 @@ def logout_view(request):
 
 
 @login_required
+def _club_of(user):
+    from apps.clubs.services import club_of
+
+    return club_of(user)
+
+
 def cabinet(request):
     """UI-07: «Главная» — разделы по ролям пользователя, без переключателя режимов."""
     import datetime
@@ -75,6 +81,11 @@ def cabinet(request):
     n = TeamMember.objects.filter(phone=user.phone, state=TeamMember.State.PENDING).count()
     if n:
         actions.append(("Приглашения в команду турнира", n, "tournaments:invitations"))
+    from apps.clubs.models import ClubMember
+
+    n = ClubMember.objects.filter(phone=user.phone, state=ClubMember.State.PENDING).count()
+    if n:
+        actions.append(("Приглашение управлять клубом", n, "tournaments:invitations"))
     n = Offer.objects.filter(phone=user.phone, state=Offer.State.PENDING).count()
     if n:
         actions.append(("Предложения: связь с профилем или передача управления", n, "profiles:offers"))
@@ -127,6 +138,7 @@ def cabinet(request):
             "actions": rows,
             "judging_today": judging_today,
             "has_team_roles": bool(judged_ids or stable_ids),
+            "my_club": _club_of(user),
             "own_athlete": Athlete.objects.filter(linked_user=user).first(),
             "today": today,
         },

@@ -6,10 +6,14 @@
     <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
     <h1 class="h1">{% if club %}{{ club.name }}{% else %}Профиль клуба{% endif %}</h1>
     {% if club %}<div class="chips"><span class="chip{% if club.status == 'confirmed' %} chip--success{% elif club.status == 'returned' %} chip--danger{% elif club.status == 'review' %} chip--info{% endif %}">{{ club.get_status_display }}</span>
-      {% if club.is_public %}<a class="table__sub" href="{% url 'clubs:detail' club.pk %}">Открыть публичную страницу →</a>{% endif %}</div>{% endif %}
+      {% if club.is_public %}<a class="table__sub" href="{% url 'clubs:detail' club.pk %}">Публичная страница →</a>{% endif %}
+      <a class="table__sub" href="{% url 'clubs:team' %}">Управляющие: {{ club.members.count|add:1 }} →</a></div>{% endif %}
   </div>
 </div>
 
+{% if invites %}
+  <div class="alert alert--info">Вас пригласили управлять клубом: {% for m in invites %}«{{ m.club.name }}»{% if not forloop.last %}, {% endif %}{% endfor %}. <a href="{% url 'tournaments:invitations' %}">Принять приглашение</a> — и не создавайте второй профиль.</div>
+{% endif %}
 {% if not club %}
   <div class="alert alert--info">Заполните профиль и отправьте на проверку. После подтверждения клуб появится в каталоге и организаторы смогут выбрать его местом проведения турнира.</div>
 {% elif club.status == "returned" %}

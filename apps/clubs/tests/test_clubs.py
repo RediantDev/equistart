@@ -153,3 +153,100 @@ class ClubContentTests(ClubBase):
         self.assertContains(r, snap_title)
         self.assertContains(r, "КСК «Пегас»")
         self.assertContains(self.client.get(reverse("clubs:detail", args=[self.club.pk])), snap_title)
+
+
+class ClubTeamTests(ClubBase):
+    def setUp(self):
+        super().setUp()
+        self.helper = mkuser("+79990002003", last_name="Иванова", first_name="Ольга")
+
+    def invite_accept(self):
+        m = services.invite_manager(self.cu, self.club.pk, "8 999 000-20-03")
+        self.client.force_login(self.helper)
+        self.assertContains(self.client.get(reverse("tournaments:invitations")), self.club.name)
+        self.client.post(reverse("clubs:invite_respond", args=[m.pk]), {"decision": "accept"})
+        m.refresh_from_db()
+        return m
+
+    def test_invite_accept_manage(self):
+        m = self.invite_accept()
+        self.assertEqual(m.state, "accepted")
+        self.helper.refresh_from_db()
+        self.assertTrue(self.helper.is_club)
+        self.assertEqual(self.client.get(reverse("clubs:mine")).status_code, 200)
+        r = self.client.post(reverse("clubs:photo_add"), {"file": SimpleUploadedFile("x.png", PNG, "image/png")})
+        self.assertEqual(self.club.photos.count(), 1)
+        # управляющий не приглашает других
+        self.client.post(reverse("clubs:team"), {"action": "invite", "phone": "+79990002009"})
+        self.assertEqual(self.club.members.count(), 1)
+
+    def test_foreign_cannot_accept(self):
+        m = services.invite_manager(self.cu, self.club.pk, "+79990002003")
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.post(reverse("clubs:invite_respond", args=[m.pk]), {"decision": "accept"}).status_code, 403)
+
+    def test_duplicate_invite_and_own_phone(self):
+        services.invite_manager(self.cu, self.club.pk, "+79990002003")
+        with self.assertRaises(ValueError):
+            services.invite_manager(self.cu, self.club.pk, "+79990002003")
+        with self.assertRaises(ValueError):
+            services.invite_manager(self.cu, self.club.pk, self.cu.phone)
+
+    def test_transfer_and_leave(self):
+        m = self.invite_accept()
+        self.client.force_login(self.cu)
+        r = self.client.post(reverse("clubs:team"), {"action": "transfer", "member": m.pk})
+        self.assertContains(r, "Передать клуб?")
+        self.client.post(reverse("clubs:team"), {"action": "transfer", "member": m.pk, "confirm": "1"})
+        self.club.refresh_from_db()
+        self.assertEqual(self.club.manager, self.helper)
+        self.assertTrue(services.can_manage(self.cu, self.club))
+        self.assertFalse(services.is_owner(self.cu, self.club))
+        # бывший владелец уходит сам
+        mm = self.club.members.get(user=self.cu)
+        self.client.post(reverse("clubs:team"), {"action": "remove", "member": mm.pk})
+        self.assertFalse(services.can_manage(self.cu, self.club))
+
+    def test_one_club_per_account(self):
+        other_club = Club.objects.create(manager=self.helper, name="КСК «Другой»", region="mos", settlement="Москва", address="x", phone="1")
+        self.helper.is_club = True
+        self.helper.save()
+        m = services.invite_manager(self.cu, self.club.pk, "+79990002003")
+        with self.assertRaises(ValueError):
+            services.respond(self.helper, m.pk, True)
+        self.assertTrue(other_club.pk)
+
+    def test_team_page_requires_club(self):
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get(reverse("clubs:team")).status_code, 404)
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("clubs:team")).status_code, 302)
+
+
+class ClubMergeTests(ClubBase):
+    def test_merge(self):
+        self.submit_confirm()
+        u2 = mkuser("+79990002004", is_club=True)
+        dup = Club.objects.create(manager=u2, name="Пегас", region="mos", settlement="Москва", address="Конная 1", phone="2")
+        services.submit(u2, dup.pk)
+        services.confirm(self.mod, dup.pk)
+        dup.refresh_from_db()
+        self.club.refresh_from_db()
+        self.t.venue = dup.venue
+        self.t.save()
+        ClubNews.objects.create(club=dup, title="Старт", text="x")
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.post(reverse("moderation:club", args=[dup.pk]), {"decision": "merge", "main": self.club.pk}).status_code, 403)
+        self.client.force_login(self.mod)
+        self.client.post(reverse("moderation:club", args=[dup.pk]), {"decision": "merge", "main": self.club.pk})
+        dup.refresh_from_db()
+        self.t.refresh_from_db()
+        self.assertEqual(dup.merged_into, self.club)
+        self.assertEqual(self.t.venue_id, self.club.venue_id)
+        self.assertFalse(dup.venue.confirmed)
+        self.assertEqual(self.club.news.count(), 1)
+        self.assertRedirects(self.client.get(reverse("clubs:detail", args=[dup.pk])), reverse("clubs:detail", args=[self.club.pk]), status_code=301)
+        self.assertNotContains(self.client.get(reverse("clubs:list")), "Конная 1")
+        self.assertFalse(services.can_manage(u2, dup))
+        with self.assertRaises(ValueError):
+            services.merge(self.mod, self.club.pk, dup.pk)

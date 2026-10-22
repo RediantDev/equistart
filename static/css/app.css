@@ -543,3 +543,4 @@ a.chip, a.tag { text-decoration: none; }
 .news + .news { margin-top: var(--space-3); }
 .photo-cap { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-top: 4px; min-width: 0; }
 .photo-cap .table__sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-card__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }

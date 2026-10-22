@@ -2,7 +2,8 @@
 {% block title %}{{ club.name }} — модерация — EquiStart{% endblock %}
 {% block content %}
 <a class="back" href="{% url 'moderation:clubs' %}">← Клубы на проверке</a>
-<h1 class="h1">{{ club.name }} <span class="chip">{{ club.get_status_display }}</span></h1>
+<h1 class="h1 break">{{ club.name }} <span class="chip">{% if club.merged_into %}Объединён{% else %}{{ club.get_status_display }}{% endif %}</span></h1>
+{% if club.merged_into %}<div class="alert alert--info">Объединён с <a href="{% url 'moderation:club' club.merged_into.pk %}">«{{ club.merged_into.public_name }}»</a> {{ club.merged_at|date:"d.m.Y H:i" }}.</div>{% endif %}
 {% if similar %}
   <div class="alert alert--warning" role="alert"><strong>Похожие клубы в том же населённом пункте.</strong> Убедитесь, что это не дубль:
     <ul class="list" style="margin-top: var(--space-2);">{% for s in similar %}<li class="list__row"><a href="{% url 'moderation:club' s.pk %}">{{ s.name }}</a><span class="table__sub">{{ s.address }} · {{ s.get_status_display }}</span></li>{% endfor %}</ul></div>
@@ -12,7 +13,7 @@
     <div><div class="caption muted">РЕГИОН, ГОРОД</div><div class="label">{{ club.region_name }}, {{ club.settlement }}</div></div>
     <div><div class="caption muted">АДРЕС</div><div class="label">{{ club.address }}</div></div>
     <div><div class="caption muted">КОНТАКТЫ</div><div class="label break">{{ club.phone }} {{ club.email }} {{ club.site }}</div></div>
-    <div><div class="caption muted">УПРАВЛЯЮЩИЙ</div><div class="label">{{ club.manager.full_name }} · {{ club.manager.phone }}</div></div>
+    <div><div class="caption muted">УПРАВЛЯЮТ</div>{% for u in managers %}<div class="label">{{ u.full_name }} · {{ u.phone }}{% if forloop.first %} (владелец){% endif %}</div>{% endfor %}</div>
   </div>
   {% if club.is_public and club.substantial_changed %}
     <div class="alert alert--info">Было опубликовано: «{{ club.pub_name }}», {{ club.pub_settlement }}, {{ club.pub_address }}.</div>
@@ -27,6 +28,18 @@
   <form method="post" class="form">{% csrf_token %}
     <div class="field"><label class="field__label" for="cm">Что исправить</label><textarea id="cm" name="comment" rows="3" placeholder="Например: укажите адрес до дома, телефон не отвечает"></textarea></div>
     <button class="btn btn--ghost" name="decision" value="return">Вернуть с замечаниями</button></form>
+</section>
+{% endif %}
+{% if not club.merged_into %}
+<section class="card stack" style="margin-top: var(--space-4);">
+  <h2 class="h2">Это дубль?</h2>
+  <p class="muted">Турниры, новости и фото перейдут к основному клубу. Этот профиль исчезнет из каталога и списка мест, его страница будет вести на основной. Управляющих дубля оповестим.</p>
+  <form method="post" class="form">{% csrf_token %}
+    <div class="field"><label class="field__label" for="main">Основной клуб</label>
+      <select id="main" name="main"><option value="">— выберите —</option>{% for s in similar %}{% if s.is_public %}<option value="{{ s.pk }}">{{ s.public_name }} · {{ s.public_address }}</option>{% endif %}{% endfor %}</select>
+      <p class="field__help">В списке — подтверждённые похожие клубы того же города. Другой клуб найдите в очереди поиском и укажите его номер: <input name="main_id" inputmode="numeric" placeholder="№" aria-label="Номер основного клуба" style="width: 6em; display: inline-block;"></p></div>
+    <div class="form__actions"><button class="btn btn--ghost" name="decision" value="merge">Объединить как дубль</button></div>
+  </form>
 </section>
 {% endif %}
 {% if news %}

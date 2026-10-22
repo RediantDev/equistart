@@ -21,9 +21,10 @@
   {% else %}
     <div class="card empty"><h2 class="h3">Очередь пуста</h2><p class="muted">Новые клубы на проверку появятся здесь.</p></div>
   {% endif %}
-  {% if recent %}
-    <h2 class="h2" style="margin-top: var(--space-6);">Недавние</h2>
-    <ul class="list">{% for c in recent %}<li class="list__row"><a href="{% url 'moderation:club' c.pk %}" class="break">{{ c.name }}</a><span class="table__sub">{{ c.get_status_display }} · {{ c.updated_at|date:"d.m.Y H:i" }}</span></li>{% endfor %}</ul>
+  {% if recent or q %}
+    <h2 class="h2" style="margin-top: var(--space-6);">Все клубы</h2>
+    <form method="get" class="filters__row" role="search"><div class="field" style="flex: 1; min-width: 0;"><label class="field__label" for="q">Название, город или №</label><input id="q" type="search" name="q" value="{{ q }}"></div><div class="filters__actions"><button class="btn btn--dark btn--sm">Найти</button></div></form>
+    <ul class="list">{% for c in recent %}<li class="list__row"><a href="{% url 'moderation:club' c.pk %}" class="break">{{ c.name }}</a><span class="table__sub">№{{ c.pk }} · {% if c.merged_into %}объединён с «{{ c.merged_into.public_name }}»{% else %}{{ c.get_status_display }}{% endif %} · {{ c.updated_at|date:"d.m.Y H:i" }}</span></li>{% endfor %}</ul>
   {% endif %}
 </section>
 {% endblock %}
