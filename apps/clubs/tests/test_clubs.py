@@ -250,3 +250,15 @@ class ClubMergeTests(ClubBase):
         self.assertFalse(services.can_manage(u2, dup))
         with self.assertRaises(ValueError):
             services.merge(self.mod, self.club.pk, dup.pk)
+
+
+class ClubCabinetTests(ClubBase):
+    def test_cabinet_tiles(self):
+        self.client.force_login(self.cu)
+        r = self.client.get(reverse("accounts:cabinet"))
+        self.assertContains(r, "Мой клуб")
+        self.assertContains(r, self.club.name)
+        helper = mkuser("+79990002005")
+        services.invite_manager(self.cu, self.club.pk, helper.phone)
+        self.client.force_login(helper)
+        self.assertContains(self.client.get(reverse("accounts:cabinet")), "Приглашение управлять клубом")

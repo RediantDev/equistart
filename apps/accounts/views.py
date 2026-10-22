@@ -46,13 +46,13 @@ def logout_view(request):
     return redirect("core:calendar")
 
 
-@login_required
 def _club_of(user):
     from apps.clubs.services import club_of
 
     return club_of(user)
 
 
+@login_required
 def cabinet(request):
     """UI-07: «Главная» — разделы по ролям пользователя, без переключателя режимов."""
     import datetime

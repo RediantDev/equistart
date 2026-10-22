@@ -544,3 +544,22 @@ a.chip, a.tag { text-decoration: none; }
 .photo-cap { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-top: 4px; min-width: 0; }
 .photo-cap .table__sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-card__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+/* ---------- Телефон: длинные подписи переносятся, кнопки и ссылки-метки удобны пальцу (аудит 22.10) ---------- */
+.btn { max-width: 100%; }
+.chip, .tag { max-width: 100%; }
+@media (max-width: 600px) {
+  .btn { white-space: normal; text-align: center; line-height: 1.25; padding-top: 8px; padding-bottom: 8px; }
+  .form-actions > .btn, .form__actions > .btn, .form-actions > form, .form__actions > form { flex: 1 1 auto; }
+  .form-actions > form > .btn, .form__actions > form > .btn { width: 100%; }
+  .chip, .tag { white-space: normal; overflow-wrap: anywhere; text-align: left; }
+  .topnav__link:not(.topnav__link--home):not(.topnav__link--desk) { min-height: 40px; display: inline-flex; align-items: center; }
+  a.tag, a.chip { min-height: 36px; padding-top: 6px; padding-bottom: 6px; }
+  .table input, .table select, .table textarea, input, select, textarea { font-size: 16px; }
+}
+.row-card__open { flex: none; }
+@media (max-width: 600px) { .row-card__open { display: none; } }
+.facts dd { overflow-wrap: anywhere; min-width: 0; }
+@media (max-width: 480px) { .facts:not(.facts--money) { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 8px var(--space-3); } }
+@media (max-width: 899px) { .filters__body > .filters__actions { grid-column: 1 / -1; } .filters__body > .filters__actions .btn { min-width: 160px; } }
+@media (max-width: 1023px) { .topbar__user { display: none; } }

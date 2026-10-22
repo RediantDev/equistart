@@ -26,7 +26,7 @@
           <a class="h3 row-card__title" href="{% url 'clubs:detail' c.pk %}">{{ c.public_name }}</a>
           <div class="table__sub">{{ c.public_region_name }}, {{ c.public_settlement }}{% if c.public_address %}, {{ c.public_address }}{% endif %}</div>
         </div>
-        <a class="btn btn--ghost btn--sm" href="{% url 'clubs:detail' c.pk %}">Открыть</a>
+        <a class="btn btn--ghost btn--sm row-card__open" href="{% url 'clubs:detail' c.pk %}" tabindex="-1" aria-hidden="true">Открыть</a>
       </article>
     {% endfor %}
   </div>
