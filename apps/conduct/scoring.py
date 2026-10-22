@@ -205,10 +205,8 @@ def save_round(user, entry_id, stage, data: dict, client_key: str = "") -> JumpR
            "status": jr.status} if existing else None
     jr.knockdowns, jr.refusals, jr.corrections = num("knockdowns"), num("refusals", 0, 3), num("corrections", 0, 5)
     jr.time, jr.fall, jr.status = t, bool(data.get("fall")), status
-    # причина хранится только у исключения (RUN-05); у «Сошёл» и прочих — пусто
-    jr.reason = (data.get("reason") or "").strip()[:200] if status == "eliminated" else ""
-    if status == "eliminated" and not jr.reason:
-        raise ValueError("Выберите причину исключения.")
+    # причина исключения не вводится (решение заказчика 22.10.2026): в протоколе — «Искл.» или «Сошёл»
+    jr.reason = ""
     jr.client_key = client_key[:64]
     jr.updated_by = user
     if existing:
@@ -396,7 +394,7 @@ def set_flags(user, entry_id, errors=None, technical=None, eliminated=None, reas
         f.technical = max(0, min(10, int(technical)))
     if eliminated is not None:
         f.eliminated = bool(eliminated)
-        f.reason = (reason or "").strip()[:200] if f.eliminated else ""
+        f.reason = ""  # причина исключения не вводится (решение заказчика 22.10.2026)
     test = test_of(e.program)
     if (f.errors or f.technical) and not test.get("penalty_scheme"):
         raise ValueError("Для езды не выбрана схема штрафов — укажите её в карточке езды (организатор).")
@@ -619,8 +617,6 @@ def result_cells(program, result) -> list:
                 out += ["", ""]
             elif r["status"] != "ok":
                 label = {"eliminated": "Искл.", "retired": "Сошёл", "withdrawn": "Снят", "no_show": "Не стартовал"}.get(r["status"], "")
-                if r["status"] == "eliminated" and r.get("reason"):
-                    label = f"Искл. ({r['reason']})"
                 out += [label, ""]
             else:
                 out += [r["pen"], r["time"]]

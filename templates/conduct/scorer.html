@@ -23,7 +23,7 @@
           {% for c in r.cells %}
             <td class="num{% if c.off %} cell-off{% endif %}" data-label="{{ c.letter }}">{% if c.signed %}{% if c.pct is not None %}{{ c.pct|floatformat:3 }}{% else %}✓{% endif %}{% elif c.returned %}<span class="chip chip--warning" title="{{ c.returned }}">возвращён</span>{% elif c.started %}<span class="chip">заполняет</span>{% else %}<span class="table__sub">—</span>{% endif %}</td>
           {% endfor %}
-          <td class="num" data-label="Ош.">{% if r.flags.eliminated %}<span class="chip chip--danger" title="{{ r.flags.reason }}">искл.</span>{% else %}{{ r.flags.errors|default:"" }}{% endif %}</td>
+          <td class="num" data-label="Ош.">{% if r.flags.eliminated %}<span class="chip chip--danger">искл.</span>{% else %}{{ r.flags.errors|default:"" }}{% endif %}</td>
           <td class="num cell-total" data-label="Итог"><strong>{% if r.res and r.res.pct is not None %}{{ r.res.pct|floatformat:3 }}{% else %}—{% endif %}</strong></td>
           <td class="num" data-label="Место">{{ r.place|default:"—" }}</td>
           <td>

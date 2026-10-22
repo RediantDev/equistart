@@ -49,8 +49,7 @@
         <input type="hidden" name="status" value="ok">
         <button class="btn btn--primary btn--block btn--lg">Сохранить{% if not jr %} и следующий{% endif %}</button>
         <details class="live__more"{% if jr and jr.status != "ok" %} open{% endif %}>
-          <summary>Исключение, падение, сошёл</summary>
-          <label class="field"><span class="field__label">Причина исключения</span><select name="reason"><option value="">— выберите причину —</option>{% for r in reasons %}<option{% if jr.reason == r %} selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+          <summary>Исключён или сошёл</summary>
           <div class="inline-row">
             <button class="btn btn--danger" name="status" value="eliminated" data-status>Исключён</button>
             <button class="btn btn--ghost" name="status" value="retired" data-status>Сошёл</button>

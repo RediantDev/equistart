@@ -71,10 +71,9 @@ class ReportFixesTests(ConductBase):
         scoring.save_round(self.judge, self.e1.pk, "main", rnd(0, 0, "", "retired", reason="второе неповиновение"))
         r = Result.objects.get(entry=self.e1)
         self.assertEqual(scoring.result_cells(self.p1, r)[0], "Сошёл")
-        with self.assertRaisesMessage(ValueError, "причину исключения"):
-            scoring.save_round(self.judge, self.e2.pk, "main", rnd(0, 2, "", "eliminated"))
-        scoring.save_round(self.judge, self.e2.pk, "main", rnd(0, 2, "", "eliminated", reason="второе неповиновение"))
-        self.assertEqual(scoring.result_cells(self.p1, Result.objects.get(entry=self.e2))[0], "Искл. (второе неповиновение)")
+        # причина исключения не вводится и не печатается (решение заказчика 22.10.2026)
+        scoring.save_round(self.judge, self.e2.pk, "main", rnd(0, 2, "", "eliminated", reason="что угодно"))
+        self.assertEqual(scoring.result_cells(self.p1, Result.objects.get(entry=self.e2))[0], "Искл.")
 
     @override_settings(DEBUG=False)
     def test_k5_russian_error_pages(self):

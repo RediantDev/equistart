@@ -516,10 +516,10 @@ a.chip, a.tag { text-decoration: none; }
 /* Лист судьи выездки: оценки кнопками */
 .mark-row.is-current { background: var(--accent-soft, #fff6cc); margin: 0 -12px; padding: 12px; border-radius: var(--radius-md); }
 .mark-row.is-empty .mark-row__val { border-style: dashed; }
-.mark-keys { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.mark-keys { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .mark-key { min-height: 48px; border: 1px solid var(--border); background: var(--surface); border-radius: 12px; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; cursor: pointer; color: var(--text); }
 .mark-key:active { background: var(--accent); }
-.mark-key--fine { font-size: 15px; background: var(--ink); color: var(--surface); }
+.mark-key--fine { font-size: 14px; background: var(--ink); color: var(--surface); padding: 0 2px; }
 .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .quick__btn { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 8px 12px; font-size: 14px; min-height: 40px; cursor: pointer; }
 .signed-marks { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
@@ -527,5 +527,5 @@ a.chip, a.tag { text-decoration: none; }
 .signed-marks__n { font-weight: 800; }
 .signed-marks__text { min-width: 0; overflow-wrap: anywhere; }
 .signed-marks__v { font-size: 18px; font-variant-numeric: tabular-nums; }
-@media (min-width: 900px) { .mark-keys { grid-template-columns: repeat(12, minmax(0, 1fr)); } }
+@media (min-width: 900px) { .mark-keys { grid-template-columns: repeat(13, minmax(0, 1fr)); } }
 .table--grid-cards .chip, .scorer .chip { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
