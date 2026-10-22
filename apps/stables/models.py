@@ -111,6 +111,11 @@ class ServiceOrder(models.Model):
     quantity = models.PositiveIntegerField()
     delivered = models.PositiveIntegerField(default=0)
     state = models.CharField(max_length=10, choices=State.choices, default=State.ORDERED)
+
+    @property
+    def remaining(self):
+        """Сколько осталось выдать — по умолчанию в форме выдачи предлагается остаток, а не весь заказ."""
+        return max(0, self.quantity - self.delivered)
     comment = models.CharField(max_length=300, blank=True)
     idempotency_key = models.CharField(max_length=64, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
