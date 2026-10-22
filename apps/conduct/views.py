@@ -28,12 +28,21 @@ def _program(request, pk, program_id):
 def overview(request, pk):
     t = get_object_or_404(Tournament, pk=pk)
     require_judge(request.user, t)
+    from django.db.models import Count
+
+    blocked = services.blocked_for(t.pk)
+    accepted_by = {}
+    for pid, horse_id in Entry.objects.filter(tournament=t, decision=Entry.Decision.ACCEPTED).values_list("program_id", "horse_id"):
+        a, r = accepted_by.get(pid, (0, 0))
+        accepted_by[pid] = (a + 1, r + (horse_id not in blocked))
+    slots_by = dict(StartSlot.objects.filter(program__tournament=t).values("program_id").annotate(n=Count("id")).values_list("program_id", "n"))
+    last_pub = {}
+    for pub in StartListPublication.objects.filter(program__tournament=t).order_by("program_id", "-version"):
+        last_pub.setdefault(pub.program_id, pub)
     programs = []
-    for p in t.programs.prefetch_related("classes", "slots", "start_publications"):
-        accepted = Entry.objects.filter(program=p, decision=Entry.Decision.ACCEPTED).count()
-        ready = sum(1 for e in Entry.objects.filter(program=p) if services.eligible(e))
-        last = p.start_publications.first()
-        programs.append({"p": p, "accepted": accepted, "ready": ready, "slots": p.slots.count(), "published": last})
+    for p in t.programs.all().order_by("day", "start_time", "position", "id"):
+        accepted, ready = accepted_by.get(p.pk, (0, 0))
+        programs.append({"p": p, "accepted": accepted, "ready": ready, "slots": slots_by.get(p.pk, 0), "published": last_pub.get(p.pk)})
     return render(request, "conduct/overview.html", {
         "t": t, "programs": programs, "manage": can_manage(request.user, t),
         "warnings": services.finish_warnings(t) if t.publication == Tournament.Publication.PUBLISHED else [],
@@ -82,13 +91,14 @@ def program(request, pk, program_id):
     p = _program(request, pk, program_id)
     t = p.tournament
     slots = list(p.slots.select_related("entry", "entry__result").order_by("position"))
-    conf = services.conflicts(t)
+    conf = services.conflicts(t, p)
+    blocked = services.blocked_for(t.pk)
     for s in slots:
         s.conflicts = conf.get(s.pk, [])
         s.result = getattr(s.entry, "result", None)
-        s.still_eligible = services.eligible(s.entry)
+        s.still_eligible = services.eligible(s.entry, blocked)
     in_list = {s.entry_id for s in slots}
-    outside = [(e, services.eligible(e)) for e in Entry.objects.filter(program=p).exclude(pk__in=in_list).exclude(decision__in=[Entry.Decision.CANCELLED, Entry.Decision.REJECTED])]
+    outside = [(e, services.eligible(e, blocked)) for e in Entry.objects.filter(program=p).exclude(pk__in=in_list).exclude(decision__in=[Entry.Decision.CANCELLED, Entry.Decision.REJECTED])]
     classes = []
     for c in p.classes.filter(merged_into__isnull=True):
         last = c.result_publications.first()
@@ -201,7 +211,7 @@ def live(request, pk, program_id):
     current = next((s for s in slots if s.status == StartSlot.Status.STARTED), None) or next((s for s in slots if s.status == StartSlot.Status.WAITING), None)
     upcoming = [s for s in slots if s.status == StartSlot.Status.WAITING and s != current][:4]
     done = sum(1 for s in slots if s.status not in (StartSlot.Status.WAITING, StartSlot.Status.STARTED))
-    conf = services.conflicts(p.tournament)
+    conf = services.conflicts(p.tournament, p)
     return render(request, "conduct/live.html", {
         "t": p.tournament, "p": p, "current": current, "upcoming": upcoming, "done": done, "total": len(slots),
         "fields": [(f, RESULT_FIELDS.get(f, f)) for f in p.result_fields], "statuses": Result.Status.choices,

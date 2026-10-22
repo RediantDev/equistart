@@ -30,11 +30,10 @@ def group_key(entry):
 
 
 def _entries(program):
-    return list(
-        Entry.objects.filter(program=program, decision=Entry.Decision.ACCEPTED)
-        .select_related("tclass", "athlete", "horse", "application")
-        .order_by("pk")
-    )
+    qs = Entry.objects.filter(program=program, decision=Entry.Decision.ACCEPTED).select_related("tclass", "athlete", "horse", "application")
+    if program.is_jumping:
+        qs = qs.prefetch_related("jump_rounds")
+    return list(qs.order_by("pk"))
 
 
 # ======================= КОНКУР =======================
@@ -450,6 +449,28 @@ def approve(user, entry_id) -> DressageFlags:
 
 
 @transaction.atomic
+def approve_all(user, program) -> int:
+    """Утвердить все готовые пары одним проходом: один подсчёт листов и один пересчёт мест (вместо пересчёта на каждую пару)."""
+    if not is_scorer(user, program):
+        raise PermissionDenied
+    now = timezone.now()
+    ready = [e for e, (res, _, fl) in pair_scores(program).items() if res is not None and not (fl and fl.approved_at)]
+    if not ready:
+        return 0
+    flags = {f.entry_id: f for f in DressageFlags.objects.select_for_update().filter(entry__in=ready)}
+    new = [DressageFlags(entry=e, approved_at=now, approved_by=user) for e in ready if e.pk not in flags]
+    DressageFlags.objects.bulk_create(new)
+    upd = [flags[e.pk] for e in ready if e.pk in flags]
+    for f in upd:
+        f.approved_at, f.approved_by, f.updated_at = now, user, now
+    DressageFlags.objects.bulk_update(upd, ["approved_at", "approved_by", "updated_at"])
+    for e in ready:
+        audit(user, "dressage.approve", e, bulk=True)
+    recompute(program)
+    return len(ready)
+
+
+@transaction.atomic
 def set_norm(user, entry_id, norm) -> DressageFlags:
     e = Entry.objects.select_related("program__tournament").get(pk=entry_id)
     if not is_scorer(user, e.program):
@@ -472,6 +493,40 @@ def recompute(program):
         return _recompute_dressage(program)
 
 
+class _ResultWriter:
+    """Пакетная запись итогов: меняем в базе только то, что действительно изменилось (вместо 2 запросов на каждую пару)."""
+
+    def __init__(self, program):
+        self.existing = {r.entry_id: r for r in Result.objects.filter(entry__program=program)}
+        self.create, self.update, self.delete = [], [], []
+
+    def save(self, e, place, status, values, sort):
+        r = self.existing.get(e.pk)
+        if r is None:
+            self.create.append(Result(entry=e, place=place, status=status, values=values, auto=True, sort_key=sort))
+        elif (r.place, r.status, r.values, r.auto, r.sort_key) != (place, status, values, True, sort):
+            r.place, r.status, r.values, r.auto, r.sort_key = place, status, values, True, sort
+            self.update.append(r)
+
+    def drop(self, e):
+        r = self.existing.get(e.pk)
+        if r is not None and r.auto:
+            self.delete.append(r.pk)
+
+    def flush(self):
+        from django.utils import timezone as tz
+
+        if self.delete:
+            Result.objects.filter(pk__in=self.delete).delete()
+        if self.create:
+            Result.objects.bulk_create(self.create)
+        if self.update:
+            now = tz.now()
+            for r in self.update:
+                r.updated_at = now
+            Result.objects.bulk_update(self.update, ["place", "status", "values", "auto", "sort_key", "updated_at"])
+
+
 def _save_result(e, place, status, values, sort):
     r, _ = Result.objects.get_or_create(entry=e)
     r.place, r.status, r.values, r.auto, r.sort_key = place, status, values, True, sort
@@ -483,18 +538,21 @@ STATUS_MAP = {"eliminated": Result.Status.ELIMINATED, "retired": Result.Status.R
 
 
 def _recompute_jumping(program):
+    w = _ResultWriter(program)
     for items in standings(program).values():
         for st in items:
             if st.status == "pending" and not st.rounds:
-                Result.objects.filter(entry=st.key, auto=True).delete()
+                w.drop(st.key)
                 continue
             status = STATUS_MAP.get(st.status, "") if st.place is None else ""
-            _save_result(st.key, st.place, status, jumping_row_values(program, st), [])
+            w.save(st.key, st.place, status, jumping_row_values(program, st), [])
+    w.flush()
 
 
 def _recompute_dressage(program):
     test = test_of(program)
     scores = pair_scores(program)
+    w = _ResultWriter(program)
     by_group = {}
     for e, (res, sheets, fl) in scores.items():
         by_group.setdefault(group_key(e), []).append((e, res, sheets, fl))
@@ -507,9 +565,9 @@ def _recompute_dressage(program):
             if res is None:
                 signed = sum(1 for p in poss if sheets.get(p.letter) and sheets[p.letter].signed)
                 if not signed and not fl:
-                    Result.objects.filter(entry=e, auto=True).delete()
+                    w.drop(e)
                     continue
-                _save_result(e, None, "", {"pending": True, "signed": signed, "of": len(poss)}, [])
+                w.save(e, None, "", {"pending": True, "signed": signed, "of": len(poss)}, [])
                 continue
             judges = {}
             for j in res.judges:
@@ -521,7 +579,8 @@ def _recompute_dressage(program):
                 "approved": bool(fl and fl.approved_at),
             }
             status = Result.Status.ELIMINATED if res.eliminated else ""
-            _save_result(e, places.get(e), status, values, [])
+            w.save(e, places.get(e), status, values, [])
+    w.flush()
 
 
 # ======================= ПРОТОКОЛ: КОЛОНКИ И ЯЧЕЙКИ =======================

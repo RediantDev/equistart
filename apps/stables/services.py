@@ -174,6 +174,18 @@ def cancel_booking(user, booking_id, reason="") -> Booking:
     return b
 
 
+def blocked_horses(tournament_id) -> set:
+    """Лошади турнира, у которых отмечено «без денника нельзя», а подтверждённой брони нет — одним запросом."""
+    rows = Booking.objects.filter(tournament_id=tournament_id).exclude(state=Booking.State.CANCELLED).values_list("horse_id", "required", "state")
+    need, ok = set(), set()
+    for horse_id, required, state in rows:
+        if required:
+            need.add(horse_id)
+        if state == Booking.State.CONFIRMED:
+            ok.add(horse_id)
+    return need - ok
+
+
 def stable_dependency_ok(entry) -> bool:
     """LOD-05: если по лошади отмечено «без денника нельзя» — нужен подтверждённый денник. Касается только этой лошади."""
     qs = Booking.objects.filter(tournament_id=entry.tournament_id, horse_id=entry.horse_id)

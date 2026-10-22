@@ -17,15 +17,22 @@ from . import scoring
 from .models import Result, ResultPublication, StartListPublication, StartSlot
 
 
-def eligible(entry) -> bool:
-    """В порядок попадают принятые выступления (и с подтверждённым обязательным денником)."""
+def eligible(entry, blocked=None) -> bool:
+    """В порядок попадают принятые выступления (и с подтверждённым обязательным денником).
+    blocked — заранее посчитанное множество лошадей без обязательного денника (чтобы не спрашивать базу на каждую строку)."""
     if entry.decision != Entry.Decision.ACCEPTED:
         return False
-    try:
-        from apps.stables.services import stable_dependency_ok
-    except ImportError:
-        return True
+    if blocked is not None:
+        return entry.horse_id not in blocked
+    from apps.stables.services import stable_dependency_ok
+
     return stable_dependency_ok(entry)
+
+
+def blocked_for(tournament_id) -> set:
+    from apps.stables.services import blocked_horses
+
+    return blocked_horses(tournament_id)
 
 
 def entry_height(entry):
@@ -51,14 +58,17 @@ def _lock_program(user, program_id):
 
 def _recompute_times(program):
     slots = list(program.slots.order_by("position", "id"))
+    changed = []
     for i, s in enumerate(slots, start=1):
-        s.position = i
+        t = None
         if program.timed_starts:
             base = datetime.datetime.combine(program.day, program.start_time)
-            s.start_time = (base + datetime.timedelta(minutes=(i - 1) * program.slot_minutes)).time()
-        else:
-            s.start_time = None
-        s.save(update_fields=["position", "start_time", "updated_at"])
+            t = (base + datetime.timedelta(minutes=(i - 1) * program.slot_minutes)).time()
+        if s.position != i or s.start_time != t:
+            s.position, s.start_time = i, t
+            changed.append(s)
+    if changed:
+        StartSlot.objects.bulk_update(changed, ["position", "start_time"])
 
 
 @transaction.atomic
@@ -66,10 +76,10 @@ def draw(user, program_id) -> int:
     """Жеребьёвка: добавляет недостающих и случайно перемешивает ещё не стартовавших. Начатые остаются на местах."""
     p = _lock_program(user, program_id)
     existing = {s.entry_id for s in p.slots.all()}
-    new = [e for e in Entry.objects.filter(program=p) if e.pk not in existing and eligible(e)]
+    blocked = blocked_for(p.tournament_id)
+    new = [e for e in Entry.objects.filter(program=p, decision=Entry.Decision.ACCEPTED) if e.pk not in existing and eligible(e, blocked)]
     top = p.slots.aggregate(m=Max("position"))["m"] or 0
-    for i, e in enumerate(new, start=1):
-        StartSlot.objects.create(program=p, entry=e, position=top + i)
+    StartSlot.objects.bulk_create([StartSlot(program=p, entry=e, position=top + i) for i, e in enumerate(new, start=1)])
     slots = list(p.slots.order_by("position"))
     movable = [s for s in slots if s.status == StartSlot.Status.WAITING]
     positions = [s.position for s in movable]
@@ -89,7 +99,8 @@ def add_missing(user, program_id) -> int:
     """Добавить в конец порядка принятых, которых в нём ещё нет (без перемешивания)."""
     p = _lock_program(user, program_id)
     existing = {s.entry_id for s in p.slots.all()}
-    new = [e for e in Entry.objects.filter(program=p) if e.pk not in existing and eligible(e)]
+    blocked = blocked_for(p.tournament_id)
+    new = [e for e in Entry.objects.filter(program=p, decision=Entry.Decision.ACCEPTED) if e.pk not in existing and eligible(e, blocked)]
     top = p.slots.aggregate(m=Max("position"))["m"] or 0
     for i, e in enumerate(new, start=1):
         StartSlot.objects.create(program=p, entry=e, position=top + i)
@@ -169,7 +180,7 @@ def set_exception(user, slot_id, reason):
     audit(user, "slot.exception", slot.program, slot=slot.pk, reason=slot.exception_reason)
 
 
-def conflicts(tournament) -> dict[int, list[str]]:
+def conflicts(tournament, program=None) -> dict[int, list[str]]:
     """Конфликты порядка: одна лошадь или один всадник стартуют, а между стартами меньше `min_gap_starts` других пар.
     {slot_id: [описания]}. Проверяется внутри программы; судья может оставить исключение с причиной."""
     gap = tournament.min_gap_starts
@@ -177,7 +188,8 @@ def conflicts(tournament) -> dict[int, list[str]]:
     if not gap:
         return out
     by_program = {}
-    for sl in (StartSlot.objects.filter(program__tournament=tournament)
+    qs = StartSlot.objects.filter(program=program) if program is not None else StartSlot.objects.filter(program__tournament=tournament)
+    for sl in (qs
                .exclude(status__in=[StartSlot.Status.WITHDRAWN, StartSlot.Status.NO_SHOW])
                .select_related("entry", "program").order_by("program_id", "position")):
         by_program.setdefault(sl.program_id, []).append(sl)

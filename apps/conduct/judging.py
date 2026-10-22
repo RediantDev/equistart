@@ -342,12 +342,8 @@ def scorer_action(request, pk, program_id, action):
             scoring.approve(request.user, int(entry_id))
             messages.success(request, "Результат утверждён.")
         elif action == "approve_all":
-            n = 0
-            for e, (res, _, fl) in scoring.pair_scores(p).items():
-                if res is not None and not (fl and fl.approved_at):
-                    scoring.approve(request.user, e.pk)
-                    n += 1
-            messages.success(request, f"Утверждено: {n}.")
+            n = scoring.approve_all(request.user, p)
+            messages.success(request, f"Утверждено: {n}." if n else "Готовых к утверждению пар нет: ждём подписи всех судей.")
         elif action == "norm":
             scoring.set_norm(request.user, int(entry_id), request.POST.get("norm", ""))
             messages.success(request, "Норматив сохранён.")
