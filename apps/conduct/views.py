@@ -157,10 +157,13 @@ def program_action(request, pk, program_id, action):
             services.set_exception(request.user, int(request.POST["slot"]), request.POST.get("reason", ""))
             messages.success(request, "Исключение сохранено.")
         elif action == "timing":
+            if not p.is_dressage:
+                raise ValueError("В конкуре время стартов не рассчитывается — указывается только начало маршрута.")
             p.slot_minutes = max(1, min(120, int(request.POST.get("slot_minutes", p.slot_minutes))))
-            p.save(update_fields=["slot_minutes"])
+            p.start_times = request.POST.get("start_times") == "1"
+            p.save(update_fields=["slot_minutes", "start_times"])
             services._recompute_times(p)
-            messages.success(request, "Интервал между стартами сохранён, время пересчитано.")
+            messages.success(request, "Время стартов пересчитано." if p.timed_starts else "Время стартов не рассчитывается — в протоколе будет только порядок.")
         elif action == "publish":
             pub = services.publish_start_list(request.user, p.pk)
             messages.success(request, f"Стартовый протокол опубликован (версия {pub.version}).")
@@ -237,10 +240,11 @@ def startlist_xlsx(request, pk, program_id):
     pub = p.start_publications.first()
     if not pub:
         raise Http404
-    rows = [["№", "Время", "Всадник", "Год рожд.", "Разряд", "Клуб", "Тренер", "Лошадь", "Год", "Пол", "Масть", "Порода", "Зачёт", "Высота", "Отметка"]]
+    timed = any(r.get("time") for r in pub.rows)
+    rows = [["№"] + (["Время"] if timed else []) + ["Всадник", "Год рожд.", "Разряд", "Клуб", "Тренер", "Лошадь", "Год", "Пол", "Масть", "Порода", "Зачёт", "Высота", "Отметка"]]
     for r in pub.rows:
         a, h = r["athlete"], r["horse"]
-        rows.append([r["position"], r["time"], a["name"], a.get("birth_year") or "", a.get("rank") or "", a.get("club") or "", a.get("coach") or "",
+        rows.append([r["position"]] + ([r["time"]] if timed else []) + [a["name"], a.get("birth_year") or "", a.get("rank") or "", a.get("club") or "", a.get("coach") or "",
                      h["name"], h.get("birth_year") or "", h.get("sex") or "", h.get("color") or "", h.get("breed") or "", r["class"],
                      r.get("height") or "", _mark(r)])
     return _xlsx_response(xlsx.build("Стартовый протокол", rows), f"start-{p.tournament_id}-{p.pk}-v{pub.version}.xlsx")
@@ -252,12 +256,17 @@ def results_xlsx(request, pk, class_id):
     pub = c.result_publications.first()
     if not pub:
         raise Http404
-    rows = [["Место", "Всадник", "Год рожд.", "Разряд", "Клуб", "Тренер", "Лошадь", "Год", "Пол", "Масть", "Порода"] + pub.fields + ["Статус"]]
+    multi = len(c.program.heights or []) > 1
+    rows = [(["Высота, см"] if multi else []) + ["Место", "Всадник", "Год рожд.", "Разряд", "Клуб", "Тренер", "Лошадь", "Год", "Пол", "Масть", "Порода"] + pub.fields + ["Статус"]]
     keys = c.program.result_fields
-    for r in pub.rows:
+    hmap = {}
+    if multi and any("height" not in r for r in pub.rows):
+        hmap = dict(Entry.objects.filter(pk__in=[r["entry"] for r in pub.rows]).values_list("pk", "height"))
+    ordered = sorted(pub.rows, key=lambda r: ((r.get("height") or hmap.get(r["entry"]) or 0) if multi else 0, r["place"] is None, r["place"] or 0))
+    for r in ordered:
         a, h = r["athlete"], r["horse"]
         cells = r["cells"] if "cells" in r else [r["values"].get(k) for k in keys]
-        rows.append([r["place"] or "", a["name"], a.get("birth_year") or "", a.get("rank") or "", a.get("club") or "", a.get("coach") or "",
+        rows.append(([r.get("height") or hmap.get(r["entry"]) or ""] if multi else []) + [r["place"] or "", a["name"], a.get("birth_year") or "", a.get("rank") or "", a.get("club") or "", a.get("coach") or "",
                      h["name"], h.get("birth_year") or "", h.get("sex") or "", h.get("color") or "", h.get("breed") or ""]
                     + ["" if v is None else v for v in cells] + [r["status"]])
     return _xlsx_response(xlsx.build("Результаты", rows), f"results-{pk}-{c.pk}-v{pub.version}.xlsx")

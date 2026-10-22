@@ -41,32 +41,61 @@
   <a class="tabs__item{% if tab == 'results' %} is-active{% endif %}" href="?tab=results">Результаты</a>
 </nav>
 
+{% if tab == "starts" or tab == "results" %}
+{% if days_nav|length > 1 %}
+<nav class="day-nav no-print" aria-label="Дни турнира">
+  {% for d in days_nav %}<a class="chip-link{% if day == d|date:'Y-m-d' %} is-active{% endif %}" href="?tab={{ tab }}&day={{ d|date:'Y-m-d' }}">{{ d|date:"j E" }}</a>{% endfor %}
+  <a class="chip-link{% if day == 'all' %} is-active{% endif %}" href="?tab={{ tab }}&day=all">Все дни</a>
+</nav>
+{% endif %}
+{% endif %}
 {% if tab == "starts" %}
+{% if starts|length > 1 %}<nav class="route-nav no-print" aria-label="Маршруты и езды">{% for b in starts %}<a href="#prog-{{ b.p.pk }}">{% if b.p.start_time %}{{ b.p.start_time|time:"H:i" }} · {% endif %}{{ b.p.name }}</a>{% endfor %}</nav>{% endif %}
 <section class="stack">
   {% for b in starts %}
-    <div class="section-head"><h2 class="h3">{{ b.p.name }}<span class="table__sub">{{ b.p.day|date:"j E" }} · версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}</span></h2><div class="chips no-print"><a class="btn btn--ghost btn--sm" href="{% url 'conduct:startlist_xlsx' t.pk b.p.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button></div></div>
-    <div class="table-wrap"><table class="table">
-      <thead><tr><th class="num">№</th><th class="num">Время</th><th>Всадник</th><th>Лошадь</th><th>Зачёт</th></tr></thead>
+    <div class="section-head" id="prog-{{ b.p.pk }}"><h2 class="h3">{{ b.p.name }}<span class="table__sub">{{ b.p.day|date:"j E" }}{% if b.p.start_time %} · начало {{ b.p.start_time|time:"H:i" }}{% endif %} · {{ b.rows|length }} пар · версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}</span></h2><div class="chips no-print"><a class="btn btn--ghost btn--sm" href="{% url 'conduct:startlist_xlsx' t.pk b.p.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button></div></div>
+    <div class="table-wrap only-wide"><table class="table">
+      <thead><tr><th class="num">№</th>{% if b.timed %}<th class="num">Время</th>{% endif %}<th>Всадник</th><th>Лошадь</th><th>Зачёт</th></tr></thead>
       <tbody>{% for r in b.rows %}<tr{% if r.mark %} class="is-muted"{% endif %}>
-        <td class="num">{{ r.position }}</td><td class="num">{{ r.time|default:"—" }}</td>
+        <td class="num">{{ r.position }}</td>{% if b.timed %}<td class="num">{{ r.time|default:"—" }}</td>{% endif %}
         <td><strong>{{ r.athlete.name }}</strong><span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.rank %} · {{ r.athlete.rank }}{% endif %}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>{% if r.athlete.coach %}<span class="table__sub">тренер {{ r.athlete.coach }}</span>{% endif %}{% if r.mark %}<span class="chip chip--danger">{{ r.mark }}</span>{% endif %}</td>
         <td>{{ r.horse.name }}<span class="table__sub">{{ r.horse.birth_year|default:"" }} {{ r.horse.sex|default:"" }} {{ r.horse.color|default:"" }}{% if r.horse.breed %} · {{ r.horse.breed }}{% endif %}</span></td>
-        <td>{{ r.class }}</td></tr>{% endfor %}</tbody>
+        <td>{{ r.class }}{% if r.height %} · {{ r.height }} см{% endif %}</td></tr>{% endfor %}</tbody>
     </table></div>
+    <ol class="pcards only-narrow">{% for r in b.rows %}
+      <li class="pcard{% if r.mark %} is-muted{% endif %}"><span class="pcard__no">{{ r.position }}</span>
+        <div class="pcard__body"><strong>{{ r.athlete.name }}</strong> <span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.rank %} · {{ r.athlete.rank }}{% endif %}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>
+          <span class="pcard__horse">{{ r.horse.name }}</span><span class="table__sub">{{ r.class }}{% if r.height %} · {{ r.height }} см{% endif %}</span>{% if r.mark %} <span class="chip chip--danger">{{ r.mark }}</span>{% endif %}</div>
+        {% if b.timed and r.time %}<span class="pcard__side">{{ r.time }}</span>{% endif %}</li>{% endfor %}</ol>
   {% empty %}<div class="card empty"><h2 class="h3">Стартовые протоколы ещё не опубликованы</h2><p class="muted">Судья публикует порядок перед началом программы.</p></div>{% endfor %}
 </section>
 {% elif tab == "results" %}
+{% if results|length > 1 %}<nav class="route-nav no-print" aria-label="Маршруты и езды">{% for b in results %}<a href="#prog-{{ b.p.pk }}">{{ b.p.name }}</a>{% endfor %}</nav>{% endif %}
 <section class="stack">
   {% for b in results %}
-    <div class="section-head"><h2 class="h3">{{ b.p.name }} · {{ b.c.name }}<span class="table__sub">версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}{% if b.pub.version > 1 %} · исправлено{% endif %}</span></h2><div class="chips no-print"><a class="btn btn--ghost btn--sm" href="{% url 'conduct:results_xlsx' t.pk b.c.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button></div></div>
-    <div class="table-wrap"><table class="table">
-      <thead><tr><th class="num">Место</th><th>Всадник</th><th>Лошадь</th>{% for f in b.pub.fields %}<th class="num">{{ f }}</th>{% endfor %}</tr></thead>
-      <tbody>{% for r in b.rows %}<tr>
-        <td class="num"><strong>{{ r.place|default:"—" }}</strong></td>
-        <td><strong>{{ r.athlete.name }}</strong><span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>{% if r.athlete.coach %}<span class="table__sub">тренер {{ r.athlete.coach }}</span>{% endif %}{% if r.status %}<span class="chip">{{ r.status }}</span>{% endif %}</td>
-        <td>{{ r.horse.name }}</td>
-        {% for v in r.cells %}<td class="num">{{ v|num }}</td>{% endfor %}</tr>{% endfor %}</tbody>
-    </table></div>
+    <article class="result-route" id="prog-{{ b.p.pk }}">
+      <h2 class="h2">{{ b.p.name }}</h2>
+      <p class="table__sub">{{ b.p.day|date:"j E" }} · {{ b.p.program_type_name }}{% if b.p.heights %} · {{ b.p.heights_label }}{% endif %}{% if b.p.article_label %} · {{ b.p.article_label }}{% endif %}</p>
+      {% for cb in b.classes %}
+        <div class="section-head" id="class-{{ cb.c.pk }}"><h3 class="h3">{{ cb.c.label }}<span class="table__sub">версия {{ cb.pub.version }} от {{ cb.pub.published_at|date:"j E H:i" }}{% if cb.pub.version > 1 %} · исправлено{% endif %}</span></h3><div class="chips no-print"><a class="btn btn--ghost btn--sm" href="{% url 'conduct:results_xlsx' t.pk cb.c.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button></div></div>
+        {% for g in cb.groups %}
+          {% if g.height %}<h4 class="label lg result-height">Высота {{ g.height }} см</h4>{% endif %}
+          <div class="table-wrap only-wide"><table class="table">
+            <thead><tr><th class="num">Место</th><th>Всадник</th><th>Лошадь</th>{% for f in cb.pub.fields %}<th class="num">{{ f }}</th>{% endfor %}</tr></thead>
+            <tbody>{% for r in g.rows %}<tr{% if r.place and r.place <= 3 %} class="medal-{{ r.place }}"{% endif %}>
+              <td class="num"><strong>{{ r.place|default:"—" }}</strong></td>
+              <td><strong>{{ r.athlete.name }}</strong><span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>{% if r.athlete.coach %}<span class="table__sub">тренер {{ r.athlete.coach }}</span>{% endif %}{% if r.status %}<span class="chip">{{ r.status }}</span>{% endif %}</td>
+              <td>{{ r.horse.name }}</td>
+              {% for v in r.cells %}<td class="num">{{ v|num }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+          </table></div>
+          <ol class="pcards only-narrow">{% for r in g.rows %}
+            <li class="pcard{% if r.place and r.place <= 3 %} medal-{{ r.place }}{% endif %}"><span class="pcard__no">{{ r.place|default:"—" }}</span>
+              <div class="pcard__body"><strong>{{ r.athlete.name }}</strong> <span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>
+                <span class="pcard__horse">{{ r.horse.name }}</span>{% if r.summary.1 %}<span class="table__sub">{{ r.summary.1 }}</span>{% endif %}{% if r.status %} <span class="chip">{{ r.status }}</span>{% endif %}</div>
+              <span class="pcard__side">{{ r.summary.0 }}</span></li>{% endfor %}</ol>
+        {% endfor %}
+      {% endfor %}
+    </article>
   {% empty %}<div class="card empty"><h2 class="h3">Результаты ещё не опубликованы</h2></div>{% endfor %}
 </section>
 {% else %}

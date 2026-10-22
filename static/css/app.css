@@ -448,3 +448,26 @@ a.chip, a.tag { text-decoration: none; }
 .sheet__sep { margin-top: var(--space-3); }
 .panel-row { border: 0; border-bottom: 1px solid var(--border); padding: 0 0 var(--space-3); margin: 0 0 var(--space-3); }
 .table tr.is-warning td { background: var(--warning-soft); }
+
+/* Страницы ошибок */
+.error-page { max-width: 640px; margin: var(--space-6) auto; }
+.error-page .list { margin: var(--space-2) 0 0; }
+
+/* Публичные протоколы: дни, маршруты, карточки на телефоне */
+.day-nav, .route-nav { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 0 var(--space-3); padding-bottom: 2px; }
+.chip-link, .route-nav a { flex: none; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); text-decoration: none; font-weight: 600; font-size: 14px; white-space: nowrap; min-height: 40px; display: inline-flex; align-items: center; }
+.chip-link.is-active { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.route-nav a { font-weight: 500; }
+.result-route { scroll-margin-top: 16px; }
+.result-route + .result-route { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 2px solid var(--border); }
+.result-height { margin: var(--space-4) 0 var(--space-2); }
+.pcards { list-style: none; margin: 0; padding: 0; flex-direction: column; gap: 8px; }
+.pcard { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; }
+.pcard.is-muted { opacity: .55; }
+.pcard__no { flex: none; min-width: 28px; font-weight: 800; font-size: 18px; text-align: center; }
+.pcard__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+.pcard__horse { font-weight: 600; }
+.pcard__side { flex: none; font-weight: 800; font-size: 16px; text-align: right; max-width: 45%; overflow-wrap: anywhere; }
+.pcard.medal-1 .pcard__no { color: #b8860b; } .pcard.medal-2 .pcard__no { color: #7d8790; } .pcard.medal-3 .pcard__no { color: #a0522d; }
+@media (max-width: 400px) { .tabs__item { padding: 10px 9px; font-size: 15px; } }
+@media print { .pcards.only-narrow { display: none !important; } .table-wrap.only-wide { display: block !important; } }

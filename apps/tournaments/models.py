@@ -195,9 +195,16 @@ class ProgramItem(models.Model):
     result_fields = models.JSONField("поля результата (прочий маршрут)", default=list, blank=True)
     position = models.PositiveIntegerField(default=0)
     slot_minutes = models.PositiveSmallIntegerField("интервал между стартами, мин", default=2)
+    start_times = models.BooleanField("рассчитывать время стартов", default=False,
+                                      help_text="Только для выездки. В конкуре время стартов не рассчитывается (RUN-04).")
 
     def __str__(self):
         return self.name
+
+    @property
+    def timed_starts(self):
+        """Время старта каждой пары считается только в выездке и только если судья включил расчёт."""
+        return self.is_dressage and self.start_times and self.start_time is not None
 
     @property
     def is_jumping(self):

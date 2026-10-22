@@ -56,18 +56,18 @@
 <div class="bulk-bar">
   <form method="post" action="{% url 'conduct:action' t.pk p.pk 'draw' %}">{% csrf_token %}<button class="btn btn--dark btn--sm">Жеребьёвка</button></form>
   <form method="post" action="{% url 'conduct:action' t.pk p.pk 'add' %}">{% csrf_token %}<button class="btn btn--ghost btn--sm">Добавить готовых в конец</button></form>
-  <form method="post" action="{% url 'conduct:action' t.pk p.pk 'timing' %}" class="inline-row" style="margin: 0; align-items: center;">{% csrf_token %}<label class="label" for="sm">Интервал, мин</label><input id="sm" class="input-sm" name="slot_minutes" type="number" min="1" value="{{ p.slot_minutes }}"><button class="btn btn--ghost btn--sm">Пересчитать время</button></form>
+  {% if p.is_dressage %}<form method="post" action="{% url 'conduct:action' t.pk p.pk 'timing' %}" class="inline-row" style="margin: 0; align-items: center;">{% csrf_token %}<label class="check"><input type="checkbox" name="start_times" value="1"{% if p.start_times %} checked{% endif %}><span>Время старта каждой пары</span></label><label class="label" for="sm">Интервал, мин</label><input id="sm" class="input-sm" name="slot_minutes" type="number" min="1" value="{{ p.slot_minutes }}"><button class="btn btn--ghost btn--sm">Сохранить</button>{% if not p.start_time %}<span class="table__sub">Чтобы считать время, укажите начало езды в программе.</span>{% endif %}</form>{% endif %}
 </div>
 
 {% if slots %}
 <div class="table-wrap">
   <table class="table">
-    <thead><tr><th class="num">№</th><th class="num">Время</th><th>Всадник / лошадь</th><th>Состояние</th><th>Результат</th><th>Порядок</th></tr></thead>
+    <thead><tr><th class="num">№</th>{% if p.timed_starts %}<th class="num">Время</th>{% endif %}<th>Всадник / лошадь</th><th>Состояние</th><th>Результат</th><th>Порядок</th></tr></thead>
     <tbody>
       {% for s in slots %}
         <tr{% if s.status == "withdrawn" or s.status == "no_show" %} class="is-muted"{% endif %} id="slot-{{ s.pk }}">
           <td class="num"><strong>{{ s.position }}</strong></td>
-          <td class="num">{{ s.start_time|time:"H:i"|default:"—" }}</td>
+          {% if p.timed_starts %}<td class="num">{{ s.start_time|time:"H:i"|default:"—" }}</td>{% endif %}
           <td><strong>{{ s.entry.athlete_snapshot.name }}</strong><span class="table__sub">{{ s.entry.athlete_snapshot.birth_year|default:"" }}{% if s.entry.athlete_snapshot.rank %} · {{ s.entry.athlete_snapshot.rank }}{% endif %}{% if s.entry.athlete_snapshot.club %} · {{ s.entry.athlete_snapshot.club }}{% endif %}</span><span class="table__sub">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}</span>
             {% for c in s.conflicts %}<span class="table__sub" style="color: {% if s.exception_reason %}var(--text-muted){% else %}var(--danger){% endif %}; font-weight: 600;">⚠ {{ c }}</span>{% endfor %}
             {% if s.conflicts %}<details><summary class="table__sub" style="cursor: pointer;">{% if s.exception_reason %}Исключение: {{ s.exception_reason }}{% else %}Оставить как исключение…{% endif %}</summary>

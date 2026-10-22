@@ -161,6 +161,8 @@ class ProgramForm(forms.ModelForm):
     def save(self, commit=True):
         obj = super().save(commit=False)
         obj.tournament = self.tournament
+        if not obj.pk:
+            obj.start_times = obj.discipline == "dressage"  # в выездке время стартов по умолчанию считается, судья может выключить
         obj.heights = self.cleaned_data.get("heights", [])
         obj.program_type = self.cleaned_data.get("program_type") or obj.program_type
         test = self.cleaned_data.get("dressage_test")

@@ -677,37 +677,113 @@ def public_detail(request, pk):
     )
 
 
+def _num(v):
+    if v is None or v == "":
+        return ""
+    return str(v).replace(".", ",")
+
+
+def _mobile_summary(fields, cells):
+    """Короткая строка результата для карточки на телефоне: главное видно без прокрутки вбок."""
+    fields, cells = list(fields or []), list(cells or [])
+    if "%" in fields and any(f.endswith(": %") for f in fields):  # выездка
+        pct = _num(cells[fields.index("%")]) if fields.index("%") < len(cells) else ""
+        judges = [f"{f.split(':')[0]} {_num(cells[i])}" for i, f in enumerate(fields) if f.endswith(": %") and i < len(cells) and cells[i] not in (None, "")]
+        errs = cells[fields.index("Ошибки")] if "Ошибки" in fields and fields.index("Ошибки") < len(cells) else ""
+        detail = " · ".join(judges) + (f" · ошибки в схеме: {errs}" if errs else "")
+        return (f"{pct} %" if pct else ""), detail
+    parts = []
+    i = 0
+    while i < len(fields):
+        f = fields[i]
+        if f.startswith("Ш/о") and i + 1 < len(fields) and fields[i + 1].startswith("Время"):
+            pen, tm = (cells[i] if i < len(cells) else ""), (cells[i + 1] if i + 1 < len(cells) else "")
+            name = f[3:].strip() or "маршрут"
+            is_num = str(pen).replace(",", "").replace(".", "").isdigit()
+            if pen not in (None, "") and not is_num and tm in (None, ""):
+                parts.append(str(pen))  # «Искл.», «Сошёл» — без подписи гита
+            elif pen not in (None, "") or tm not in (None, ""):
+                parts.append(f"{name.capitalize()}: {_num(pen)}" + (f" / {_num(tm)} с" if tm not in (None, "") else ""))
+            i += 2
+            continue
+        if i < len(cells) and cells[i] not in (None, ""):
+            parts.append(f"{f}: {_num(cells[i])}")
+        i += 1
+    return (parts[0] if parts else ""), " · ".join(parts[1:])
+
+
 def _public_tabs(request, t):
-    """Вкладки «Стартовые» и «Результаты»: только опубликованные версии (ТЗ, разделы 10–11)."""
+    """Вкладки «Стартовые» и «Результаты»: только опубликованные версии (ТЗ, разделы 10–11).
+    Результаты — по маршрутам, внутри маршрута каждый зачёт отдельно, внутри зачёта — по высотам (JMP-09)."""
     from apps.conduct.models import ResultPublication, StartListPublication
     from apps.entries.models import Entry
 
     tab = request.GET.get("tab", "")
     if tab not in ("starts", "results"):
         tab = ""
-    starts, results = [], []
+    out = {"tab": tab, "starts": [], "results": [], "days_nav": [], "day": ""}
+    if not tab:
+        return out
+    programs = list(t.programs.prefetch_related("classes").order_by("day", "start_time", "position", "id"))
     if tab == "starts":
         pubs = {}
-        for pub in StartListPublication.objects.filter(program__tournament=t).select_related("program").order_by("program_id", "-version"):
+        for pub in StartListPublication.objects.filter(program__tournament=t).order_by("program_id", "-version"):
             pubs.setdefault(pub.program_id, pub)
-        ids = [r["entry"] for pub in pubs.values() for r in pub.rows]
-        inactive = {e.pk for e in Entry.objects.filter(pk__in=ids) if not e.is_active}
-        for p in t.programs.all():
-            pub = pubs.get(p.pk)
-            if pub:
-                rows = [dict(r, mark={"withdrawn": "Снят", "no_show": "Не явился"}.get(r.get("status")) or ("Снят" if r["entry"] in inactive else "")) for r in pub.rows]
-                starts.append({"p": p, "pub": pub, "rows": rows})
-    elif tab == "results":
+        have = [p for p in programs if p.pk in pubs]
+    else:
         pubs = {}
-        for pub in ResultPublication.objects.filter(tclass__program__tournament=t).select_related("tclass__program").order_by("tclass_id", "-version"):
+        for pub in ResultPublication.objects.filter(tclass__program__tournament=t).order_by("tclass_id", "-version"):
             pubs.setdefault(pub.tclass_id, pub)
-        for p in t.programs.prefetch_related("classes"):
+        have = [p for p in programs if any(c.pk in pubs for c in p.classes.all())]
+    days = sorted({p.day for p in have})
+    out["days_nav"] = days
+    day = request.GET.get("day", "")
+    if days and len(days) > 1:
+        if day == "all":
+            pass
+        else:
+            try:
+                d = datetime.date.fromisoformat(day)
+            except ValueError:
+                d = None
+            if d not in days:
+                local_today = timezone.now().astimezone(zoneinfo.ZoneInfo(t.pub_timezone or "Europe/Moscow")).date()
+                d = local_today if local_today in days else (days[-1] if tab == "results" else days[0])
+            day = d.isoformat()
+            have = [p for p in have if p.day == d]
+    out["day"] = day
+    if tab == "starts":
+        ids = [r["entry"] for p in have for r in pubs[p.pk].rows]
+        inactive = {e.pk for e in Entry.objects.filter(pk__in=ids) if not e.is_active}
+        for p in have:
+            pub = pubs[p.pk]
+            rows = [dict(r, mark={"withdrawn": "Снят", "no_show": "Не явился"}.get(r.get("status")) or ("Снят" if r["entry"] in inactive else ""))
+                    for r in pub.rows]
+            out["starts"].append({"p": p, "pub": pub, "rows": rows, "timed": any(r.get("time") for r in rows)})
+    else:
+        need_h = {r["entry"] for p in have if len(p.heights or []) > 1 for c in p.classes.all() if c.pk in pubs
+                  for r in pubs[c.pk].rows if "height" not in r}
+        hmap = dict(Entry.objects.filter(pk__in=need_h).values_list("pk", "height")) if need_h else {}
+        for p in have:
+            blocks = []
             for c in p.classes.all():
                 pub = pubs.get(c.pk)
-                if pub:
-                    rows = [r if "cells" in r else dict(r, cells=[r["values"].get(k) for k in p.result_fields]) for r in pub.rows]
-                    results.append({"p": p, "c": c, "pub": pub, "rows": rows})
-    return {"tab": tab, "starts": starts, "results": results}
+                if not pub:
+                    continue
+                rows = [r if "cells" in r else dict(r, cells=[r["values"].get(k) for k in p.result_fields]) for r in pub.rows]
+                rows = [dict(r, summary=_mobile_summary(pub.fields, r["cells"])) for r in rows]
+                groups = []
+                if len(p.heights or []) > 1:
+                    by_h = {}
+                    for r in rows:
+                        by_h.setdefault(r.get("height") or hmap.get(r["entry"]), []).append(r)
+                    for h in sorted(by_h, key=lambda x: x or 0):
+                        groups.append({"height": h, "rows": sorted(by_h[h], key=lambda r: (r["place"] is None, r["place"] or 0))})
+                else:
+                    groups.append({"height": None, "rows": rows})
+                blocks.append({"c": c, "pub": pub, "groups": groups})
+            out["results"].append({"p": p, "classes": blocks})
+    return out
 
 
 def public_regulation(request, pk):

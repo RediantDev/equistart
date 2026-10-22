@@ -206,7 +206,10 @@ def save_round(user, entry_id, stage, data: dict, client_key: str = "") -> JumpR
            "status": jr.status} if existing else None
     jr.knockdowns, jr.refusals, jr.corrections = num("knockdowns"), num("refusals", 0, 3), num("corrections", 0, 5)
     jr.time, jr.fall, jr.status = t, bool(data.get("fall")), status
-    jr.reason = (data.get("reason") or "").strip()[:200]
+    # причина хранится только у исключения (RUN-05); у «Сошёл» и прочих — пусто
+    jr.reason = (data.get("reason") or "").strip()[:200] if status == "eliminated" else ""
+    if status == "eliminated" and not jr.reason:
+        raise ValueError("Выберите причину исключения.")
     jr.client_key = client_key[:64]
     jr.updated_by = user
     if existing:
@@ -227,13 +230,14 @@ def save_round(user, entry_id, stage, data: dict, client_key: str = "") -> JumpR
 
 def jumping_row_values(program, st: J.Standing) -> dict:
     out = {"rounds": {}, "total": J.fmt(st.total) if st.total is not None else ""}
+    digits = 1 if course(program).get("timing") == "manual" else 2  # время печатается с точностью хронометража: 61,10
     for spec in J.rounds_of(program.route, program.variant):
         r = st.rounds.get(spec.key)
         if r is None:
             continue
         out["rounds"][spec.key] = {
             "title": spec.title, "status": r.status, "reason": r.reason,
-            "pen": J.fmt(r.penalties) if r.finished else "", "time": J.fmt(r.time) if r.time is not None else "",
+            "pen": J.fmt(r.penalties) if r.finished else "", "time": f"{r.time:.{digits}f}".replace(".", ",") if r.time is not None else "",
             "obstacle_pen": J.fmt(r.obstacle_pen), "time_pen": J.fmt(r.time_pen),
         }
     return out
@@ -555,7 +559,10 @@ def result_cells(program, result) -> list:
             if not r:
                 out += ["", ""]
             elif r["status"] != "ok":
-                out += [r.get("reason") or {"eliminated": "искл.", "retired": "сошёл", "withdrawn": "снят", "no_show": "н/с"}.get(r["status"], ""), ""]
+                label = {"eliminated": "Искл.", "retired": "Сошёл", "withdrawn": "Снят", "no_show": "Не стартовал"}.get(r["status"], "")
+                if r["status"] == "eliminated" and r.get("reason"):
+                    label = f"Искл. ({r['reason']})"
+                out += [label, ""]
             else:
                 out += [r["pen"], r["time"]]
         if program.route.key in SUM_ROUTES:

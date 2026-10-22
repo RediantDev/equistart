@@ -33,7 +33,7 @@
           <label class="field"><span class="field__label">Прочие ошибки (технические)</span><input name="technical" type="number" min="0" max="10" inputmode="numeric" value="{{ flags.technical|default:0 }}"></label>
         </div>
         <label class="check"><input type="checkbox" name="eliminated" value="1"{% if flags.eliminated %} checked{% endif %}><span>Исключение</span></label>
-        <label class="field"><span class="field__label">Причина исключения</span><select name="reason">{% for r in reasons %}<option{% if flags.reason == r %} selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+        <label class="field"><span class="field__label">Причина исключения</span><select name="reason"><option value="">— выберите причину —</option>{% for r in reasons %}<option{% if flags.reason == r %} selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
         <button class="btn btn--dark btn--sm">Сохранить отметки</button>
       </form>
     </section>

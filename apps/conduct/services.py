@@ -53,7 +53,7 @@ def _recompute_times(program):
     slots = list(program.slots.order_by("position", "id"))
     for i, s in enumerate(slots, start=1):
         s.position = i
-        if program.start_time:
+        if program.timed_starts:
             base = datetime.datetime.combine(program.day, program.start_time)
             s.start_time = (base + datetime.timedelta(minutes=(i - 1) * program.slot_minutes)).time()
         else:
@@ -297,23 +297,35 @@ def publish_results(user, class_id) -> ResultPublication:
         if waiting:
             raise ValueError(f"Не утверждены результаты: {', '.join(e.athlete_snapshot.get('name', '') for e in waiting[:5])}.")
     rows = []
+    multi = len(p.heights or []) > 1
     for e in with_results:
         r = e.result
         rows.append({
-            "entry": e.pk, "place": r.place,
+            "entry": e.pk, "place": r.place, "height": e.height if multi else None,
             "athlete": {k: e.athlete_snapshot.get(k) for k in ATHLETE_PUBLIC},
             "horse": {k: e.horse_snapshot.get(k) for k in HORSE_PUBLIC},
             "class": e.tclass.label if e.tclass_id != c.pk else "",
             "cells": scoring.result_cells(p, r), "values": r.values if p.is_manual else {},
             "status": r.get_status_display() if r.status else "",
         })
-    rows.sort(key=lambda x: (x["place"] is None, x["place"] or 0, x["athlete"]["name"] or ""))
+    rows.sort(key=lambda x: (x["height"] or 0, x["place"] is None, x["place"] or 0, x["athlete"]["name"] or ""))
     version = (c.result_publications.aggregate(m=Max("version"))["m"] or 0) + 1
     pub = ResultPublication.objects.create(tclass=c, version=version, rows=rows, fields=scoring.result_columns(p), published_by=user)
     audit(user, "results.publish", p.tournament, tclass=c.pk, version=version)
-    users = [e.application.submitted_by for e in with_results] + [e.athlete.linked_user for e in with_results if e.athlete.linked_user_id]
-    notify(users, f"Опубликованы результаты: «{p.tournament.pub_title}», {p.name} · {c.label}",
-           reverse("tournaments:public", args=[p.tournament_id]) + "?tab=results", "results")
+    # RES-05: каждому — место и результат своих пар, одним уведомлением на зачёт
+    url = reverse("tournaments:public", args=[p.tournament_id]) + f"?tab=results#class-{c.pk}"
+    mine = {}
+    for e in with_results:
+        for u in {e.application.submitted_by, e.athlete.linked_user} - {None}:
+            mine.setdefault(u, []).append(e)
+    for u, items in mine.items():
+        parts = []
+        for e in items[:4]:
+            r = e.result
+            res = f"{r.place} место" if r.place else (r.get_status_display() or "без места")
+            parts.append(f"{e.athlete_snapshot.get('name')} / {e.horse_snapshot.get('name')} — {res}")
+        more = f" и ещё {len(items) - 4}" if len(items) > 4 else ""
+        notify([u], f"Результаты: {p.name} · {c.label}. " + "; ".join(parts) + more, url, "results")
     return pub
 
 

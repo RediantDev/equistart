@@ -65,7 +65,7 @@ class JumpingTests(ConductBase):
         pub = services.publish_results(self.judge, self.c_open.pk)
         self.assertEqual(pub.fields, ["Ш/о", "Время", "Ш/о перепр.", "Время перепр."])
         self.assertEqual([r["place"] for r in pub.rows], [1, 2, 3])
-        self.assertEqual(pub.rows[2]["cells"], ["12", "75,2", "", ""])  # время основного гита — у всех пар
+        self.assertEqual(pub.rows[2]["cells"], ["12", "75,20", "", ""])  # время основного гита — у всех пар
         # ручной ввод для автоматического маршрута закрыт
         with self.assertRaises(ValueError):
             services.save_result(self.judge, self.e2.pk, {}, "1", "")

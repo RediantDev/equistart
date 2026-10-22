@@ -46,8 +46,8 @@ class DrawTests(ConductBase):
         ids = set(self.p1.slots.values_list("entry_id", flat=True))
         self.assertEqual(ids, {self.e1.pk, self.e2.pk})
         self.assertNotIn(pending.pk, ids)
-        times = sorted(self.p1.slots.values_list("start_time", flat=True))
-        self.assertEqual(times, [datetime.time(10, 0), datetime.time(10, 3)])
+        # конкур: время стартов не рассчитывается (RUN-04, решение заказчика 22.10.2026)
+        self.assertEqual(set(self.p1.slots.values_list("start_time", flat=True)), {None})
 
     def test_redraw_keeps_started(self):
         services.draw(self.judge, self.p1.pk)
@@ -63,7 +63,7 @@ class DrawTests(ConductBase):
         services.move(self.judge, b.pk, 1)
         a.refresh_from_db(); b.refresh_from_db()
         self.assertEqual((b.position, a.position), (1, 2))
-        self.assertEqual(b.start_time, datetime.time(10, 0))
+        self.assertIsNone(b.start_time)  # конкур: время стартов не считается
         services.set_status(self.judge, b.pk, StartSlot.Status.STARTED)
         with self.assertRaises(ValueError):
             services.move(self.judge, a.pk, 1)

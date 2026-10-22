@@ -233,3 +233,7 @@ LEGAL_DOCS_VERSION = "2026-10-14"
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT") or BASE_DIR / "media")
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2_621_440
 DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024
+
+# Ограничение числа полей формы снято: судья принимает решения по сотням выступлений за раз (отчёт тестирования 22.10.2026, К1).
+DATA_UPLOAD_MAX_NUMBER_FIELDS = None
+CSRF_FAILURE_VIEW = "apps.core.errors.csrf_failure"
