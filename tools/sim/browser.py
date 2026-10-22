@@ -111,6 +111,9 @@ class Browser:
         if extra: data += list(extra)
         if button_name: data.append((button_name, button_value or ""))
         action = urljoin(self.page.url, form.get("action") or self.page.url)
+        if (form.get("method") or "get").lower() == "get":
+            from urllib.parse import urlencode
+            return self.get(action.split("?")[0] + "?" + urlencode([(k, v) for k, v in data if k != "csrfmiddlewaretoken"]), note=note)
         return self.post(action, data, files=files, note=note)
     def click(self, *needles, note=""):
         href = self.page.find_link(*needles)

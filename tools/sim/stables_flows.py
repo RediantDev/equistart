@@ -15,6 +15,8 @@ def find_manage(sb, pk):
             href = h; break
     if href:
         sb.get(href)
+    if "/stables/" in sb.page.url:
+        return sb.page
     if not sb.click("Денники и услуги", "Денники"):
         sb.friction("Конюшня", "Не нашёл вход в управление денниками за 3 клика", "high")
         sb.get(f"/organizer/t/{pk}/stables/")

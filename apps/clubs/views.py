@@ -89,8 +89,11 @@ def mine(request):
         return redirect("accounts:add_role")
     club = _my_club(request.user)
     form = ClubForm(request.POST or None, request.FILES or None, instance=club)
+    form.submitting = "submit" in request.POST
     if request.method == "POST" and form.is_valid():
         obj = form.save(commit=False)
+        if request.POST.get("logo_clear") and "logo" not in request.FILES:
+            obj.logo = None
         try:
             services.save(request.user, obj, form.changed_data)
         except PermissionDenied:

@@ -122,7 +122,7 @@ a.tag { text-decoration: none; }
 .field__help { margin: 0; font-size: 14px; color: var(--text-muted); }
 .field__error { margin: 0; font-size: 14px; color: var(--danger); font-weight: 600; }
 .field__error span { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--danger); color: var(--surface); font-size: 11px; font-weight: 800; margin-right: 2px; }
-input[type="text"], input[type="tel"], input[type="email"], input[type="password"], input[type="search"], input[type="number"], input[type="date"], input[type="time"], select, textarea {
+input:not([type]), input[type="url"], input[type="text"], input[type="tel"], input[type="email"], input[type="password"], input[type="search"], input[type="number"], input[type="date"], input[type="time"], select, textarea {
   width: 100%; min-height: var(--control-height); padding: 10px var(--space-3); font: inherit; color: var(--text);
   background: var(--surface); border: 1px solid var(--control-border); border-radius: var(--radius-sm);
 }
@@ -178,6 +178,7 @@ input:focus, select:focus, textarea:focus { outline: 3px solid var(--focus); out
   .topnav__link { padding: 6px var(--space-2); }
   .brand span:not(.brand__mark) { display: none; }
   .topnav__link--home { display: none; }
+  .topnav__link--desk { display: none; }
 }
 
 /* ---------- Раскладки страниц ---------- */
@@ -535,8 +536,10 @@ a.chip, a.tag { text-decoration: none; }
 .club-logo--empty { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: var(--text-muted); }
 .club-logo--lg { width: 72px; height: 72px; }
 .club-head { display: flex; gap: var(--space-3); align-items: center; }
-.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-2); }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: var(--space-2); }
 .photo-grid img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius-md, 12px); display: block; }
 .photo-grid figure { margin: 0; min-width: 0; }
 .break { overflow-wrap: anywhere; }
 .news + .news { margin-top: var(--space-3); }
+.photo-cap { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-top: 4px; min-width: 0; }
+.photo-cap .table__sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

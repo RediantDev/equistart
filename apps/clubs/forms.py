@@ -10,7 +10,7 @@ class ClubForm(forms.ModelForm):
     class Meta:
         model = Club
         fields = ["name", "description", "region", "settlement", "address", "phone", "email", "site", "socials", "logo"]
-        widgets = {"description": forms.Textarea(attrs={"rows": 5}), "logo": forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png"})}
+        widgets = {"description": forms.Textarea(attrs={"rows": 5}), "logo": forms.FileInput(attrs={"accept": "image/jpeg,image/png"})}
         help_texts = {"name": "Как клуб называют участники: «КСК «Пегас»».", "address": "Улица, дом или ориентир — для навигатора.",
                       "description": "Пара абзацев: площадки, манежи, чем занимаетесь. Видно всем после подтверждения.",
                       "logo": "JPEG или PNG до 10 МБ."}
@@ -19,6 +19,14 @@ class ClubForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["region"].choices = [("", "— выберите —")] + list(self.fields["region"].choices)[1:]
         self.fields["phone"].widget.input_type = "tel"
+
+    submitting = False
+
+    def clean(self):
+        c = super().clean()
+        if self.submitting and not (c.get("phone") or c.get("email") or c.get("site")):
+            self.add_error("phone", "Укажите хотя бы один контакт: телефон, email или сайт — без него не отправить на проверку.")
+        return c
 
     def clean_logo(self):
         f = self.cleaned_data.get("logo")

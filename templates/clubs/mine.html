@@ -40,6 +40,7 @@
       {% include "partials/field.html" with field=form.site %}
     </div>
     {% include "partials/field.html" with field=form.socials %}
+    {% if club.logo %}<div class="club-head"><img class="club-logo club-logo--lg" src="{% url 'clubs:file' 'logo' club.pk %}" alt="Текущий логотип"><label class="check"><input type="checkbox" name="logo_clear" value="1"><span>Убрать логотип</span></label></div>{% endif %}
     {% include "partials/field.html" with field=form.logo %}
     <div class="form__actions">
       {% if not club or club.status == "draft" or club.status == "returned" %}
@@ -57,9 +58,9 @@
   <h2 class="h2">Фото клуба <span class="tag">{{ club.photos.count }}</span></h2>
   {% if club.photos.all %}
     <div class="photo-grid">{% for p in club.photos.all %}
-      <figure><img src="{% url 'clubs:file' 'photo' p.pk %}" alt="{{ p.caption }}" loading="lazy">
-        <figcaption class="table__sub">{{ p.caption }}
-          <form method="post" action="{% url 'clubs:photo_delete' p.pk %}" style="display: inline;">{% csrf_token %}<button class="btn btn--ghost btn--sm" type="submit">Удалить</button></form></figcaption></figure>
+      <figure><img src="{% url 'clubs:file' 'photo' p.pk %}" alt="{{ p.caption }}">
+        <figcaption class="photo-cap"><span class="table__sub">{{ p.caption|default:"Без подписи" }}</span>
+          <form method="post" action="{% url 'clubs:photo_delete' p.pk %}">{% csrf_token %}<button class="btn btn--ghost btn--sm" type="submit" aria-label="Удалить фото {{ p.caption }}">Удалить</button></form></figcaption></figure>
     {% endfor %}</div>
   {% endif %}
   <form method="post" action="{% url 'clubs:photo_add' %}" enctype="multipart/form-data" class="form">

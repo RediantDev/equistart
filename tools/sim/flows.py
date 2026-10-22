@@ -152,6 +152,13 @@ def create_tournament(b, spec):
     data = {"title": spec["title"], "starts_on": spec["start"], "venue_name": spec["venue"][0], "venue_region": spec["venue"][1],
             "venue_settlement": spec["venue"][2], "venue_address": spec["venue"][3] if len(spec["venue"]) > 3 else "",
             "contact_name": spec.get("contact_name", ""), "contact": spec.get("contact", ""), "level": spec.get("level", "club")}
+    if spec.get("venue_pick"):
+        sel = f.find("select", attrs={"name": "venue"})
+        vid = next((o.get("value") for o in sel.find_all("option") if spec["venue_pick"] in o.get_text()), None) if sel else None
+        if vid:
+            data.update(venue=vid, venue_name="", venue_region="", venue_settlement="", venue_address="")
+        else:
+            b.friction("Мастер, шаг 1", f"Клуб «{spec['venue_pick']}» не найден в списке мест", "high")
     if spec["end"] != spec["start"]:
         data.update(multiday="on", ends_on=spec["end"])
     if spec.get("classification"):
