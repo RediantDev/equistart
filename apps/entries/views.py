@@ -451,6 +451,9 @@ def manage_decide(request, pk):
         qs = _manage_qs(t, f).exclude(decision=Entry.Decision.CANCELLED)
         ids = [str(i) for i in qs.values_list("pk", flat=True)]
         revs = dict(qs.values_list("pk", "revision"))
+    elif request.POST.get("items"):
+        ids = [c.partition(":")[0] for c in request.POST["items"].split(",") if c.partition(":")[0].isdigit()]
+        revs = None
     else:
         ids = [i for i in request.POST.getlist("entry") if i.isdigit()]
         revs = None
