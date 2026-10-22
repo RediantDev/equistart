@@ -137,7 +137,9 @@ def horse_edit(request, pk=None):
     similar = []
     if request.method == "POST" and form.is_valid():
         if not horse and "confirm_similar" not in request.POST:
-            similar = list(Horse.objects.filter(name__iexact=form.cleaned_data["name"].strip(), archived=False)[:5])
+            # одинаковые клички — обычное дело; предупреждаем, только если совпал и год рождения (вероятный дубль)
+            similar = list(Horse.objects.filter(name__iexact=form.cleaned_data["name"].strip(), birth_year=form.cleaned_data["birth_year"],
+                                                archived=False)[:5])
         if not similar:
             try:
                 with transaction.atomic():

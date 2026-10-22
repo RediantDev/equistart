@@ -5,7 +5,7 @@
 <div class="page-head">
   <div>
     <h1 class="h1">Модерация турниров</h1>
-    <p class="muted">Проверьте положение, даты, место, программу, цены и условия. Решение относится к конкретной версии.</p>
+    <p class="muted">Проверьте положение, даты, место, программу с зачётами и условия. Решение относится к конкретной версии.</p>
   </div>
 </div>
 
@@ -15,7 +15,7 @@
     <div class="list-cards">
       {% for t in waiting %}
         <article class="row-card">
-          <div style="flex: 1; min-width: 0;">
+          <div style="flex: 1 1 180px; min-width: 0;">
             <a class="h3 row-card__title" href="{% url 'moderation:detail' t.pk %}">{{ t.title }}</a>
             <div class="table__sub">{{ t.starts_on|isodate }} · {{ t.venue.name }}, {{ t.venue.settlement }} · {{ t.owner.full_name }}</div>
           </div>
@@ -35,11 +35,11 @@
   {% if recent %}
     <h2 class="h2" style="margin-top: var(--space-6);">Недавние решения</h2>
     <div class="table-wrap">
-      <table class="table">
+      <table class="table table--stack">
         <thead><tr><th>Турнир</th><th>Решение</th><th>Модератор</th><th>Когда</th></tr></thead>
         <tbody>
           {% for t in recent %}
-            <tr><td><a href="{% url 'moderation:detail' t.pk %}">{{ t.title }}</a></td><td>{% if t.status == "returned" %}<span class="chip chip--danger">Возвращён</span>{% else %}<span class="chip chip--success">Опубликован</span>{% endif %}</td><td>{{ t.reviewed_by.short_name }}</td><td>{{ t.reviewed_at|date:"d.m.Y H:i" }}</td></tr>
+            <tr><td class="stack-full"><a href="{% url 'moderation:detail' t.pk %}">{{ t.title }}</a></td><td data-label="Решение">{% if t.status == "returned" %}<span class="chip chip--danger">Возвращён</span>{% else %}<span class="chip chip--success">Опубликован</span>{% endif %}</td><td data-label="Модератор">{{ t.reviewed_by.short_name }}</td><td data-label="Когда">{{ t.reviewed_at|date:"d.m.Y H:i" }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

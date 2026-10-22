@@ -12,6 +12,8 @@ from apps.entries.models import Entry
 from apps.entries.services import require_judge
 from apps.tournaments.disciplines import RESULT_FIELDS
 from apps.tournaments.models import ProgramItem, Tournament, TournamentClass
+from django.db.models import Count
+
 from apps.tournaments.services import can_manage
 
 from . import scoring, services
@@ -28,12 +30,21 @@ def _program(request, pk, program_id):
 def overview(request, pk):
     t = get_object_or_404(Tournament, pk=pk)
     require_judge(request.user, t)
+    from django.db.models import Count
+
+    blocked = services.blocked_for(t.pk)
+    accepted_by = {}
+    for pid, horse_id in Entry.objects.filter(tournament=t, decision=Entry.Decision.ACCEPTED).values_list("program_id", "horse_id"):
+        a, r = accepted_by.get(pid, (0, 0))
+        accepted_by[pid] = (a + 1, r + (horse_id not in blocked))
+    slots_by = dict(StartSlot.objects.filter(program__tournament=t).values("program_id").annotate(n=Count("id")).values_list("program_id", "n"))
+    last_pub = {}
+    for pub in StartListPublication.objects.filter(program__tournament=t).order_by("program_id", "-version"):
+        last_pub.setdefault(pub.program_id, pub)
     programs = []
-    for p in t.programs.prefetch_related("classes", "slots", "start_publications"):
-        accepted = Entry.objects.filter(program=p, decision=Entry.Decision.ACCEPTED).count()
-        ready = sum(1 for e in Entry.objects.filter(program=p) if services.eligible(e))
-        last = p.start_publications.first()
-        programs.append({"p": p, "accepted": accepted, "ready": ready, "slots": p.slots.count(), "published": last})
+    for p in t.programs.all().order_by("day", "start_time", "position", "id"):
+        accepted, ready = accepted_by.get(p.pk, (0, 0))
+        programs.append({"p": p, "accepted": accepted, "ready": ready, "slots": slots_by.get(p.pk, 0), "published": last_pub.get(p.pk)})
     return render(request, "conduct/overview.html", {
         "t": t, "programs": programs, "manage": can_manage(request.user, t),
         "warnings": services.finish_warnings(t) if t.publication == Tournament.Publication.PUBLISHED else [],
@@ -73,7 +84,7 @@ def finish(request, pk):
     t.revision += 1
     t.save()
     audit(request.user, "tournament.finish", t, warnings=services.finish_warnings(t))
-    messages.success(request, "Турнир завершён. Опубликованные сведения остаются в архиве; долги и возвраты можно закрывать и дальше.")
+    messages.success(request, "Турнир завершён. Опубликованные протоколы и результаты остаются в архиве и доступны всем.")
     return redirect("conduct:overview", pk=t.pk)
 
 
@@ -82,14 +93,17 @@ def program(request, pk, program_id):
     p = _program(request, pk, program_id)
     t = p.tournament
     slots = list(p.slots.select_related("entry", "entry__result").order_by("position"))
-    conf = services.conflicts(t)
+    conf = services.conflicts(t, p)
+    blocked = services.blocked_for(t.pk)
     for s in slots:
         s.conflicts = conf.get(s.pk, [])
         s.result = getattr(s.entry, "result", None)
-        s.still_eligible = services.eligible(s.entry)
+        s.still_eligible = services.eligible(s.entry, blocked)
     in_list = {s.entry_id for s in slots}
-    outside = [(e, services.eligible(e)) for e in Entry.objects.filter(program=p).exclude(pk__in=in_list).exclude(decision__in=[Entry.Decision.CANCELLED, Entry.Decision.REJECTED])]
+    outside = [(e, services.eligible(e, blocked)) for e in Entry.objects.filter(program=p).exclude(pk__in=in_list).exclude(decision__in=[Entry.Decision.CANCELLED, Entry.Decision.REJECTED])]
     classes = []
+    all_classes = list(p.classes.all())
+    merged = [c for c in all_classes if c.merged_into_id]
     for c in p.classes.filter(merged_into__isnull=True):
         last = c.result_publications.first()
         classes.append({"c": c, "published": last, "count": Entry.objects.filter(tclass__in=[c, *c.merged.all()], result__isnull=False).count()})
@@ -98,6 +112,9 @@ def program(request, pk, program_id):
         "published": p.start_publications.first(),
         "fields": [(f, RESULT_FIELDS.get(f, f)) for f in p.result_fields], "statuses": Result.Status.choices,
         "auto": not p.is_manual,
+        "merged": merged, "all_classes": all_classes,
+        "entries_by_class": {cid: n for cid, n in Entry.objects.filter(program=p).exclude(decision__in=[Entry.Decision.CANCELLED, Entry.Decision.REJECTED]).values_list("tclass_id").annotate(n=Count("id"))},
+        "can_publish": not (p.is_dressage and not p.is_manual) or scoring.is_scorer(request.user, p) or can_manage(request.user, t),
     }
     if not p.is_manual:
         for s in slots:
@@ -157,10 +174,19 @@ def program_action(request, pk, program_id, action):
             services.set_exception(request.user, int(request.POST["slot"]), request.POST.get("reason", ""))
             messages.success(request, "Исключение сохранено.")
         elif action == "timing":
+            if not p.is_dressage:
+                raise ValueError("В конкуре время стартов не рассчитывается — указывается только начало маршрута.")
             p.slot_minutes = max(1, min(120, int(request.POST.get("slot_minutes", p.slot_minutes))))
-            p.save(update_fields=["slot_minutes"])
+            p.start_times = request.POST.get("start_times") == "1"
+            p.save(update_fields=["slot_minutes", "start_times"])
             services._recompute_times(p)
-            messages.success(request, "Интервал между стартами сохранён, время пересчитано.")
+            messages.success(request, "Время стартов пересчитано." if p.timed_starts else "Время стартов не рассчитывается — в протоколе будет только порядок.")
+        elif action == "merge":
+            c = services.merge_classes(request.user, int(request.POST["tclass"]), int(request.POST["into"]))
+            messages.success(request, f"Зачёт «{c.label}» объединён с «{c.merged_into.label}». Представители получили уведомление.")
+        elif action == "unmerge":
+            c = services.unmerge_class(request.user, int(request.POST["tclass"]))
+            messages.success(request, f"Объединение зачёта «{c.label}» отменено.")
         elif action == "publish":
             pub = services.publish_start_list(request.user, p.pk)
             messages.success(request, f"Стартовый протокол опубликован (версия {pub.version}).")
@@ -197,7 +223,7 @@ def live(request, pk, program_id):
     current = next((s for s in slots if s.status == StartSlot.Status.STARTED), None) or next((s for s in slots if s.status == StartSlot.Status.WAITING), None)
     upcoming = [s for s in slots if s.status == StartSlot.Status.WAITING and s != current][:4]
     done = sum(1 for s in slots if s.status not in (StartSlot.Status.WAITING, StartSlot.Status.STARTED))
-    conf = services.conflicts(p.tournament)
+    conf = services.conflicts(p.tournament, p)
     return render(request, "conduct/live.html", {
         "t": p.tournament, "p": p, "current": current, "upcoming": upcoming, "done": done, "total": len(slots),
         "fields": [(f, RESULT_FIELDS.get(f, f)) for f in p.result_fields], "statuses": Result.Status.choices,
@@ -237,10 +263,11 @@ def startlist_xlsx(request, pk, program_id):
     pub = p.start_publications.first()
     if not pub:
         raise Http404
-    rows = [["№", "Время", "Всадник", "Год рожд.", "Разряд", "Клуб", "Тренер", "Лошадь", "Год", "Пол", "Масть", "Порода", "Зачёт", "Высота", "Отметка"]]
+    timed = any(r.get("time") for r in pub.rows)
+    rows = [["№"] + (["Время"] if timed else []) + ["Всадник", "Год рожд.", "Разряд", "Клуб", "Тренер", "Лошадь", "Год", "Пол", "Масть", "Порода", "Зачёт", "Высота", "Отметка"]]
     for r in pub.rows:
         a, h = r["athlete"], r["horse"]
-        rows.append([r["position"], r["time"], a["name"], a.get("birth_year") or "", a.get("rank") or "", a.get("club") or "", a.get("coach") or "",
+        rows.append([r["position"]] + ([r["time"]] if timed else []) + [a["name"], a.get("birth_year") or "", a.get("rank") or "", a.get("club") or "", a.get("coach") or "",
                      h["name"], h.get("birth_year") or "", h.get("sex") or "", h.get("color") or "", h.get("breed") or "", r["class"],
                      r.get("height") or "", _mark(r)])
     return _xlsx_response(xlsx.build("Стартовый протокол", rows), f"start-{p.tournament_id}-{p.pk}-v{pub.version}.xlsx")
@@ -252,12 +279,17 @@ def results_xlsx(request, pk, class_id):
     pub = c.result_publications.first()
     if not pub:
         raise Http404
-    rows = [["Место", "Всадник", "Год рожд.", "Разряд", "Клуб", "Тренер", "Лошадь", "Год", "Пол", "Масть", "Порода"] + pub.fields + ["Статус"]]
+    multi = len(c.program.heights or []) > 1
+    rows = [(["Высота, см"] if multi else []) + ["Место", "Всадник", "Год рожд.", "Разряд", "Клуб", "Тренер", "Лошадь", "Год", "Пол", "Масть", "Порода"] + pub.fields + ["Статус"]]
     keys = c.program.result_fields
-    for r in pub.rows:
+    hmap = {}
+    if multi and any("height" not in r for r in pub.rows):
+        hmap = dict(Entry.objects.filter(pk__in=[r["entry"] for r in pub.rows]).values_list("pk", "height"))
+    ordered = sorted(pub.rows, key=lambda r: ((r.get("height") or hmap.get(r["entry"]) or 0) if multi else 0, r["place"] is None, r["place"] or 0))
+    for r in ordered:
         a, h = r["athlete"], r["horse"]
         cells = r["cells"] if "cells" in r else [r["values"].get(k) for k in keys]
-        rows.append([r["place"] or "", a["name"], a.get("birth_year") or "", a.get("rank") or "", a.get("club") or "", a.get("coach") or "",
+        rows.append(([r.get("height") or hmap.get(r["entry"]) or ""] if multi else []) + [r["place"] or "", a["name"], a.get("birth_year") or "", a.get("rank") or "", a.get("club") or "", a.get("coach") or "",
                      h["name"], h.get("birth_year") or "", h.get("sex") or "", h.get("color") or "", h.get("breed") or ""]
                     + ["" if v is None else v for v in cells] + [r["status"]])
     return _xlsx_response(xlsx.build("Результаты", rows), f"results-{pk}-{c.pk}-v{pub.version}.xlsx")

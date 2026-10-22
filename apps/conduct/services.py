@@ -17,15 +17,22 @@ from . import scoring
 from .models import Result, ResultPublication, StartListPublication, StartSlot
 
 
-def eligible(entry) -> bool:
-    """В порядок попадают принятые выступления (и с подтверждённым обязательным денником)."""
+def eligible(entry, blocked=None) -> bool:
+    """В порядок попадают принятые выступления (и с подтверждённым обязательным денником).
+    blocked — заранее посчитанное множество лошадей без обязательного денника (чтобы не спрашивать базу на каждую строку)."""
     if entry.decision != Entry.Decision.ACCEPTED:
         return False
-    try:
-        from apps.stables.services import stable_dependency_ok
-    except ImportError:
-        return True
+    if blocked is not None:
+        return entry.horse_id not in blocked
+    from apps.stables.services import stable_dependency_ok
+
     return stable_dependency_ok(entry)
+
+
+def blocked_for(tournament_id) -> set:
+    from apps.stables.services import blocked_horses
+
+    return blocked_horses(tournament_id)
 
 
 def entry_height(entry):
@@ -51,14 +58,17 @@ def _lock_program(user, program_id):
 
 def _recompute_times(program):
     slots = list(program.slots.order_by("position", "id"))
+    changed = []
     for i, s in enumerate(slots, start=1):
-        s.position = i
-        if program.start_time:
+        t = None
+        if program.timed_starts:
             base = datetime.datetime.combine(program.day, program.start_time)
-            s.start_time = (base + datetime.timedelta(minutes=(i - 1) * program.slot_minutes)).time()
-        else:
-            s.start_time = None
-        s.save(update_fields=["position", "start_time", "updated_at"])
+            t = (base + datetime.timedelta(minutes=(i - 1) * program.slot_minutes)).time()
+        if s.position != i or s.start_time != t:
+            s.position, s.start_time = i, t
+            changed.append(s)
+    if changed:
+        StartSlot.objects.bulk_update(changed, ["position", "start_time"])
 
 
 @transaction.atomic
@@ -66,10 +76,10 @@ def draw(user, program_id) -> int:
     """Жеребьёвка: добавляет недостающих и случайно перемешивает ещё не стартовавших. Начатые остаются на местах."""
     p = _lock_program(user, program_id)
     existing = {s.entry_id for s in p.slots.all()}
-    new = [e for e in Entry.objects.filter(program=p) if e.pk not in existing and eligible(e)]
+    blocked = blocked_for(p.tournament_id)
+    new = [e for e in Entry.objects.filter(program=p, decision=Entry.Decision.ACCEPTED) if e.pk not in existing and eligible(e, blocked)]
     top = p.slots.aggregate(m=Max("position"))["m"] or 0
-    for i, e in enumerate(new, start=1):
-        StartSlot.objects.create(program=p, entry=e, position=top + i)
+    StartSlot.objects.bulk_create([StartSlot(program=p, entry=e, position=top + i) for i, e in enumerate(new, start=1)])
     slots = list(p.slots.order_by("position"))
     movable = [s for s in slots if s.status == StartSlot.Status.WAITING]
     positions = [s.position for s in movable]
@@ -89,7 +99,8 @@ def add_missing(user, program_id) -> int:
     """Добавить в конец порядка принятых, которых в нём ещё нет (без перемешивания)."""
     p = _lock_program(user, program_id)
     existing = {s.entry_id for s in p.slots.all()}
-    new = [e for e in Entry.objects.filter(program=p) if e.pk not in existing and eligible(e)]
+    blocked = blocked_for(p.tournament_id)
+    new = [e for e in Entry.objects.filter(program=p, decision=Entry.Decision.ACCEPTED) if e.pk not in existing and eligible(e, blocked)]
     top = p.slots.aggregate(m=Max("position"))["m"] or 0
     for i, e in enumerate(new, start=1):
         StartSlot.objects.create(program=p, entry=e, position=top + i)
@@ -169,7 +180,7 @@ def set_exception(user, slot_id, reason):
     audit(user, "slot.exception", slot.program, slot=slot.pk, reason=slot.exception_reason)
 
 
-def conflicts(tournament) -> dict[int, list[str]]:
+def conflicts(tournament, program=None) -> dict[int, list[str]]:
     """Конфликты порядка: одна лошадь или один всадник стартуют, а между стартами меньше `min_gap_starts` других пар.
     {slot_id: [описания]}. Проверяется внутри программы; судья может оставить исключение с причиной."""
     gap = tournament.min_gap_starts
@@ -177,7 +188,8 @@ def conflicts(tournament) -> dict[int, list[str]]:
     if not gap:
         return out
     by_program = {}
-    for sl in (StartSlot.objects.filter(program__tournament=tournament)
+    qs = StartSlot.objects.filter(program=program) if program is not None else StartSlot.objects.filter(program__tournament=tournament)
+    for sl in (qs
                .exclude(status__in=[StartSlot.Status.WITHDRAWN, StartSlot.Status.NO_SHOW])
                .select_related("entry", "program").order_by("program_id", "position")):
         by_program.setdefault(sl.program_id, []).append(sl)
@@ -297,23 +309,35 @@ def publish_results(user, class_id) -> ResultPublication:
         if waiting:
             raise ValueError(f"Не утверждены результаты: {', '.join(e.athlete_snapshot.get('name', '') for e in waiting[:5])}.")
     rows = []
+    multi = len(p.heights or []) > 1
     for e in with_results:
         r = e.result
         rows.append({
-            "entry": e.pk, "place": r.place,
+            "entry": e.pk, "place": r.place, "height": e.height if multi else None,
             "athlete": {k: e.athlete_snapshot.get(k) for k in ATHLETE_PUBLIC},
             "horse": {k: e.horse_snapshot.get(k) for k in HORSE_PUBLIC},
             "class": e.tclass.label if e.tclass_id != c.pk else "",
             "cells": scoring.result_cells(p, r), "values": r.values if p.is_manual else {},
             "status": r.get_status_display() if r.status else "",
         })
-    rows.sort(key=lambda x: (x["place"] is None, x["place"] or 0, x["athlete"]["name"] or ""))
+    rows.sort(key=lambda x: (x["height"] or 0, x["place"] is None, x["place"] or 0, x["athlete"]["name"] or ""))
     version = (c.result_publications.aggregate(m=Max("version"))["m"] or 0) + 1
     pub = ResultPublication.objects.create(tclass=c, version=version, rows=rows, fields=scoring.result_columns(p), published_by=user)
     audit(user, "results.publish", p.tournament, tclass=c.pk, version=version)
-    users = [e.application.submitted_by for e in with_results] + [e.athlete.linked_user for e in with_results if e.athlete.linked_user_id]
-    notify(users, f"Опубликованы результаты: «{p.tournament.pub_title}», {p.name} · {c.label}",
-           reverse("tournaments:public", args=[p.tournament_id]) + "?tab=results", "results")
+    # RES-05: каждому — место и результат своих пар, одним уведомлением на зачёт
+    url = reverse("tournaments:public", args=[p.tournament_id]) + f"?tab=results#class-{c.pk}"
+    mine = {}
+    for e in with_results:
+        for u in {e.application.submitted_by, e.athlete.linked_user} - {None}:
+            mine.setdefault(u, []).append(e)
+    for u, items in mine.items():
+        parts = []
+        for e in items[:4]:
+            r = e.result
+            res = f"{r.place} место" if r.place else (r.get_status_display() or "без места")
+            parts.append(f"{e.athlete_snapshot.get('name')} / {e.horse_snapshot.get('name')} — {res}")
+        more = f" и ещё {len(items) - 4}" if len(items) > 4 else ""
+        notify([u], f"Результаты: {p.name} · {c.label}. " + "; ".join(parts) + more, url, "results")
     return pub
 
 
@@ -334,3 +358,49 @@ def finish_warnings(tournament) -> list[str]:
             continue
         out += m.finish_warnings(tournament)
     return out
+
+
+@transaction.atomic
+def merge_classes(user, class_id, into_id) -> TournamentClass:
+    """APP-12: объединить зачёт с другим зачётом того же маршрута (например, при малом числе пар) до публикации протокола.
+    Выступления остаются в своих зачётах, места считаются по объединённому; представители получают уведомление."""
+    c = TournamentClass.objects.select_for_update().select_related("program__tournament").get(pk=class_id)
+    into = TournamentClass.objects.select_for_update().get(pk=into_id)
+    p = c.program
+    require_judge(user, p.tournament)
+    if into.program_id != p.pk or into.pk == c.pk:
+        raise ValueError("Объединять можно только зачёты одного маршрута или езды.")
+    if c.merged_into_id or into.merged_into_id:
+        raise ValueError("Один из зачётов уже объединён — сначала отмените прежнее объединение.")
+    if c.merged.exists():
+        raise ValueError(f"С зачётом «{c.label}» уже объединены другие — объединяйте их с «{into.label}» по одному.")
+    if p.start_publications.exists():
+        raise ValueError("Стартовый протокол уже опубликован — объединять зачёты можно только до публикации.")
+    if (c.height or None) != (into.height or None) and c.height and into.height:
+        raise ValueError("Зачёты разных высот объединить нельзя.")
+    c.merged_into = into
+    c.save(update_fields=["merged_into"])
+    entries = list(Entry.objects.filter(tclass=c).exclude(decision=Entry.Decision.CANCELLED).select_related("application", "athlete"))
+    audit(user, "class.merge", p.tournament, tclass=c.pk, into=into.pk, entries=len(entries))
+    users = {e.application.submitted_by for e in entries} | {e.athlete.linked_user for e in entries if e.athlete.linked_user_id}
+    notify(list(users), f"«{p.tournament.pub_title}», {p.name}: зачёт «{c.label}» объединён с «{into.label}» — места будут общими.",
+           reverse("tournaments:public", args=[p.tournament_id]), "merge")
+    scoring.recompute(p)
+    return c
+
+
+@transaction.atomic
+def unmerge_class(user, class_id) -> TournamentClass:
+    c = TournamentClass.objects.select_for_update().select_related("program__tournament").get(pk=class_id)
+    p = c.program
+    require_judge(user, p.tournament)
+    if not c.merged_into_id:
+        raise ValueError("Зачёт не объединён.")
+    if p.start_publications.exists():
+        raise ValueError("Стартовый протокол уже опубликован — объединение не отменить.")
+    into = c.merged_into
+    c.merged_into = None
+    c.save(update_fields=["merged_into"])
+    audit(user, "class.unmerge", p.tournament, tclass=c.pk, into=into.pk)
+    scoring.recompute(p)
+    return c

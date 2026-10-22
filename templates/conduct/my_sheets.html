@@ -14,9 +14,9 @@
 {% for s in sheets %}
   <section class="card">
     <h2 class="h3">{{ s.pos.letter }} — {{ s.pos.judge_name }}{% if s.pos.judge_category %} ({{ s.pos.judge_category }}){% endif %}{% with j=result.values.judges|get:s.pos.letter %}{% if j %} <span class="table__sub">{{ j.points }} баллов · {{ j.pct }} %</span>{% endif %}{% endwith %}</h2>
-    <div class="table-wrap"><table class="table">
-      <thead><tr><th class="num">№</th><th>Буквы</th><th>Упражнение</th><th class="num">Коэф.</th><th class="num">Оценка</th><th>Комментарий</th></tr></thead>
-      <tbody>{% for r in s.rows %}<tr><td class="num">{{ r.n }}</td><td>{{ r.letters }}</td><td>{{ r.text }}</td><td class="num">{{ r.coef }}</td><td class="num"><strong>{{ r.value|num }}</strong></td><td>{{ r.comment }}</td></tr>{% endfor %}</tbody>
+    <div class="table-wrap"><table class="table table--sheet">
+      <thead><tr><th class="num">№</th><th class="wide-only">Буквы</th><th>Упражнение</th><th class="num wide-only">Коэф.</th><th class="num">Оценка</th><th class="wide-only">Комментарий</th></tr></thead>
+      <tbody>{% for r in s.rows %}<tr><td class="num">{{ r.n }}</td><td class="wide-only">{{ r.letters }}</td><td>{{ r.text }}<span class="narrow-only table__sub">{% if r.letters %}{{ r.letters }}{% endif %}{% if r.coef and r.coef != 1 %} · коэф. {{ r.coef }}{% endif %}{% if r.comment %}<br><em>{{ r.comment }}</em>{% endif %}</span></td><td class="num wide-only">{{ r.coef }}</td><td class="num"><strong>{{ r.value|num }}</strong></td><td class="wide-only">{{ r.comment }}</td></tr>{% endfor %}</tbody>
     </table></div>
     {% if s.remark %}<p class="muted">{{ s.remark }}</p>{% endif %}
   </section>

@@ -56,28 +56,28 @@
 <div class="bulk-bar">
   <form method="post" action="{% url 'conduct:action' t.pk p.pk 'draw' %}">{% csrf_token %}<button class="btn btn--dark btn--sm">Жеребьёвка</button></form>
   <form method="post" action="{% url 'conduct:action' t.pk p.pk 'add' %}">{% csrf_token %}<button class="btn btn--ghost btn--sm">Добавить готовых в конец</button></form>
-  <form method="post" action="{% url 'conduct:action' t.pk p.pk 'timing' %}" class="inline-row" style="margin: 0; align-items: center;">{% csrf_token %}<label class="label" for="sm">Интервал, мин</label><input id="sm" class="input-sm" name="slot_minutes" type="number" min="1" value="{{ p.slot_minutes }}"><button class="btn btn--ghost btn--sm">Пересчитать время</button></form>
+  {% if p.is_dressage %}<form method="post" action="{% url 'conduct:action' t.pk p.pk 'timing' %}" class="inline-row" style="margin: 0; align-items: center;">{% csrf_token %}<label class="check"><input type="checkbox" name="start_times" value="1"{% if p.start_times %} checked{% endif %}><span>Время старта каждой пары</span></label><label class="label" for="sm">Интервал, мин</label><input id="sm" class="input-sm" name="slot_minutes" type="number" min="1" value="{{ p.slot_minutes }}"><button class="btn btn--ghost btn--sm">Сохранить</button>{% if not p.start_time %}<span class="table__sub">Чтобы считать время, укажите начало езды в программе.</span>{% endif %}</form>{% endif %}
 </div>
 
 {% if slots %}
 <div class="table-wrap">
-  <table class="table">
-    <thead><tr><th class="num">№</th><th class="num">Время</th><th>Всадник / лошадь</th><th>Состояние</th><th>Результат</th><th>Порядок</th></tr></thead>
+  <table class="table table--stack table--order">
+    <thead><tr><th class="num">№</th>{% if p.timed_starts %}<th class="num">Время</th>{% endif %}<th>Всадник / лошадь</th><th>Состояние</th><th>Результат</th><th>Порядок</th></tr></thead>
     <tbody>
       {% for s in slots %}
         <tr{% if s.status == "withdrawn" or s.status == "no_show" %} class="is-muted"{% endif %} id="slot-{{ s.pk }}">
-          <td class="num"><strong>{{ s.position }}</strong></td>
-          <td class="num">{{ s.start_time|time:"H:i"|default:"—" }}</td>
-          <td><strong>{{ s.entry.athlete_snapshot.name }}</strong><span class="table__sub">{{ s.entry.athlete_snapshot.birth_year|default:"" }}{% if s.entry.athlete_snapshot.rank %} · {{ s.entry.athlete_snapshot.rank }}{% endif %}{% if s.entry.athlete_snapshot.club %} · {{ s.entry.athlete_snapshot.club }}{% endif %}</span><span class="table__sub">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}</span>
+          <td class="num" data-label="№"><strong>{{ s.position }}</strong></td>
+          {% if p.timed_starts %}<td class="num" data-label="Время">{{ s.start_time|time:"H:i"|default:"—" }}</td>{% endif %}
+          <td class="stack-full"><strong>{{ s.entry.athlete_snapshot.name }}</strong><span class="table__sub">{{ s.entry.athlete_snapshot.birth_year|default:"" }}{% if s.entry.athlete_snapshot.rank %} · {{ s.entry.athlete_snapshot.rank }}{% endif %}{% if s.entry.athlete_snapshot.club %} · {{ s.entry.athlete_snapshot.club }}{% endif %}</span><span class="table__sub">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}</span>
             {% for c in s.conflicts %}<span class="table__sub" style="color: {% if s.exception_reason %}var(--text-muted){% else %}var(--danger){% endif %}; font-weight: 600;">⚠ {{ c }}</span>{% endfor %}
             {% if s.conflicts %}<details><summary class="table__sub" style="cursor: pointer;">{% if s.exception_reason %}Исключение: {{ s.exception_reason }}{% else %}Оставить как исключение…{% endif %}</summary>
               <form method="post" action="{% url 'conduct:action' t.pk p.pk 'exception' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="slot" value="{{ s.pk }}"><input name="reason" value="{{ s.exception_reason }}" placeholder="Причина" aria-label="Причина исключения"><button class="btn btn--ghost btn--sm">Сохранить</button></form></details>{% endif %}
             {% if not s.still_eligible and s.status == "waiting" %}<span class="chip chip--danger">Выступление больше не принято — отметьте «Снят»</span>{% endif %}
           </td>
-          <td><span class="chip{% if s.status == 'finished' %} chip--success{% elif s.status == 'started' %} chip--warning{% elif s.status != 'waiting' %} chip--danger{% endif %}">{{ s.get_status_display }}</span>
+          <td class="stack-full"><span class="chip{% if s.status == 'finished' %} chip--success{% elif s.status == 'started' %} chip--warning{% elif s.status != 'waiting' %} chip--danger{% endif %}">{{ s.get_status_display }}</span>
             {% if s.status == "waiting" %}<form method="post" action="{% url 'conduct:action' t.pk p.pk 'status' %}" class="inline-row" style="margin-top: 6px;">{% csrf_token %}<input type="hidden" name="slot" value="{{ s.pk }}"><button class="btn btn--ghost btn--sm" name="status" value="started">На поле</button><button class="btn btn--ghost btn--sm" name="status" value="withdrawn">Снят</button><button class="btn btn--ghost btn--sm" name="status" value="no_show">Не явился</button></form>{% endif %}
           </td>
-          <td>
+          <td class="stack-full" data-label="Результат">
             {% if auto %}
               {% if s.result %}<span class="table__sub">{% for v in s.cells %}{% if v != "" and v is not None %}{{ v }}{% if not forloop.last %} · {% endif %}{% endif %}{% endfor %}</span>{% if s.result.place %}<strong>{{ s.result.place }} место</strong>{% endif %}{% if s.result.status %} <span class="chip chip--danger">{{ s.result.get_status_display }}</span>{% endif %}{% if s.result.values.pending %}<span class="table__sub">листы подписаны: {{ s.result.values.signed }} из {{ s.result.values.of }}</span>{% endif %}{% else %}<span class="table__sub">—</span>{% endif %}
             {% else %}
@@ -91,7 +91,7 @@
             </details>
             {% endif %}
           </td>
-          <td style="white-space: nowrap;">
+          <td class="stack-full" style="white-space: nowrap;">
             {% if not s.locked %}
               <form method="post" action="{% url 'conduct:action' t.pk p.pk 'move' %}" class="order-ctl">{% csrf_token %}<input type="hidden" name="slot" value="{{ s.pk }}"><input type="hidden" name="next" value="{{ request.path }}#slot-{{ s.pk }}">
                 <button class="icon-btn" name="position" value="{{ s.position|add:'-1' }}" aria-label="Выше"{% if forloop.first %} disabled{% endif %}>↑</button>
@@ -128,13 +128,36 @@
 </section>
 {% endif %}
 
+{% if all_classes|length > 1 %}
+<section class="card" style="margin-top: var(--space-4);" id="merge">
+  <h2 class="h3">Объединение зачётов</h2>
+  <p class="muted">Если в зачёте мало пар, его можно объединить с другим зачётом этого маршрута — места будут общими. Только до публикации стартового протокола; представители получат уведомление.</p>
+  <ul class="list">
+    {% for c in all_classes %}
+      <li class="list__row"><span style="flex: 1;"><strong>{{ c.label }}</strong><span class="table__sub">пар: {{ entries_by_class|get:c.pk|default:0 }}{% if c.min_pairs %} · минимум для открытия: {{ c.min_pairs }}{% endif %}{% if c.merged_into %} · объединён с «{{ c.merged_into.label }}»{% endif %}</span></span>
+        {% if not published %}
+          {% if c.merged_into %}
+            <form method="post" action="{% url 'conduct:action' t.pk p.pk 'unmerge' %}">{% csrf_token %}<input type="hidden" name="tclass" value="{{ c.pk }}"><input type="hidden" name="next" value="{{ request.path }}#merge"><button class="btn btn--ghost btn--sm">Отменить объединение</button></form>
+          {% elif not c.merged.exists %}
+            <form method="post" action="{% url 'conduct:action' t.pk p.pk 'merge' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="tclass" value="{{ c.pk }}"><input type="hidden" name="next" value="{{ request.path }}#merge">
+              <select name="into" aria-label="С каким зачётом объединить">{% for o in all_classes %}{% if o.pk != c.pk and not o.merged_into %}<option value="{{ o.pk }}">с «{{ o.label }}»</option>{% endif %}{% endfor %}</select>
+              <button class="btn btn--ghost btn--sm">Объединить</button></form>
+          {% endif %}
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 <section class="card" style="margin-top: var(--space-4);">
   <h2 class="h3">Публикация результатов по зачётам</h2>
   <p class="muted">Сохранённые результаты не видны публике до публикации. Исправление после публикации — новая версия.</p>
   <ul class="list">{% for r in classes %}
     <li class="list__row"><span style="flex: 1;"><strong>{{ r.c.label }}</strong><span class="table__sub">результатов введено: {{ r.count }}</span></span>
       {% if r.published %}<span class="chip chip--info">Опубликовано v{{ r.published.version }}</span>{% endif %}
-      <form method="post" action="{% url 'conduct:action' t.pk p.pk 'publish_results' %}">{% csrf_token %}<input type="hidden" name="tclass" value="{{ r.c.pk }}"><button class="btn btn--primary btn--sm"{% if not r.count %} disabled{% endif %}>{% if r.published %}Опубликовать исправление{% else %}Опубликовать результаты{% endif %}</button></form>
+      {% if can_publish %}<form method="post" action="{% url 'conduct:action' t.pk p.pk 'publish_results' %}">{% csrf_token %}<input type="hidden" name="tclass" value="{{ r.c.pk }}"><button class="btn btn--primary btn--sm"{% if not r.count %} disabled{% endif %}>{% if r.published %}Опубликовать исправление{% else %}Опубликовать результаты{% endif %}</button></form>
+      {% else %}<span class="table__sub">Публикует судья-подсчёт</span>{% endif %}
     </li>{% endfor %}</ul>
 </section>
 {% endblock %}

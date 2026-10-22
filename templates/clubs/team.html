@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Управляющие клубом — EquiStart{% endblock %}
+{% block content %}
+<div class="page-head"><div>
+  <a class="back" href="{% url 'clubs:mine' %}">← {{ club.name }}</a>
+  <h1 class="h1">Кто управляет клубом</h1>
+  <p class="muted">Управляющие правят профиль, фото и новости. Приглашать и убирать людей, передавать клуб может только владелец.</p>
+</div></div>
+
+<div class="list-cards">
+  <article class="row-card">
+    <div style="flex: 1 1 180px; min-width: 0;"><div class="h3">{{ club.manager.full_name }}</div><div class="table__sub">{{ club.manager.phone_display }}</div></div>
+    <span class="tag tag--lemon">Владелец</span>
+  </article>
+  {% for m in members %}
+    <article class="row-card">
+      <div style="flex: 1 1 180px; min-width: 0;">
+        <div class="h3">{% if m.user %}{{ m.user.full_name }}{% else %}{{ m.phone }}{% endif %}</div>
+        <div class="table__sub">{% if m.state == "pending" %}ждёт ответа — примет приглашение в кабинете{% else %}{{ m.user.phone_display }}{% endif %}</div>
+      </div>
+      <span class="tag{% if m.state == 'accepted' %} tag--mint{% endif %}">{% if m.state == "accepted" %}Управляющий{% else %}Приглашён{% endif %}</span>
+      <div class="row-card__actions">
+        {% if owner and m.state == "accepted" %}
+          <form method="post">{% csrf_token %}<input type="hidden" name="member" value="{{ m.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="transfer">Сделать владельцем</button></form>
+        {% endif %}
+        {% if owner %}
+          <form method="post">{% csrf_token %}<input type="hidden" name="member" value="{{ m.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="remove">{% if m.state == "pending" %}Отозвать{% else %}Убрать{% endif %}</button></form>
+        {% elif m.user_id == user.pk %}
+          <form method="post">{% csrf_token %}<input type="hidden" name="member" value="{{ m.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="remove">Перестать управлять</button></form>
+        {% endif %}
+      </div>
+    </article>
+  {% endfor %}
+</div>
+
+{% if owner %}
+<section class="card stack">
+  <h2 class="h2">Пригласить управляющего</h2>
+  <form method="post" class="form" novalidate>
+    {% csrf_token %}
+    <div class="field"><label class="field__label" for="ph">Телефон</label><input id="ph" type="tel" name="phone" placeholder="+7 999 123-45-67" autocomplete="off" required>
+      <p class="field__help">Если у человека ещё нет аккаунта — приглашение будет ждать, пока он зарегистрируется с этим номером.</p></div>
+    <div class="form__actions"><button class="btn btn--primary" name="action" value="invite">Пригласить</button></div>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

@@ -20,7 +20,7 @@
     <div class="live__name" style="font-size: 20px; line-height: 26px;">{{ entry.athlete_snapshot.name }}</div>
     <div class="table__sub">{{ entry.horse_snapshot.name }} · {{ entry.class_name }}</div>
     {% if sheet.returned_reason %}<div class="alert alert--warning" role="alert">Лист возвращён судьёй-подсчётом: {{ sheet.returned_reason }}</div>{% endif %}
-    {% if flags.eliminated %}<div class="alert alert--error">Пара исключена: {{ flags.reason }}</div>{% endif %}
+    {% if flags.eliminated %}<div class="alert alert--error">Пара исключена.</div>{% endif %}
   </section>
 
   {% if is_c %}
@@ -33,7 +33,6 @@
           <label class="field"><span class="field__label">Прочие ошибки (технические)</span><input name="technical" type="number" min="0" max="10" inputmode="numeric" value="{{ flags.technical|default:0 }}"></label>
         </div>
         <label class="check"><input type="checkbox" name="eliminated" value="1"{% if flags.eliminated %} checked{% endif %}><span>Исключение</span></label>
-        <label class="field"><span class="field__label">Причина исключения</span><select name="reason">{% for r in reasons %}<option{% if flags.reason == r %} selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
         <button class="btn btn--dark btn--sm">Сохранить отметки</button>
       </form>
     </section>
@@ -42,10 +41,7 @@
   {% if sheet.signed %}
     <section class="card">
       <div class="alert alert--success">Лист подписан {{ sheet.signed_at|date:"j E H:i" }}.{% if score %} {{ score.points|num }} баллов · {{ score.pct|floatformat:3 }} %{% endif %}</div>
-      <div class="table-wrap"><table class="table">
-        <thead><tr><th class="num">№</th><th>Упражнение</th><th class="num">Коэф.</th><th class="num">Оценка</th></tr></thead>
-        <tbody>{% for r in rows %}<tr><td class="num">{{ r.n }}</td><td>{{ r.text }}{% if r.comment %}<span class="table__sub">{{ r.comment }}</span>{% endif %}</td><td class="num">{{ r.coef }}</td><td class="num"><strong>{{ r.value|num }}</strong></td></tr>{% endfor %}</tbody>
-      </table></div>
+      <ol class="signed-marks">{% for r in rows %}<li><span class="signed-marks__n">{{ r.n }}</span><span class="signed-marks__text">{{ r.text }}{% if r.coef != 1 %} <span class="chip">×{{ r.coef }}</span>{% endif %}{% if r.comment %}<span class="table__sub">{{ r.comment }}</span>{% endif %}</span><strong class="signed-marks__v">{{ r.value|num }}</strong></li>{% endfor %}</ol>
       {% if sheet.remark %}<p class="muted">{{ sheet.remark }}</p>{% endif %}
       <p class="table__sub">Исправить оценку можно, только если судья-подсчёт вернёт лист.</p>
     </section>
@@ -57,16 +53,22 @@
         {% if parts|length > 1 %}<h2 class="h3">{{ part.grouper }}</h2>{% endif %}
         {% for r in part.list %}
           {% ifchanged r.collective %}{% if r.collective and not part.list.0.collective %}<div class="caption muted sheet__sep">ОБЩИЕ ОЦЕНКИ</div>{% endif %}{% endifchanged %}
-          <div class="mark-row">
-            <div class="mark-row__text"><span class="mark-row__n">{{ r.n }}</span>{% if r.letters %}<span class="mark-row__letters">{{ r.letters }}</span>{% endif %}<span>{{ r.text }}</span>{% if r.coef != 1 %}<span class="chip">×{{ r.coef }}</span>{% endif %}</div>
-            <input class="mark-row__val" name="m_{{ r.part }}_{{ r.i }}" data-part="{{ r.part }}" data-i="{{ r.i }}" inputmode="decimal" autocomplete="off" value="{{ r.value|default_if_none:'' }}" aria-label="Оценка: {{ r.text }}" placeholder="0–10">
-            <details class="mark-row__comment"{% if r.comment %} open{% endif %}><summary>комментарий</summary><textarea name="c_{{ r.part }}_{{ r.i }}" data-part="{{ r.part }}" data-i="{{ r.i }}" rows="2">{{ r.comment }}</textarea></details>
+          <div class="mark-row{% if r.value is None %} is-empty{% endif %}" data-step="{{ r.step }}">
+            <div class="mark-row__text"><span class="mark-row__n">{{ r.n }}</span>{% if r.letters %}<span class="mark-row__letters">{{ r.letters }}</span>{% endif %}<span>{{ r.text }}</span>{% if r.coef != 1 %}<span class="chip chip--warning">×{{ r.coef }}</span>{% endif %}</div>
+            <input class="mark-row__val" name="m_{{ r.part }}_{{ r.i }}" data-part="{{ r.part }}" data-i="{{ r.i }}" inputmode="decimal" autocomplete="off" value="{% if r.value is not None %}{{ r.value|num }}{% endif %}" aria-label="Оценка: {{ r.text }}" placeholder="—">
+            <div class="mark-keys" role="group" aria-label="Оценка кнопками">
+              {% for v in "0,1,2,3,4,5,6,7,8,9,10"|split:"," %}<button type="button" class="mark-key" data-v="{{ v }}">{{ v }}</button>{% endfor %}
+              {% if r.step == "0.1" %}<button type="button" class="mark-key mark-key--fine" data-add="-0.1">−0,1</button><button type="button" class="mark-key mark-key--fine" data-add="0.1">+0,1</button>
+              {% else %}<button type="button" class="mark-key mark-key--fine" data-add="-0.5">−0,5</button><button type="button" class="mark-key mark-key--fine" data-add="0.5">+0,5</button>{% endif %}
+            </div>
+            <details class="mark-row__comment"{% if r.comment %} open{% endif %}><summary>комментарий</summary><textarea name="c_{{ r.part }}_{{ r.i }}" data-part="{{ r.part }}" data-i="{{ r.i }}" rows="2">{{ r.comment }}</textarea>
+              <div class="quick">{% for q in quick %}<button type="button" class="quick__btn">{{ q }}</button>{% endfor %}</div></details>
           </div>
         {% endfor %}
       {% endfor %}
       <label class="field"><span class="field__label">Общее замечание <span class="field__optional">необязательно</span></span><textarea name="remark" rows="3">{{ sheet.remark }}</textarea></label>
       <p class="table__sub" id="sheet-status">Оценки сохраняются автоматически. Шаг оценки — {{ rows.0.step|default:"0.5" }}.{% if missing %} Не заполнено: {{ missing|length }}.{% endif %}</p>
-      <button class="btn btn--primary btn--block btn--lg">Подписать лист</button>
+      <button class="btn btn--primary btn--block btn--lg sheet__sign" id="sign-btn"{% if missing %} disabled{% endif %}>Подписать лист</button>
     </form>
   {% endif %}
   {% endif %}
@@ -75,24 +77,58 @@
 (function () {
   var root = document.getElementById("sheet"), form = document.getElementById("sheet-form");
   if (!form) return;
-  var url = root.dataset.markUrl, status = document.getElementById("sheet-status");
+  var url = root.dataset.markUrl, status = document.getElementById("sheet-status"), sign = document.getElementById("sign-btn");
   var csrf = form.querySelector("[name=csrfmiddlewaretoken]").value, entry = form.querySelector("[name=entry]").value;
+  var rows = Array.prototype.slice.call(form.querySelectorAll(".mark-row"));
+  function refresh() {
+    var empty = rows.filter(function (r) { return r.querySelector(".mark-row__val").value.trim() === ""; });
+    rows.forEach(function (r) { r.classList.toggle("is-empty", r.querySelector(".mark-row__val").value.trim() === ""); });
+    sign.disabled = empty.length > 0;
+    sign.textContent = empty.length ? "Подписать лист — не заполнено: " + empty.length : "Подписать лист";
+  }
   function save(el) {
+    var row = el.closest(".mark-row");
+    var mark = row.querySelector(".mark-row__val"), com = row.querySelector("textarea");
     var fd = new FormData();
     fd.append("csrfmiddlewaretoken", csrf); fd.append("entry", entry);
-    fd.append("part", el.dataset.part); fd.append("i", el.dataset.i);
-    var mark = form.querySelector('[name="m_' + el.dataset.part + "_" + el.dataset.i + '"]');
-    var com = form.querySelector('[name="c_' + el.dataset.part + "_" + el.dataset.i + '"]');
+    fd.append("part", mark.dataset.part); fd.append("i", mark.dataset.i);
     fd.append("value", mark.value.replace(",", ".")); if (com) fd.append("comment", com.value);
     fetch(url, { method: "POST", body: fd, headers: { "X-Requested-With": "fetch" }, credentials: "same-origin" })
       .then(function (r) { return r.json(); })
       .then(function (j) { mark.classList.toggle("is-error", !j.ok); status.textContent = j.ok ? "Сохранено." : j.error; })
-      .catch(function () { status.textContent = "Нет связи — оценки отправятся при подписи листа."; });
+      .catch(function () { status.textContent = "Нет связи — оценки сохранены на экране и отправятся при подписи листа."; });
   }
-  form.querySelectorAll(".mark-row__val, .mark-row__comment textarea").forEach(function (el) { el.addEventListener("change", function () { save(el); }); });
+  function setCurrent(row) {
+    rows.forEach(function (r) { r.classList.toggle("is-current", r === row); });
+    if (row) row.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+  function fmt(v) { return (Math.round(v * 10) / 10).toString().replace(".", ","); }
+  form.addEventListener("click", function (e) {
+    var k = e.target.closest(".mark-key"), q = e.target.closest(".quick__btn");
+    if (q) { var ta = q.closest("details").querySelector("textarea"); ta.value = (ta.value ? ta.value + ", " : "") + q.textContent; save(ta); return; }
+    if (!k) return;
+    var row = k.closest(".mark-row"), input = row.querySelector(".mark-row__val");
+    var cur = parseFloat((input.value || "0").replace(",", ".")) || 0, v;
+    if (k.dataset.v !== undefined) v = parseFloat(k.dataset.v);
+    else { v = cur + parseFloat(k.dataset.add); if (v > 10 || v < 0) return; }
+    input.value = fmt(v); save(input); refresh();
+    if (v <= 5) { var d = row.querySelector("details"); if (d && !d.open) { d.open = true; status.textContent = "Оценка 5 и ниже — добавьте комментарий (необязательно)."; } }
+    if (k.dataset.v !== undefined && v < 10) {
+      var next = rows[rows.indexOf(row) + 1];
+      if (next) setCurrent(next);
+    } else if (k.dataset.v === "10") { var n2 = rows[rows.indexOf(row) + 1]; if (n2) setCurrent(n2); }
+  });
+  form.querySelectorAll(".mark-row__val, .mark-row__comment textarea").forEach(function (el) { el.addEventListener("change", function () { save(el); refresh(); }); });
   form.querySelectorAll(".mark-row__val").forEach(function (el, idx, all) {
+    el.addEventListener("focus", function () { rows.forEach(function (r) { r.classList.toggle("is-current", r === el.closest(".mark-row")); }); });
     el.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); if (all[idx + 1]) all[idx + 1].focus(); } });
   });
+  form.addEventListener("submit", function (e) {
+    refresh();
+    if (sign.disabled) { e.preventDefault(); var first = form.querySelector(".mark-row.is-empty"); if (first) setCurrent(first); }
+  });
+  var firstEmpty = form.querySelector(".mark-row.is-empty"); if (firstEmpty) firstEmpty.classList.add("is-current");
+  refresh();
 })();
 </script>
 {% endblock %}

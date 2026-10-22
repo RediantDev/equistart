@@ -46,6 +46,12 @@ def logout_view(request):
     return redirect("core:calendar")
 
 
+def _club_of(user):
+    from apps.clubs.services import club_of
+
+    return club_of(user)
+
+
 @login_required
 def cabinet(request):
     """UI-07: «Главная» — разделы по ролям пользователя, без переключателя режимов."""
@@ -75,6 +81,11 @@ def cabinet(request):
     n = TeamMember.objects.filter(phone=user.phone, state=TeamMember.State.PENDING).count()
     if n:
         actions.append(("Приглашения в команду турнира", n, "tournaments:invitations"))
+    from apps.clubs.models import ClubMember
+
+    n = ClubMember.objects.filter(phone=user.phone, state=ClubMember.State.PENDING).count()
+    if n:
+        actions.append(("Приглашение управлять клубом", n, "tournaments:invitations"))
     n = Offer.objects.filter(phone=user.phone, state=Offer.State.PENDING).count()
     if n:
         actions.append(("Предложения: связь с профилем или передача управления", n, "profiles:offers"))
@@ -93,6 +104,16 @@ def cabinet(request):
                             .values_list("tournament_id", "tournament__pub_title").distinct()):
             cnt = Booking.objects.filter(tournament_id=t_id, state=Booking.State.PENDING).count()
             actions.append((f"Брони денников ждут подтверждения: {title}", cnt, ("stables:manage", t_id)))
+    from apps.entries.models import ApplicationDraft
+
+    own = Athlete.objects.filter(linked_user=user, archived=False).first()
+    if own and not own.birth_date:
+        actions.append(("Профиль спортсмена: укажите дату рождения — без неё недоступны зачёты с возрастом", None, ("profiles:athlete_edit", own.pk)))
+
+    for d in ApplicationDraft.objects.filter(user=user, tournament__publication=Tournament.Publication.PUBLISHED).select_related("tournament"):
+        n = len(d.data.get("lines", []))
+        actions.append((f"Незавершённая заявка: {d.tournament.pub_title} — продолжить", n,
+                        ("entries:apply", d.tournament_id) if not d.late else None))
     if user.is_moderator:
         n = Tournament.objects.filter(status=Tournament.Status.REVIEW).count()
         if n:
@@ -117,6 +138,7 @@ def cabinet(request):
             "actions": rows,
             "judging_today": judging_today,
             "has_team_roles": bool(judged_ids or stable_ids),
+            "my_club": _club_of(user),
             "own_athlete": Athlete.objects.filter(linked_user=user).first(),
             "today": today,
         },
@@ -172,6 +194,8 @@ def change_password(request):
     from apps.core.models import audit
 
     form = PasswordChangeForm(request.user, request.POST or None)
+    form.fields["new_password1"].help_text = "Не короче 8 символов, не только цифры и не похож на телефон или имя."
+    form.fields["new_password2"].help_text = ""
     if request.method == "POST" and form.is_valid():
         user = form.save()
         update_session_auth_hash(request, user)

@@ -57,6 +57,13 @@ def test_edit(request, pk=None):
             initial["name"] = test.name
     form = DressageTestForm(request.POST or None, instance=test, initial=initial)
     back = request.GET.get("t") or request.POST.get("t")
+    if request.method == "POST" and form.is_valid() and request.POST.get("confirm") != "1":
+        # Предпросмотр листа перед сохранением: видно, как разобран текст (номер, буквы, коэффициент)
+        parts = [{"p": p, "items": D.items_of(p), "max": D.part_max(p)} for p in form.instance.parts]
+        lines = [l for l in (request.POST.get("technique_movements") or "").splitlines() if l.strip()]
+        no_pipes = len(lines) >= 3 and not any("|" in l for l in lines)
+        return render(request, "sport/test_edit.html", {"form": form, "test": test if test and test.pk else None, "back": back,
+                                                        "preview": parts, "no_pipes": no_pipes})
     if request.method == "POST" and form.is_valid():
         obj = form.save(commit=False)
         if not obj.pk:

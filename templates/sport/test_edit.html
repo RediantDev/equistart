@@ -27,7 +27,19 @@
     {% include "partials/field.html" with field=form.technique_collective %}
     <div id="second-part">{% include "partials/field.html" with field=form.second_collective %}</div>
   </div>
-  <div class="form-actions"><button class="btn btn--primary">Сохранить езду</button></div>
+  {% if preview %}
+    <div class="form__group" id="preview" style="border-bottom: 0;">
+      <h2 class="h3">Проверьте лист перед сохранением</h2>
+      {% if no_pipes %}<div class="alert alert--warning" role="alert">Похоже, текст вставлен без разделителей «|». Тогда номер, буквы и коэффициент попадают в описание, а у всех упражнений коэффициент 1. Нужный формат строки: <strong>1 | A–X | Въезд, остановка, приветствие | 1</strong>.</div>{% endif %}
+      {% for part in preview %}
+        <p class="label">{{ part.p.title }} · максимум {{ part.max }} баллов</p>
+        <ol class="signed-marks">{% for it in part.items %}<li><span class="signed-marks__n">{{ it.n|default:"·" }}</span><span class="signed-marks__text">{% if it.letters %}<strong>{{ it.letters }}</strong> {% endif %}{{ it.text }}</span><strong class="signed-marks__v">×{{ it.coef }}</strong></li>{% endfor %}</ol>
+      {% endfor %}
+    </div>
+    <div class="form-actions"><button class="btn btn--ghost" name="confirm" value="0">Исправить и проверить снова</button><button class="btn btn--primary" name="confirm" value="1">Всё верно — сохранить езду</button></div>
+  {% else %}
+    <div class="form-actions"><button class="btn btn--primary">Проверить лист</button></div>
+  {% endif %}
 </form>
 <script>
 (function () {

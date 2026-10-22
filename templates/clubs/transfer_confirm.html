@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Передать клуб — EquiStart{% endblock %}
+{% block content %}
+<section class="auth"><div class="card auth__card">
+  <a class="back" href="{% url 'clubs:team' %}">← Управляющие</a>
+  <h1 class="h1">Передать клуб?</h1>
+  <p>Владельцем «{{ club.name }}» станет <strong>{{ m.user.full_name }}</strong>. Вы останетесь управляющим, но приглашать и убирать людей больше не сможете. Вернуть владение может только новый владелец.</p>
+  <form method="post" class="form__actions">{% csrf_token %}
+    <input type="hidden" name="member" value="{{ m.pk }}"><input type="hidden" name="confirm" value="1">
+    <a class="btn btn--ghost" href="{% url 'clubs:team' %}">Отмена</a>
+    <button class="btn btn--primary" name="action" value="transfer">Передать</button>
+  </form>
+</div></section>
+{% endblock %}

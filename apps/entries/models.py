@@ -126,3 +126,19 @@ class ChangeProposal(models.Model):
         if self.tclass_id:
             parts.append(f"зачёт → {self.tclass.program.name} · {self.tclass.name}")
         return "; ".join(parts)
+
+
+class ApplicationDraft(models.Model):
+    """Черновик заявки: собранные пары и выступления хранятся в базе, а не в сессии —
+    не пропадают при выходе и доступны с другого устройства (отчёт тестирования 22.10.2026)."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="application_drafts")
+    tournament = models.ForeignKey("tournaments.Tournament", on_delete=models.CASCADE, related_name="drafts")
+    late = models.BooleanField(default=False)
+    data = models.JSONField(default=dict)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "черновик заявки"
+        verbose_name_plural = "черновики заявок"
+        constraints = [models.UniqueConstraint(fields=["user", "tournament", "late"], name="one_draft_per_tournament")]

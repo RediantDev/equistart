@@ -148,7 +148,10 @@ def step(request, pk, step):
     if step == 1:
         return _step1(request, t)
     if step == 2:
-        return render(request, "tournaments/step2.html", _wizard_ctx(t, 2, **_step2_ctx(t)))
+        custom = request.GET.get("custom")
+        program = t.programs.filter(pk=custom).first() if custom and custom.isdigit() else None
+        return render(request, "tournaments/step2.html", _wizard_ctx(t, 2, **_step2_ctx(
+            t, class_form=ClassForm(program) if program else None, class_program=program, user=request.user)))
     if step == 3:
         return _step3(request, t)
     return _step4(request, t)
@@ -196,7 +199,9 @@ def _step2_ctx(t, form=None, editing=None, class_form=None, class_program=None, 
         if class_program is not None and p.pk == class_program.pk:
             p.form, p.editing_class, p.form_open = class_form, editing_class, True
         else:
-            p.form, p.editing_class, p.form_open = ClassForm(p), None, False
+            # форма своего зачёта строится только для открытой карточки — страница с 20 маршрутами остаётся лёгкой
+            p.form, p.editing_class, p.form_open = None, None, False
+        p.expanded = p.form_open or len(programs) <= 6 or not p.classes.all()
     by_day = [{"day": d, "programs": [p for p in programs if p.day == d]} for d in days]
     orphans = [p for p in programs if p.day not in days]
     return {
@@ -349,7 +354,8 @@ def class_from_template(request, pk, program_id):
     except Conflict:
         messages.error(request, CONFLICT_MSG)
         return redirect("tournaments:step", pk=pk, step=2)
-    messages.success(request, f"Зачёт «{obj.label}» добавлен: {obj.conditions or 'без ограничений'}. Условия можно поправить.")
+    hint = " В выездке дети — 10–14 лет: проверьте годы рождения." if tpl.name == "Дети" and program.is_dressage else ""
+    messages.success(request, f"Зачёт «{obj.label}» добавлен: {obj.conditions or 'без ограничений'}. Условия можно поправить.{hint}")
     return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + f"#program-{program.pk}")
 
 
@@ -520,8 +526,11 @@ def team_revoke(request, pk, member_id):
 
 @login_required
 def invitations(request):
+    from apps.clubs.models import ClubMember
+
     pending = TeamMember.objects.filter(phone=request.user.phone, state=TeamMember.State.PENDING).select_related("tournament", "invited_by")
-    return render(request, "tournaments/invitations.html", {"pending": pending})
+    clubs = ClubMember.objects.filter(phone=request.user.phone, state=ClubMember.State.PENDING).select_related("club", "invited_by")
+    return render(request, "tournaments/invitations.html", {"pending": pending, "club_invites": clubs})
 
 
 @login_required
@@ -566,6 +575,15 @@ def calendar(request):
         qs = qs.filter(pub_disciplines__contains=[discipline])
     if region:
         qs = qs.filter(pub_region=region)
+    club = None
+    if request.GET.get("club", "").isdigit():
+        from apps.clubs.models import Club
+
+        club = Club.objects.filter(pk=int(request.GET["club"]), confirmed_at__isnull=False).first()
+        if club and club.merged_into_id:
+            club = club.merged_into
+        if club:
+            qs = qs.filter(venue_id=club.venue_id)
     month_label = ""
     if month:
         try:
@@ -589,6 +607,8 @@ def calendar(request):
         active.append(dict(DISCIPLINE_CHOICES).get(discipline, ""))
     if region:
         active.append(REGION_NAMES.get(region, ""))
+    if club:
+        active.append(club.public_name)
     if only_open:
         active.append("Приём открыт")
     if past:
@@ -601,7 +621,7 @@ def calendar(request):
             "cards": cards, "q": q, "discipline": discipline, "region": region, "month": month,
             "only_open": only_open, "past": past, "active": active, "months": months,
             "disciplines": DISCIPLINE_CHOICES, "regions": REGION_CHOICES,
-            "filters_open": bool(discipline or region or month or only_open or past),
+            "filters_open": bool(discipline or region or month or only_open or past), "club": club,
         },
     )
 
@@ -647,6 +667,12 @@ def _card(t):
     }
 
 
+def _club_of(t):
+    from apps.clubs.models import Club
+
+    return Club.objects.filter(venue_id=t.venue_id, confirmed_at__isnull=False, merged_into__isnull=True).first() if t.venue_id else None
+
+
 def public_detail(request, pk):
     t = get_object_or_404(Tournament, pk=pk, publication__in=PUBLIC_STATES)
     s = t.snapshot
@@ -667,6 +693,7 @@ def public_detail(request, pk):
         "tournaments/public_detail.html",
         {
             "t": t, "s": s, "days": day_list, "deadline": deadline, "days_left": days_left,
+            "club": _club_of(t),
             "open": t.public_entries_open(), "card": _card(t),
             "can_manage": request.user.is_authenticated and services.can_manage(request.user, t),
             "can_judge": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "judge"}),
@@ -677,37 +704,115 @@ def public_detail(request, pk):
     )
 
 
+def _num(v):
+    if v is None or v == "":
+        return ""
+    return str(v).replace(".", ",")
+
+
+def _mobile_summary(fields, cells):
+    """Короткая строка результата для карточки на телефоне: главное видно без прокрутки вбок."""
+    fields, cells = list(fields or []), list(cells or [])
+    if "%" in fields and any(f.endswith(": %") for f in fields):  # выездка
+        pct = _num(cells[fields.index("%")]) if fields.index("%") < len(cells) else ""
+        judges = [f"{f.split(':')[0]} {_num(cells[i])}" for i, f in enumerate(fields) if f.endswith(": %") and i < len(cells) and cells[i] not in (None, "")]
+        errs = cells[fields.index("Ошибки")] if "Ошибки" in fields and fields.index("Ошибки") < len(cells) else ""
+        detail = " · ".join(judges) + (f" · ошибки в схеме: {errs}" if errs else "")
+        return (f"{pct} %" if pct else ""), detail
+    parts = []
+    i = 0
+    while i < len(fields):
+        f = fields[i]
+        if f.startswith("Ш/о") and i + 1 < len(fields) and fields[i + 1].startswith("Время"):
+            pen, tm = (cells[i] if i < len(cells) else ""), (cells[i + 1] if i + 1 < len(cells) else "")
+            name = f[3:].strip() or "маршрут"
+            is_num = str(pen).replace(",", "").replace(".", "").isdigit()
+            if pen not in (None, "") and not is_num and tm in (None, ""):
+                parts.append(str(pen))  # «Искл.», «Сошёл» — без подписи гита
+            elif pen not in (None, "") or tm not in (None, ""):
+                value = f"{_num(pen)} ш/о" + (f" · {_num(tm)} с" if tm not in (None, "") else "")
+                parts.append(value if name == "маршрут" else f"{name.capitalize()}: {value}")
+            i += 2
+            continue
+        if i < len(cells) and cells[i] not in (None, ""):
+            parts.append(f"{f}: {_num(cells[i])}")
+        i += 1
+    # главное — последний решающий результат (перепрыжка, 2-я фаза, итог), остальное — строкой ниже
+    return (parts[-1] if parts else ""), " · ".join(parts[:-1])
+
+
 def _public_tabs(request, t):
-    """Вкладки «Стартовые» и «Результаты»: только опубликованные версии (ТЗ, разделы 10–11)."""
+    """Вкладки «Стартовые» и «Результаты»: только опубликованные версии (ТЗ, разделы 10–11).
+    Результаты — по маршрутам, внутри маршрута каждый зачёт отдельно, внутри зачёта — по высотам (JMP-09)."""
     from apps.conduct.models import ResultPublication, StartListPublication
     from apps.entries.models import Entry
 
     tab = request.GET.get("tab", "")
     if tab not in ("starts", "results"):
         tab = ""
-    starts, results = [], []
+    out = {"tab": tab, "starts": [], "results": [], "days_nav": [], "day": ""}
+    if not tab:
+        return out
+    programs = list(t.programs.prefetch_related("classes").order_by("day", "start_time", "position", "id"))
     if tab == "starts":
         pubs = {}
-        for pub in StartListPublication.objects.filter(program__tournament=t).select_related("program").order_by("program_id", "-version"):
+        for pub in StartListPublication.objects.filter(program__tournament=t).order_by("program_id", "-version"):
             pubs.setdefault(pub.program_id, pub)
-        ids = [r["entry"] for pub in pubs.values() for r in pub.rows]
-        inactive = {e.pk for e in Entry.objects.filter(pk__in=ids) if not e.is_active}
-        for p in t.programs.all():
-            pub = pubs.get(p.pk)
-            if pub:
-                rows = [dict(r, mark={"withdrawn": "Снят", "no_show": "Не явился"}.get(r.get("status")) or ("Снят" if r["entry"] in inactive else "")) for r in pub.rows]
-                starts.append({"p": p, "pub": pub, "rows": rows})
-    elif tab == "results":
+        have = [p for p in programs if p.pk in pubs]
+    else:
         pubs = {}
-        for pub in ResultPublication.objects.filter(tclass__program__tournament=t).select_related("tclass__program").order_by("tclass_id", "-version"):
+        for pub in ResultPublication.objects.filter(tclass__program__tournament=t).order_by("tclass_id", "-version"):
             pubs.setdefault(pub.tclass_id, pub)
-        for p in t.programs.prefetch_related("classes"):
+        have = [p for p in programs if any(c.pk in pubs for c in p.classes.all())]
+    days = sorted({p.day for p in have})
+    out["days_nav"] = days
+    day = request.GET.get("day", "")
+    if days and len(days) > 1:
+        if day == "all":
+            pass
+        else:
+            try:
+                d = datetime.date.fromisoformat(day)
+            except ValueError:
+                d = None
+            if d not in days:
+                local_today = timezone.now().astimezone(zoneinfo.ZoneInfo(t.pub_timezone or "Europe/Moscow")).date()
+                d = local_today if local_today in days else (days[-1] if tab == "results" else days[0])
+            day = d.isoformat()
+            have = [p for p in have if p.day == d]
+    out["day"] = day
+    if tab == "starts":
+        ids = [r["entry"] for p in have for r in pubs[p.pk].rows]
+        inactive = {e.pk for e in Entry.objects.filter(pk__in=ids) if not e.is_active}
+        for p in have:
+            pub = pubs[p.pk]
+            rows = [dict(r, mark={"withdrawn": "Снят", "no_show": "Не явился"}.get(r.get("status")) or ("Снят" if r["entry"] in inactive else ""))
+                    for r in pub.rows]
+            out["starts"].append({"p": p, "pub": pub, "rows": rows, "timed": any(r.get("time") for r in rows)})
+    else:
+        need_h = {r["entry"] for p in have if len(p.heights or []) > 1 for c in p.classes.all() if c.pk in pubs
+                  for r in pubs[c.pk].rows if "height" not in r}
+        hmap = dict(Entry.objects.filter(pk__in=need_h).values_list("pk", "height")) if need_h else {}
+        for p in have:
+            blocks = []
             for c in p.classes.all():
                 pub = pubs.get(c.pk)
-                if pub:
-                    rows = [r if "cells" in r else dict(r, cells=[r["values"].get(k) for k in p.result_fields]) for r in pub.rows]
-                    results.append({"p": p, "c": c, "pub": pub, "rows": rows})
-    return {"tab": tab, "starts": starts, "results": results}
+                if not pub:
+                    continue
+                rows = [r if "cells" in r else dict(r, cells=[r["values"].get(k) for k in p.result_fields]) for r in pub.rows]
+                rows = [dict(r, summary=_mobile_summary(pub.fields, r["cells"])) for r in rows]
+                groups = []
+                if len(p.heights or []) > 1:
+                    by_h = {}
+                    for r in rows:
+                        by_h.setdefault(r.get("height") or hmap.get(r["entry"]), []).append(r)
+                    for h in sorted(by_h, key=lambda x: x or 0):
+                        groups.append({"height": h, "rows": sorted(by_h[h], key=lambda r: (r["place"] is None, r["place"] or 0))})
+                else:
+                    groups.append({"height": None, "rows": rows})
+                blocks.append({"c": c, "pub": pub, "groups": groups})
+            out["results"].append({"p": p, "classes": blocks})
+    return out
 
 
 def public_regulation(request, pk):

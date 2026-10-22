@@ -80,7 +80,7 @@ class Tournament(models.Model):
     level = models.CharField("статус соревнований", max_length=12, choices=Level.choices, default=Level.CLUB)
     classification = models.BooleanField("классификационные (присвоение разрядов)", default=False)
     entry_deadline = models.DateField("последний день подачи заявок", null=True, blank=True)
-    cancel_terms = models.TextField("условия отмены и возврата", blank=True)
+    cancel_terms = models.TextField("условия отмены", blank=True)
     regulation = models.FileField("положение (PDF)", upload_to="regulations/%Y/%m/", blank=True)
 
     status = models.CharField("рабочая копия", max_length=16, choices=Status.choices, default=Status.DRAFT)
@@ -195,9 +195,16 @@ class ProgramItem(models.Model):
     result_fields = models.JSONField("поля результата (прочий маршрут)", default=list, blank=True)
     position = models.PositiveIntegerField(default=0)
     slot_minutes = models.PositiveSmallIntegerField("интервал между стартами, мин", default=2)
+    start_times = models.BooleanField("рассчитывать время стартов", default=False,
+                                      help_text="Только для выездки. В конкуре время стартов не рассчитывается (RUN-04).")
 
     def __str__(self):
         return self.name
+
+    @property
+    def timed_starts(self):
+        """Время старта каждой пары считается только в выездке и только если судья включил расчёт."""
+        return self.is_dressage and self.start_times and self.start_time is not None
 
     @property
     def is_jumping(self):

@@ -65,6 +65,7 @@ class Notification(models.Model):
     text = models.CharField(max_length=300)
     url = models.CharField(max_length=300, blank=True)
     kind = models.CharField(max_length=40, blank=True)
+    count = models.PositiveIntegerField(default=1, help_text="Сколько однотипных событий собрано в одно уведомление")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     read_at = models.DateTimeField(null=True, blank=True)
 
@@ -83,3 +84,26 @@ def notify(users, text: str, url: str = "", kind: str = ""):
         seen.add(u.pk)
         objs.append(Notification(user=u, text=text[:300], url=url, kind=kind))
     Notification.objects.bulk_create(objs)
+
+
+def notify_merged(users, kind: str, url: str, text_for):
+    """Сводное уведомление: пока прежнее такое же (тот же вид и ссылка) не прочитано, увеличиваем счётчик
+    и переписываем текст, а не создаём новое. text_for(n) возвращает текст для n событий."""
+    from django.db.models import F
+    from django.utils import timezone
+
+    seen = set()
+    for u in users:
+        if u is None or u.pk in seen:
+            continue
+        seen.add(u.pk)
+        n = Notification.objects.select_for_update().filter(user=u, kind=kind, url=url, read_at__isnull=True).first()
+        if n:
+            n.count = F("count") + 1
+            n.save(update_fields=["count"])
+            n.refresh_from_db(fields=["count"])
+            n.text = text_for(n.count)[:300]
+            n.created_at = timezone.now()
+            n.save(update_fields=["text", "created_at"])
+        else:
+            Notification.objects.create(user=u, kind=kind, url=url, text=text_for(1)[:300])

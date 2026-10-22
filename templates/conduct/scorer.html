@@ -6,7 +6,7 @@
   <div>
     <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← {{ p.name }}</a>
     <h1 class="h1">Судья-подсчёт</h1>
-    <p class="muted">{{ test.name }}. Итог пары — среднее процентов судей, когда все листы подписаны. Расхождение 5 % и больше между судьями — повод проверить лист; вернуть лист можно с причиной, судья увидит её.</p>
+    <p class="muted">{{ test.name }}. Итог пары — среднее процентов судей, когда все листы подписаны. Если процент одного судьи отличается от среднего остальных на 5 пунктов и больше, его ячейка подсвечена — повод проверить лист; вернуть лист можно с причиной, судья увидит её.</p>
   </div>
   <form method="post" action="{% url 'conduct:scorer_action' t.pk p.pk 'approve_all' %}">{% csrf_token %}<button class="btn btn--dark">Утвердить все готовые</button></form>
 </div>
@@ -14,18 +14,18 @@
 {% if not poss %}<div class="alert alert--warning">Бригада не назначена. <a href="{% url 'conduct:panel' t.pk p.pk %}">Назначить</a></div>{% endif %}
 
 <div class="table-wrap">
-  <table class="table scorer">
+  <table class="table scorer table--grid-cards">
     <thead><tr><th>Пара</th>{% for x in poss %}<th class="num">{{ x.letter }}</th>{% endfor %}<th class="num">Ош.</th><th class="num">Итог, %</th><th class="num">Место</th><th>Действия</th></tr></thead>
     <tbody>
       {% for r in rows %}
-        <tr id="e{{ r.e.pk }}"{% if r.warn %} class="is-warning"{% endif %}>
-          <td><strong>{{ r.e.athlete_snapshot.name }}</strong><span class="table__sub">{{ r.e.horse_snapshot.name }} · {{ r.e.class_name }}</span>{% if r.warn %}<span class="chip chip--warning">расхождение {{ r.spread|floatformat:2 }} %</span>{% endif %}</td>
+        <tr id="e{{ r.e.pk }}">
+          <td><strong>{{ r.e.athlete_snapshot.name }}</strong><span class="table__sub">{{ r.e.horse_snapshot.name }} · {{ r.e.class_name }}</span>{% if r.warn %}<span class="chip chip--warning">{% for l, d in r.off %}{{ l }}: {{ d|floatformat:2 }} п.{% if not forloop.last %}, {% endif %}{% endfor %} от среднего</span>{% endif %}</td>
           {% for c in r.cells %}
-            <td class="num">{% if c.signed %}{% if c.pct is not None %}{{ c.pct|floatformat:3 }}{% else %}✓{% endif %}{% elif c.returned %}<span class="chip chip--warning" title="{{ c.returned }}">возвращён</span>{% elif c.started %}<span class="chip">заполняет</span>{% else %}<span class="table__sub">—</span>{% endif %}</td>
+            <td class="num{% if c.off %} cell-off{% endif %}" data-label="{{ c.letter }}">{% if c.signed %}{% if c.pct is not None %}{{ c.pct|floatformat:3 }}{% else %}✓{% endif %}{% elif c.returned %}<span class="chip chip--warning" title="{{ c.returned }}">возвращён</span>{% elif c.started %}<span class="chip">заполняет</span>{% else %}<span class="table__sub">—</span>{% endif %}</td>
           {% endfor %}
-          <td class="num">{% if r.flags.eliminated %}<span class="chip chip--danger" title="{{ r.flags.reason }}">искл.</span>{% else %}{{ r.flags.errors|default:"" }}{% endif %}</td>
-          <td class="num"><strong>{% if r.res and r.res.pct is not None %}{{ r.res.pct|floatformat:3 }}{% else %}—{% endif %}</strong></td>
-          <td class="num">{{ r.place|default:"—" }}</td>
+          <td class="num" data-label="Ош.">{% if r.flags.eliminated %}<span class="chip chip--danger">искл.</span>{% else %}{{ r.flags.errors|default:"" }}{% endif %}</td>
+          <td class="num cell-total" data-label="Итог"><strong>{% if r.res and r.res.pct is not None %}{{ r.res.pct|floatformat:3 }}{% else %}—{% endif %}</strong></td>
+          <td class="num" data-label="Место">{{ r.place|default:"—" }}</td>
           <td>
             <div class="inline-row">
               {% if r.res and not r.approved and not r.flags.eliminated %}<form method="post" action="{% url 'conduct:scorer_action' t.pk p.pk 'approve' %}">{% csrf_token %}<input type="hidden" name="entry" value="{{ r.e.pk }}"><button class="btn btn--primary btn--sm">Утвердить</button></form>{% elif r.approved %}<span class="chip chip--success">утверждено</span>{% endif %}

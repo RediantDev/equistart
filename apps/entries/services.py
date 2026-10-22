@@ -183,8 +183,11 @@ def submit(user, tournament_id, lines: list[Line], key: str, contact_name="", co
             decided_by=user if late else None, decided_at=timezone.now() if late else None,
         )
     audit(user, "application.submit", app, tournament=t.pk, entries=len(lines), late=late)
+    from apps.core.models import notify_merged
+
     judges = _judges(t)
-    notify(judges, f"Новая заявка №{app.pk} на «{t.pub_title}»: выступлений {len(lines)}", reverse("entries:manage", args=[t.pk]), "application")
+    notify_merged(judges, "application", reverse("entries:manage", args=[t.pk]) + "?decision=pending",
+                  lambda n: f"«{t.pub_title}»: новых заявок — {n}. Последняя: №{app.pk}, выступлений {len(lines)}.")
     return app
 
 
@@ -228,7 +231,7 @@ def decide(user, tournament_id, items: list[tuple[int, str]], action: str, reaso
         raise ValueError("Неизвестное действие")
     if action in ("reject", "cancel") and not reason.strip():
         raise ValueError("Укажите причину — её увидит подавший заявку.")
-    results = []
+    results, done = [], []
     for entry_id, rev in items:
         try:
             with transaction.atomic():
@@ -239,14 +242,33 @@ def decide(user, tournament_id, items: list[tuple[int, str]], action: str, reaso
                 e.revision += 1
                 e.save()
                 audit(user, f"entry.{action}", e, reason=reason or "", decision=e.decision)
-                notify(_recipients(e), f"«{t.pub_title}», {e.program_name}: {e.athlete_snapshot.get('name')} / {e.horse_snapshot.get('name')} — {text.lower()}",
-                       reverse("entries:application", args=[e.application_id]), "decision")
+                done.append((e, text))
             results.append(RowResult(entry_id, True, text))
         except (Conflict, ValueError) as ex:
             results.append(RowResult(entry_id, False, str(ex)))
         except Entry.DoesNotExist:
             results.append(RowResult(entry_id, False, "позиция не найдена в этом турнире"))
+    _notify_decisions(t, done)
     return results
+
+
+def _notify_decisions(t, done):
+    """Одно уведомление получателю на заявку за одно решение судьи, а не по каждому выступлению."""
+    groups = {}
+    for e, text in done:
+        for u in _recipients(e):
+            groups.setdefault((u.pk, e.application_id), (u, []))[1].append((e, text))
+    for (_, app_id), (u, items) in groups.items():
+        if len(items) == 1:
+            e, text = items[0]
+            msg = f"«{t.pub_title}», {e.program_name}: {e.athlete_snapshot.get('name')} / {e.horse_snapshot.get('name')} — {text.lower()}"
+        else:
+            by_text = {}
+            for e, text in items:
+                by_text.setdefault(text, 0)
+                by_text[text] += 1
+            msg = f"«{t.pub_title}», заявка №{app_id}: " + "; ".join(f"{k.lower()} — {v}" for k, v in by_text.items())
+        notify([u], msg, reverse("entries:application", args=[app_id]), "decision")
 
 
 def _apply_action(user, e, action, reason):

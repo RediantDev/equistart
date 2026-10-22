@@ -35,7 +35,7 @@
   {% if upcoming %}
     <div class="caption muted" style="margin-top: var(--space-4);">ДАЛЕЕ</div>
     <div class="list-cards" style="margin-top: var(--space-2);">{% for s in upcoming %}
-      <div class="row-card" style="padding: 12px 14px;"><span class="numeric">{{ s.position }}</span><span style="flex: 1; min-width: 0;">{{ s.entry.athlete_snapshot.name }}<span class="table__sub">{{ s.entry.horse_snapshot.name }}{% if s.start_time %} · {{ s.start_time|time:"H:i" }}{% endif %}</span></span></div>
+      <div class="row-card" style="padding: 12px 14px;"><span class="numeric">{{ s.position }}</span><span style="flex: 1 1 180px; min-width: 0;">{{ s.entry.athlete_snapshot.name }}<span class="table__sub">{{ s.entry.horse_snapshot.name }}{% if s.start_time %} · {{ s.start_time|time:"H:i" }}{% endif %}</span></span></div>
     {% endfor %}</div>
   {% endif %}
 </div>

@@ -29,6 +29,9 @@ class DressageTestViews(TestCase):
     def test_create_parse_and_privacy(self):
         self.client.force_login(self.org)
         resp = self.client.post(reverse("sport:test_new"), self.data())
+        self.assertContains(resp, "Проверьте лист перед сохранением")  # сначала предпросмотр
+        self.assertFalse(DressageTest.objects.filter(name="Клубная езда №1").exists())
+        resp = self.client.post(reverse("sport:test_new"), {**self.data(), "confirm": "1"})
         t = DressageTest.objects.get(name="Клубная езда №1")
         self.assertRedirects(resp, reverse("sport:test_detail", args=[t.pk]))
         self.assertEqual((t.owner, t.is_official), (self.org, False))
@@ -49,9 +52,14 @@ class DressageTestViews(TestCase):
         self.client.force_login(self.org)
         resp = self.client.post(reverse("sport:test_new"), self.data(kind="children"))
         self.assertContains(resp, "Качество езды")
-        resp = self.client.post(reverse("sport:test_new"), self.data(kind="children", second_collective="Посадка | 2\nСредства управления | 2"))
+        resp = self.client.post(reverse("sport:test_new"), {**self.data(kind="children", second_collective="Посадка | 2\nСредства управления | 2"), "confirm": "1"})
         self.assertEqual(resp.status_code, 302)
         self.assertEqual([p["key"] for p in DressageTest.objects.get(name="Клубная езда №1").parts], ["technique", "quality"])
+
+    def test_preview_warns_when_pasted_without_pipes(self):
+        self.client.force_login(self.org)
+        resp = self.client.post(reverse("sport:test_new"), self.data(technique_movements="Въезд A коэф 1\nПоворот C коэф 1\nКруг E коэф 2"))
+        self.assertContains(resp, "без разделителей")
 
     def test_guest_and_participant(self):
         url = reverse("sport:test_list")

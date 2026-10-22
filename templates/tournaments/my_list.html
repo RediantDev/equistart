@@ -16,9 +16,10 @@
     {% for r in rows %}
       {% with t=r.t %}
       <article class="row-card">
-        <div style="min-width: 0; flex: 1;">
-          <a class="h3 row-card__title" href="{% if 'organizer' in r.roles %}{% url 'tournaments:step' t.pk 4 %}{% else %}{% url 'tournaments:team' t.pk %}{% endif %}">{{ t.title|default:"Без названия" }}</a>
+        <div style="min-width: 0; flex: 1 1 180px;">
+          <a class="h3 row-card__title" href="{% if 'organizer' in r.roles %}{% url 'tournaments:step' t.pk 4 %}{% elif 'judge' in r.roles and t.is_published %}{% url 'conduct:overview' t.pk %}{% elif 'stable' in r.roles and t.is_published %}{% url 'stables:manage' t.pk %}{% else %}{% url 'tournaments:team' t.pk %}{% endif %}">{{ t.title|default:"Без названия" }}</a>
           <div class="table__sub">{% if t.starts_on %}{% daterange t.starts_on t.ends_on %}{% else %}Даты не указаны{% endif %}{% if t.venue %} · {{ t.venue.name }}, {{ t.venue.settlement }}{% endif %}</div>
+          {% if not t.is_published and 'organizer' not in r.roles %}<div class="table__sub">Рабочие экраны откроются после публикации турнира.</div>{% endif %}
           {% if t.is_published %}<div class="chips" style="margin-top: 8px;">
             {% if 'organizer' in r.roles or 'judge' in r.roles %}<a class="tag tag--sky" href="{% url 'entries:manage' t.pk %}">Заявки</a><a class="tag tag--mint" href="{% url 'conduct:overview' t.pk %}">Проведение</a>{% endif %}
             

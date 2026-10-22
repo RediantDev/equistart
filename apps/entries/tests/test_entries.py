@@ -118,10 +118,14 @@ class ProfileTests(Base):
         resp = self.client.post(reverse("profiles:horse_new"), {**data, "name": "Гром-2", "fksr_number": "AB-123"})
         self.assertContains(resp, "уже есть в сервисе")
         resp = self.client.post(reverse("profiles:horse_new"), {**data, "fksr_number": ""})
-        self.assertContains(resp, "уже есть лошади с такой кличкой")
+        self.assertContains(resp, "с такой кличкой и тем же годом рождения")
         self.assertEqual(Horse.objects.filter(name="Гром").count(), 1)
         self.client.post(reverse("profiles:horse_new"), {**data, "fksr_number": "", "confirm_similar": "1"})
         self.assertEqual(Horse.objects.filter(name="Гром").count(), 2)
+        # та же кличка, другой год — обычная тёзка, без предупреждения и лишнего шага
+        resp = self.client.post(reverse("profiles:horse_new"), {**data, "fksr_number": "", "birth_year": 2010})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Horse.objects.filter(name="Гром").count(), 3)
 
     def test_future_birth_year_rejected(self):
         self.client.force_login(self.coach)

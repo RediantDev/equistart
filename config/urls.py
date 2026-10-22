@@ -10,6 +10,7 @@ admin.site.index_title = "Модерация и администрировани
 urlpatterns = [
     path("manage/", admin.site.urls),
     path("moderation/", include(moderation_patterns)),
+    path("", include("apps.clubs.urls")),
     path("", include("apps.tournaments.urls")),
     path("", include("apps.profiles.urls")),
     path("", include("apps.entries.urls")),
@@ -19,3 +20,9 @@ urlpatterns = [
     path("", include("apps.accounts.urls")),
     path("", include("apps.core.urls")),
 ]
+
+# Страницы ошибок на русском (ТЗ UI-03)
+handler400 = "apps.core.errors.bad_request"
+handler403 = "apps.core.errors.permission_denied"
+handler404 = "apps.core.errors.page_not_found"
+handler500 = "apps.core.errors.server_error"

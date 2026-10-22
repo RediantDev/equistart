@@ -198,3 +198,21 @@ class LastBoxRaceTests(TransactionTestCase):
             th.join()
         self.assertEqual(sorted(results), ["conflict", "conflict", "conflict", "ok"])
         self.assertEqual(Booking.objects.filter(category=cat).count(), 1)
+
+
+class StaffScreenTests(StableBase):
+    def test_delivery_form_offers_remaining_and_default_tab_shows_nobox(self):
+        from django.urls import reverse
+        from apps.stables import services as S
+        from apps.stables.models import Booking, ServiceOrder
+
+        svc = self.t.services.create(name="Опилки", unit="тюк", recipient="horse", available_from=self.d0, available_to=self.d1)
+        o = S.order(self.coach, svc.pk, 4, "k-s1", horse=self.h1)
+        S.deliver(self.groom, o.pk, 3)
+        self.client.force_login(self.groom)
+        page = self.client.get(reverse("stables:manage", args=[self.t.pk]) + "?tab=orders").content.decode()
+        self.assertIn('max="1" value="1"', page)  # остаток, а не весь заказ
+        b = S.book(self.coach, self.cat.pk, self.h1, self.cat.available_from, self.cat.available_to, "k-b1")
+        S.decide(self.groom, b.pk, True)
+        page = self.client.get(reverse("stables:manage", args=[self.t.pk]) + "?tab=bookings").content.decode()
+        self.assertIn("Назначить денник", page)  # без ожидающих — сразу брони без номера

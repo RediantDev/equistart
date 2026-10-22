@@ -161,6 +161,8 @@ class ProgramForm(forms.ModelForm):
     def save(self, commit=True):
         obj = super().save(commit=False)
         obj.tournament = self.tournament
+        if not obj.pk:
+            obj.start_times = obj.discipline == "dressage"  # в выездке время стартов по умолчанию считается, судья может выключить
         obj.heights = self.cleaned_data.get("heights", [])
         obj.program_type = self.cleaned_data.get("program_type") or obj.program_type
         test = self.cleaned_data.get("dressage_test")
@@ -255,7 +257,7 @@ class TermsForm(forms.ModelForm):
         }
         help_texts = {
             "entry_deadline": "До 23:59 этого дня по времени места проведения.",
-            "cancel_terms": "Например: «Полный возврат взноса при отмене до 18 ноября; после — взнос не возвращается». Публикуется на странице турнира.",
+            "cancel_terms": "Например: «Отказ от старта — не позднее 18:00 накануне дня маршрута, через сайт или судье». Публикуется на странице турнира; пустое поле не показывается.",
             "regulation": "PDF до 10 МБ. Проверяется модератором.",
         }
 

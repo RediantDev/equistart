@@ -5,7 +5,7 @@
 {% if entries %}
   <div class="list-cards">{% for e in entries %}
     <article class="row-card">
-      <div style="flex: 1; min-width: 0;"><a class="h3 row-card__title" href="{% url 'tournaments:public' e.tournament_id %}">{{ e.tournament.pub_title }}</a>
+      <div style="flex: 1 1 180px; min-width: 0;"><a class="h3 row-card__title" href="{% url 'tournaments:public' e.tournament_id %}">{{ e.tournament.pub_title }}</a>
         <div class="table__sub">{{ e.day|date:"j E Y" }} · {{ e.program_name }} · {{ e.class_name }} · на {{ e.horse_snapshot.name }}</div></div>
       {% include "entries/_entry_chips.html" %}
     </article>

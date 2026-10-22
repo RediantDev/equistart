@@ -16,7 +16,7 @@
   <div class="list-cards">
     {% for r in rows %}
       <article class="row-card">
-        <div style="flex: 1; min-width: 0;">
+        <div style="flex: 1 1 180px; min-width: 0;">
           <a class="h3 row-card__title" href="{% url 'profiles:athlete' r.a.pk %}">{{ r.a.full_name }}</a>
           <div class="table__sub">{{ r.a.summary|default:"Дополнительные сведения не заполнены" }}</div>
         </div>

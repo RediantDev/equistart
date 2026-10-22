@@ -100,7 +100,10 @@ def book(user, category_id, horse, arrive, depart, key, required=False, contact_
         required=bool(required), contact_phone=contact_phone or "", comment=(comment or "").strip()[:500], idempotency_key=key,
     )
     audit(user, "booking.create", b, category=c.pk, arrive=str(arrive), depart=str(depart), required=b.required)
-    notify(_staff(t), f"Новая бронь: {c.name}, {horse.name}, {arrive:%d.%m}–{depart:%d.%m}", reverse("stables:manage", args=[t.pk]) + "?tab=bookings", "booking")
+    from apps.core.models import notify_merged
+
+    notify_merged(_staff(t), "booking", reverse("stables:manage", args=[t.pk]) + "?tab=bookings&state=pending",
+                  lambda n: f"«{t.pub_title}»: новых броней денников — {n}. Последняя: {c.name}, {horse.name}, {arrive:%d.%m}–{depart:%d.%m}.")
     return b
 
 
@@ -172,6 +175,18 @@ def cancel_booking(user, booking_id, reason="") -> Booking:
         notify(_staff(b.tournament), f"Представитель отменил бронь: {b.horse_name}, {b.arrive:%d.%m}–{b.depart:%d.%m}",
                reverse("stables:manage", args=[b.tournament_id]) + "?tab=bookings", "booking")
     return b
+
+
+def blocked_horses(tournament_id) -> set:
+    """Лошади турнира, у которых отмечено «без денника нельзя», а подтверждённой брони нет — одним запросом."""
+    rows = Booking.objects.filter(tournament_id=tournament_id).exclude(state=Booking.State.CANCELLED).values_list("horse_id", "required", "state")
+    need, ok = set(), set()
+    for horse_id, required, state in rows:
+        if required:
+            need.add(horse_id)
+        if state == Booking.State.CONFIRMED:
+            ok.add(horse_id)
+    return need - ok
 
 
 def stable_dependency_ok(entry) -> bool:
@@ -251,7 +266,10 @@ def order(user, service_id, quantity, key, horse=None, trailer="", for_date=None
     o = ServiceOrder.objects.create(service=s, tournament=t, ordered_by=user, horse=horse, recipient_label=label, for_date=for_date, quantity=quantity,
                                     comment=(comment or "").strip()[:300], idempotency_key=key)
     audit(user, "service_order.create", o, service=s.pk, quantity=quantity)
-    notify(_staff(t), f"Заказ услуги: {s.name} × {quantity} ({label})", reverse("stables:manage", args=[t.pk]) + "?tab=orders", "booking")
+    from apps.core.models import notify_merged
+
+    notify_merged(_staff(t), "service_order", reverse("stables:manage", args=[t.pk]) + "?tab=orders",
+                  lambda n: f"«{t.pub_title}»: новых заказов услуг — {n}. Последний: {s.name} × {quantity} ({label}).")
     return o
 
 

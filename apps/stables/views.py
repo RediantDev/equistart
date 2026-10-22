@@ -146,12 +146,16 @@ def manage(request, pk):
     ctx["cats"] = cats
     ctx["svcs"] = list(t.services.all())
     if tab == "bookings":
-        state = request.GET.get("state", "pending")
+        pending = Booking.objects.filter(tournament=t, state=Booking.State.PENDING).count()
+        nobox = Booking.objects.filter(tournament=t, state=Booking.State.CONFIRMED, box_number="").count()
+        # по умолчанию — то, что требует действия: сначала подтверждение, затем назначение номеров
+        state = request.GET.get("state") or ("pending" if pending or not nobox else "nobox")
         qs = Booking.objects.filter(tournament=t).select_related("category", "requested_by", "horse")
-        if state in Booking.State.values:
+        if state == "nobox":
+            qs = qs.filter(state=Booking.State.CONFIRMED, box_number="")
+        elif state in Booking.State.values:
             qs = qs.filter(state=state)
-        ctx.update({"bookings": qs, "state": state, "states": Booking.State.choices,
-                    "pending": Booking.objects.filter(tournament=t, state=Booking.State.PENDING).count()})
+        ctx.update({"bookings": qs, "state": state, "states": Booking.State.choices, "pending": pending, "nobox": nobox})
     elif tab == "grid":
         grid = []
         for c in cats:

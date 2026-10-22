@@ -28,11 +28,21 @@ urlpatterns = [
     path("cabinet/invitations/<int:member_id>/", views.invitation_respond, name="invitation_respond"),
 ]
 
+def _club_mod(name):
+    def view(request, *a, **kw):
+        from apps.clubs import views as cv
+
+        return getattr(cv, name)(request, *a, **kw)
+    return view
+
+
 moderation_patterns = (
     [
         path("", moderation.queue, name="queue"),
         path("t/<int:pk>/", moderation.detail, name="detail"),
         path("t/<int:pk>/decide/", moderation.decide, name="decide"),
+        path("clubs/", _club_mod("mod_queue"), name="clubs"),
+        path("clubs/<int:pk>/", _club_mod("mod_detail"), name="club"),
     ],
     "moderation",
 )

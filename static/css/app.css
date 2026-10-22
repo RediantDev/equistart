@@ -122,7 +122,7 @@ a.tag { text-decoration: none; }
 .field__help { margin: 0; font-size: 14px; color: var(--text-muted); }
 .field__error { margin: 0; font-size: 14px; color: var(--danger); font-weight: 600; }
 .field__error span { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--danger); color: var(--surface); font-size: 11px; font-weight: 800; margin-right: 2px; }
-input[type="text"], input[type="tel"], input[type="email"], input[type="password"], input[type="search"], input[type="number"], input[type="date"], input[type="time"], select, textarea {
+input:not([type]), input[type="url"], input[type="text"], input[type="tel"], input[type="email"], input[type="password"], input[type="search"], input[type="number"], input[type="date"], input[type="time"], select, textarea {
   width: 100%; min-height: var(--control-height); padding: 10px var(--space-3); font: inherit; color: var(--text);
   background: var(--surface); border: 1px solid var(--control-border); border-radius: var(--radius-sm);
 }
@@ -178,6 +178,7 @@ input:focus, select:focus, textarea:focus { outline: 3px solid var(--focus); out
   .topnav__link { padding: 6px var(--space-2); }
   .brand span:not(.brand__mark) { display: none; }
   .topnav__link--home { display: none; }
+  .topnav__link--desk { display: none; }
 }
 
 /* ---------- Раскладки страниц ---------- */
@@ -448,3 +449,139 @@ a.chip, a.tag { text-decoration: none; }
 .sheet__sep { margin-top: var(--space-3); }
 .panel-row { border: 0; border-bottom: 1px solid var(--border); padding: 0 0 var(--space-3); margin: 0 0 var(--space-3); }
 .table tr.is-warning td { background: var(--warning-soft); }
+
+/* Страницы ошибок */
+.error-page { max-width: 640px; margin: var(--space-6) auto; }
+.error-page .list { margin: var(--space-2) 0 0; }
+
+/* Публичные протоколы: дни, маршруты, карточки на телефоне */
+.day-nav, .route-nav { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 0 var(--space-3); padding-bottom: 2px; }
+.chip-link, .route-nav a { flex: none; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); text-decoration: none; font-weight: 600; font-size: 14px; white-space: nowrap; min-height: 40px; display: inline-flex; align-items: center; }
+.chip-link.is-active { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.route-nav a { font-weight: 500; }
+.result-route { scroll-margin-top: 16px; }
+.result-route + .result-route { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 2px solid var(--border); }
+.result-height { margin: var(--space-4) 0 var(--space-2); }
+.pcards { list-style: none; margin: 0; padding: 0; flex-direction: column; gap: 8px; }
+.pcard { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; }
+.pcard.is-muted { opacity: .55; }
+.pcard__no { flex: none; min-width: 28px; font-weight: 800; font-size: 18px; text-align: center; }
+.pcard__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+.pcard__horse { font-weight: 600; }
+.pcard__side { flex: none; font-weight: 800; font-size: 15px; text-align: right; max-width: 36%; overflow-wrap: anywhere; }
+.pcard.medal-1 .pcard__no { color: #b8860b; } .pcard.medal-2 .pcard__no { color: #7d8790; } .pcard.medal-3 .pcard__no { color: #a0522d; }
+@media (max-width: 400px) { .tabs__item { padding: 10px 9px; font-size: 15px; } }
+@media print { .pcards.only-narrow { display: none !important; } .table-wrap.only-wide { display: block !important; } }
+
+/* Заявка: раскрыта одна пара, остальные свёрнуты */
+.pair--closed { padding-top: 14px; padding-bottom: 14px; }
+.pair-summary { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.pair-prog__select { width: 100%; min-height: 48px; margin-top: 6px; }
+.pair-form__actions { position: sticky; bottom: 0; background: var(--surface); padding: 12px 0 4px; margin-top: 8px; border-top: 1px solid var(--border); }
+.pair-form__actions .btn { width: 100%; }
+
+/* Списки судьи: закреплённая панель действий, страницы, таблица → карточки на телефоне */
+.bulk-bar--sticky { position: sticky; top: 0; z-index: 5; }
+.pager { display: flex; gap: var(--space-3); align-items: center; justify-content: center; margin: var(--space-4) 0; }
+@media (max-width: 640px) {
+  .table--cards thead { display: none; }
+  .table--cards, .table--cards tbody, .table--cards tr, .table--cards td { display: block; width: 100%; }
+  .table--cards tr { position: relative; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); padding: 12px 14px 12px 44px; margin-bottom: 8px; }
+  .table--cards td { border: 0; padding: 2px 0; }
+  .table--cards td:first-child { position: absolute; left: 12px; top: 14px; width: auto; }
+  .table--cards td:first-child input[type=checkbox] { width: 22px; height: 22px; }
+  .table-wrap:has(.table--cards) { overflow: visible; border: 0; background: none; }
+}
+
+/* Шаг 2 мастера: сворачиваемые карточки, кнопки зачёта под текстом на телефоне */
+.prog-card__toggle { cursor: pointer; color: var(--text-muted); font-size: 14px; padding: 6px 0; list-style-position: inside; }
+.prog-card__body[open] > .prog-card__toggle { margin-bottom: var(--space-2); }
+.class-row { flex-wrap: wrap; }
+.class-row__text { flex: 1 1 220px; min-width: 0; }
+.class-row__actions { display: flex; gap: var(--space-2); flex: none; }
+@media (max-width: 480px) { .class-row__actions { width: 100%; } .class-row__actions .btn { flex: 1; } }
+
+/* Судья-подсчёт на телефоне: строка пары — карточка с сеткой «судья → %» */
+.cell-off { background: var(--warning-soft); color: var(--warning); font-weight: 700; }
+@media (max-width: 900px) {
+  .table--grid-cards thead { display: none; }
+  .table--grid-cards, .table--grid-cards tbody { display: block; }
+  .table--grid-cards tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); padding: 12px; margin-bottom: 8px; }
+  .table--grid-cards td { display: block; border: 0; padding: 0; text-align: left; }
+  .table--grid-cards td:first-child, .table--grid-cards td:last-child { grid-column: 1 / -1; }
+  .table--grid-cards td[data-label]::before { content: attr(data-label); display: block; font-size: 12px; color: var(--text-muted); font-weight: 600; }
+  .table--grid-cards td.cell-total { font-size: 18px; }
+  .table-wrap:has(.table--grid-cards) { overflow: visible; border: 0; background: none; }
+}
+
+/* Лист судьи выездки: оценки кнопками */
+.mark-row.is-current { background: var(--accent-soft, #fff6cc); margin: 0 -12px; padding: 12px; border-radius: var(--radius-md); }
+.mark-row.is-empty .mark-row__val { border-style: dashed; }
+.mark-keys { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.mark-key { min-height: 48px; border: 1px solid var(--border); background: var(--surface); border-radius: 12px; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; cursor: pointer; color: var(--text); }
+.mark-key:active { background: var(--accent); }
+.mark-key--fine { font-size: 14px; background: var(--ink); color: var(--surface); padding: 0 2px; }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.quick__btn { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 8px 12px; font-size: 14px; min-height: 40px; cursor: pointer; }
+.signed-marks { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
+.signed-marks li { display: grid; grid-template-columns: 2.2ch 1fr auto; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); align-items: baseline; }
+.signed-marks__n { font-weight: 800; }
+.signed-marks__text { min-width: 0; overflow-wrap: anywhere; }
+.signed-marks__v { font-size: 18px; font-variant-numeric: tabular-nums; }
+@media (min-width: 900px) { .mark-keys { grid-template-columns: repeat(13, minmax(0, 1fr)); } }
+.table--grid-cards .chip, .scorer .chip { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+
+/* Клубы */
+.club-logo { width: 48px; height: 48px; border-radius: var(--radius-md, 12px); object-fit: cover; flex: none; background: var(--surface-2); }
+.club-logo--empty { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: var(--text-muted); }
+.club-logo--lg { width: 72px; height: 72px; }
+.club-head { display: flex; gap: var(--space-3); align-items: center; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: var(--space-2); }
+.photo-grid img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius-md, 12px); display: block; }
+.photo-grid figure { margin: 0; min-width: 0; }
+.break { overflow-wrap: anywhere; }
+.news + .news { margin-top: var(--space-3); }
+.photo-cap { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-top: 4px; min-width: 0; }
+.photo-cap .table__sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-card__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+/* ---------- Телефон: длинные подписи переносятся, кнопки и ссылки-метки удобны пальцу (аудит 22.10) ---------- */
+.btn { max-width: 100%; }
+.chip, .tag { max-width: 100%; }
+@media (max-width: 600px) {
+  .btn { white-space: normal; text-align: center; line-height: 1.25; padding-top: 8px; padding-bottom: 8px; }
+  .form-actions > .btn, .form__actions > .btn, .form-actions > form, .form__actions > form { flex: 1 1 auto; }
+  .form-actions > form > .btn, .form__actions > form > .btn { width: 100%; }
+  .chip, .tag { white-space: normal; overflow-wrap: anywhere; text-align: left; }
+  .topnav__link:not(.topnav__link--home):not(.topnav__link--desk) { min-height: 40px; display: inline-flex; align-items: center; }
+  a.tag, a.chip { min-height: 36px; padding-top: 6px; padding-bottom: 6px; }
+  .table input, .table select, .table textarea, input:not([type=checkbox]):not([type=radio]), select, textarea { font-size: 16px; }
+}
+.row-card__open { flex: none; }
+@media (max-width: 600px) { .row-card__open { display: none; } }
+.facts dd { overflow-wrap: anywhere; min-width: 0; }
+@media (max-width: 480px) { .facts:not(.facts--money) { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 8px var(--space-3); } }
+@media (max-width: 899px) { .filters__body > .filters__actions { grid-column: 1 / -1; } .filters__body > .filters__actions .btn { min-width: 160px; } }
+@media (max-width: 1023px) { .topbar__user { display: none; } }
+@media (max-width: 480px) { .search { flex-wrap: wrap; } .search input { flex: 1 1 100%; } .search select { flex: 1 1 auto; } }
+.narrow-only { display: none; }
+@media (max-width: 600px) {
+  .table--sheet .wide-only { display: none; }
+  .table--sheet .narrow-only { display: block; margin-top: 2px; }
+  .table--sheet td, .table--sheet th { padding-left: 8px; padding-right: 8px; }
+}
+/* Таблица → карточки на телефоне: подписи из data-label */
+@media (max-width: 600px) {
+  .table--stack thead { display: none; }
+  .table--stack, .table--stack tbody { display: block; }
+  .table--stack tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); padding: 12px; margin-bottom: 8px; }
+  .table--stack td { display: block; border: 0; padding: 0; text-align: left; white-space: normal !important; min-width: 0; }
+  .table--stack td.stack-full { grid-column: 1 / -1; }
+  .table--stack td:empty { display: none; }
+  .table--stack td[data-label]::before { content: attr(data-label); display: block; font-size: 12px; color: var(--text-muted); font-weight: 600; }
+  .table--stack .chip { white-space: normal; }
+  .table-wrap:has(.table--stack) { overflow: visible; border: 0; background: none; }
+  .table--stack tr.is-muted { opacity: .7; }
+}
+@media (max-width: 600px) { .table--stack td.num { text-align: left; } .table--stack td[data-label="№"]::before, .table--stack td[data-label="Время"]::before { display: inline; margin-right: 6px; } }
+@media (min-width: 641px) and (max-width: 900px) { .table--grid-cards tr { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
