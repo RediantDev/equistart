@@ -131,7 +131,7 @@
       </table>
     </div>
   {% endfor %}
-  {% if s.cancel_terms %}<div class="alert"><strong>Условия отмены и возврата:</strong> {{ s.cancel_terms|linebreaksbr }} <span class="muted">Условия задаёт организатор.</span></div>{% endif %}
+  {% if s.cancel_terms %}<div class="alert"><strong>Условия отмены:</strong> {{ s.cancel_terms|linebreaksbr }} <span class="muted">Условия задаёт организатор.</span></div>{% endif %}
   <p class="muted" style="font-size: 14px;">Опубликовано {{ t.published_at|date:"j E Y" }}. Сведения проверены модератором EquiStart. Проверка сервиса не является утверждением федерацией.</p>
 </section>
 {% endif %}

@@ -148,7 +148,10 @@ def step(request, pk, step):
     if step == 1:
         return _step1(request, t)
     if step == 2:
-        return render(request, "tournaments/step2.html", _wizard_ctx(t, 2, **_step2_ctx(t)))
+        custom = request.GET.get("custom")
+        program = t.programs.filter(pk=custom).first() if custom and custom.isdigit() else None
+        return render(request, "tournaments/step2.html", _wizard_ctx(t, 2, **_step2_ctx(
+            t, class_form=ClassForm(program) if program else None, class_program=program, user=request.user)))
     if step == 3:
         return _step3(request, t)
     return _step4(request, t)
@@ -196,7 +199,9 @@ def _step2_ctx(t, form=None, editing=None, class_form=None, class_program=None, 
         if class_program is not None and p.pk == class_program.pk:
             p.form, p.editing_class, p.form_open = class_form, editing_class, True
         else:
-            p.form, p.editing_class, p.form_open = ClassForm(p), None, False
+            # форма своего зачёта строится только для открытой карточки — страница с 20 маршрутами остаётся лёгкой
+            p.form, p.editing_class, p.form_open = None, None, False
+        p.expanded = p.form_open or len(programs) <= 6 or not p.classes.all()
     by_day = [{"day": d, "programs": [p for p in programs if p.day == d]} for d in days]
     orphans = [p for p in programs if p.day not in days]
     return {
@@ -349,7 +354,8 @@ def class_from_template(request, pk, program_id):
     except Conflict:
         messages.error(request, CONFLICT_MSG)
         return redirect("tournaments:step", pk=pk, step=2)
-    messages.success(request, f"Зачёт «{obj.label}» добавлен: {obj.conditions or 'без ограничений'}. Условия можно поправить.")
+    hint = " В выездке дети — 10–14 лет: проверьте годы рождения." if tpl.name == "Дети" and program.is_dressage else ""
+    messages.success(request, f"Зачёт «{obj.label}» добавлен: {obj.conditions or 'без ограничений'}. Условия можно поправить.{hint}")
     return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + f"#program-{program.pk}")
 
 

@@ -19,13 +19,16 @@
 {% if entries %}
 <form method="post" action="{% url 'entries:decide' t.pk %}">
   {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
-  <div class="bulk-bar">
-    <span class="label">Выбранные:</span>
+  <input type="hidden" name="f_q" value="{{ f.q }}"><input type="hidden" name="f_decision" value="{{ f.decision }}"><input type="hidden" name="f_program" value="{{ f.program }}">
+  <div class="bulk-bar bulk-bar--sticky">
+    <label class="check"><input type="checkbox" id="pick-page"><span>Все на странице</span></label>
     <select name="action" aria-label="Действие" style="width: auto;">{% for v, l in actions.items %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
-    <button class="btn btn--dark btn--sm">Продолжить…</button>
+    <button class="btn btn--dark btn--sm">Выбранные…</button>
+    <button class="btn btn--ghost btn--sm" name="scope" value="filter">Все по фильтру ({{ total }})…</button>
   </div>
+  <p class="table__sub">Показано {{ page.start_index }}–{{ page.end_index }} из {{ total }}.{% if not f.decision %} Совет: фильтр «Решение: На рассмотрении» оставит только то, что ждёт решения.{% endif %}</p>
   <div class="table-wrap">
-    <table class="table">
+    <table class="table table--cards">
       <thead><tr><th><span class="visually-hidden">Выбор</span></th><th>Спортсмен / лошадь</th><th>Программа и зачёт</th><th>Состояние</th><th>Заявка</th></tr></thead>
       <tbody>
       {% for e in entries %}
@@ -41,6 +44,17 @@
     </table>
   </div>
 </form>
+{% if page.has_other_pages %}
+<nav class="pager" aria-label="Страницы">
+  {% if page.has_previous %}<a class="btn btn--ghost btn--sm" href="?{{ params }}{% if params %}&{% endif %}page={{ page.previous_page_number }}">← Назад</a>{% endif %}
+  <span class="label">Страница {{ page.number }} из {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a class="btn btn--ghost btn--sm" href="?{{ params }}{% if params %}&{% endif %}page={{ page.next_page_number }}">Дальше →</a>{% endif %}
+</nav>
+{% endif %}
+<script>
+(function () { var all = document.getElementById("pick-page"); if (!all) return;
+  all.addEventListener("change", function () { document.querySelectorAll('input[name="entry"]:not(:disabled)').forEach(function (c) { c.checked = all.checked; }); }); })();
+</script>
 {% else %}
   <div class="card empty"><h2 class="h3">Заявок нет</h2><p class="muted">Когда участники подадут заявки, они появятся здесь.</p></div>
 {% endif %}

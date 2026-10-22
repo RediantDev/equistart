@@ -478,3 +478,53 @@ a.chip, a.tag { text-decoration: none; }
 .pair-prog__select { width: 100%; min-height: 48px; margin-top: 6px; }
 .pair-form__actions { position: sticky; bottom: 0; background: var(--surface); padding: 12px 0 4px; margin-top: 8px; border-top: 1px solid var(--border); }
 .pair-form__actions .btn { width: 100%; }
+
+/* Списки судьи: закреплённая панель действий, страницы, таблица → карточки на телефоне */
+.bulk-bar--sticky { position: sticky; top: 0; z-index: 5; }
+.pager { display: flex; gap: var(--space-3); align-items: center; justify-content: center; margin: var(--space-4) 0; }
+@media (max-width: 640px) {
+  .table--cards thead { display: none; }
+  .table--cards, .table--cards tbody, .table--cards tr, .table--cards td { display: block; width: 100%; }
+  .table--cards tr { position: relative; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); padding: 12px 14px 12px 44px; margin-bottom: 8px; }
+  .table--cards td { border: 0; padding: 2px 0; }
+  .table--cards td:first-child { position: absolute; left: 12px; top: 14px; width: auto; }
+  .table--cards td:first-child input[type=checkbox] { width: 22px; height: 22px; }
+  .table-wrap:has(.table--cards) { overflow: visible; border: 0; background: none; }
+}
+
+/* Шаг 2 мастера: сворачиваемые карточки, кнопки зачёта под текстом на телефоне */
+.prog-card__toggle { cursor: pointer; color: var(--text-muted); font-size: 14px; padding: 6px 0; list-style-position: inside; }
+.prog-card__body[open] > .prog-card__toggle { margin-bottom: var(--space-2); }
+.class-row { flex-wrap: wrap; }
+.class-row__text { flex: 1 1 220px; min-width: 0; }
+.class-row__actions { display: flex; gap: var(--space-2); flex: none; }
+@media (max-width: 480px) { .class-row__actions { width: 100%; } .class-row__actions .btn { flex: 1; } }
+
+/* Судья-подсчёт на телефоне: строка пары — карточка с сеткой «судья → %» */
+.cell-off { background: var(--warning-soft); color: var(--warning); font-weight: 700; }
+@media (max-width: 640px) {
+  .table--grid-cards thead { display: none; }
+  .table--grid-cards, .table--grid-cards tbody { display: block; }
+  .table--grid-cards tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); padding: 12px; margin-bottom: 8px; }
+  .table--grid-cards td { display: block; border: 0; padding: 0; text-align: left; }
+  .table--grid-cards td:first-child, .table--grid-cards td:last-child { grid-column: 1 / -1; }
+  .table--grid-cards td[data-label]::before { content: attr(data-label); display: block; font-size: 12px; color: var(--text-muted); font-weight: 600; }
+  .table--grid-cards td.cell-total { font-size: 18px; }
+  .table-wrap:has(.table--grid-cards) { overflow: visible; border: 0; background: none; }
+}
+
+/* Лист судьи выездки: оценки кнопками */
+.mark-row.is-current { background: var(--accent-soft, #fff6cc); margin: 0 -12px; padding: 12px; border-radius: var(--radius-md); }
+.mark-row.is-empty .mark-row__val { border-style: dashed; }
+.mark-keys { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.mark-key { min-height: 48px; border: 1px solid var(--border); background: var(--surface); border-radius: 12px; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; cursor: pointer; color: var(--text); }
+.mark-key:active { background: var(--accent); }
+.mark-key--fine { font-size: 15px; background: var(--ink); color: var(--surface); }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.quick__btn { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 8px 12px; font-size: 14px; min-height: 40px; cursor: pointer; }
+.signed-marks { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
+.signed-marks li { display: grid; grid-template-columns: 2.2ch 1fr auto; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); align-items: baseline; }
+.signed-marks__n { font-weight: 800; }
+.signed-marks__text { min-width: 0; overflow-wrap: anywhere; }
+.signed-marks__v { font-size: 18px; font-variant-numeric: tabular-nums; }
+@media (min-width: 900px) { .mark-keys { grid-template-columns: repeat(12, minmax(0, 1fr)); } }

@@ -20,6 +20,9 @@ from apps.tournaments.models import ProgramItem
 from . import scoring
 from .models import DressageFlags, DressageSheet, JudgePosition, JumpRound, Result
 
+QUICK_COMMENTS = ["не прямо", "потеря ритма", "неточный переход", "напряжение", "сопротивление", "нет сгибания",
+                  "потеря контакта", "не по букве", "мало импульса", "хорошо"]
+
 EXCLUSION_REASONS = [
     "второе неповиновение", "третье неповиновение", "падение всадника или лошади", "превышен лимит времени",
     "ошибка в схеме, не исправлена", "не взят старт в течение 45 с", "прочее (указать)",
@@ -221,6 +224,7 @@ def judge_sheet(request, pk, program_id, letter):
         "t": p.tournament, "p": p, "pos": pos, "test": test, "queue": [(e, s, sheets.get(e.pk)) for e, s in queue], "entry": entry,
         "sheet": sheet, "rows": rows, "flags": flags, "is_c": pos.letter == "C", "score": js, "reasons": EXCLUSION_REASONS,
         "missing": scoring.sheet_missing(test, pos, sheet), "scheme": D.PENALTY_SCHEMES.get(test.get("penalty_scheme") or "", {}).get("label", ""),
+        "quick": QUICK_COMMENTS,
     })
 
 
@@ -301,9 +305,22 @@ def scorer(request, pk, program_id):
                 pcts.append(js.pct)
             cells.append({"letter": pos.letter, "signed": bool(sh and sh.signed), "started": bool(sh and any(v for row in (sh.marks or {}).values() for v in row)),
                           "returned": sh.returned_reason if sh else "", "pct": js.pct if js else None})
-        spread = (max(pcts) - min(pcts)) if len(pcts) > 1 else None
+        # DRS-07: подсвечиваем судью, чей процент отличается от среднего остальных на 5 пунктов и более
+        off = []
+        if len(pcts) > 1:
+            for c in cells:
+                if c["pct"] is None:
+                    continue
+                others = [cc["pct"] for cc in cells if cc is not c and cc["pct"] is not None]
+                if others:
+                    diff = abs(c["pct"] - sum(others) / len(others))
+                    c["diff"] = diff
+                    if diff >= 5:
+                        c["off"] = True
+                        off.append((c["letter"], diff))
+        spread = max((d for _, d in off), default=None)
         result = getattr(e, "result", None)
-        rows.append({"e": e, "res": res, "cells": cells, "flags": fl, "spread": spread, "warn": spread is not None and spread >= 5,
+        rows.append({"e": e, "res": res, "cells": cells, "flags": fl, "spread": spread, "off": off, "warn": bool(off),
                      "place": result.place if result else None, "approved": bool(fl and fl.approved_at)})
     classes = []
     for c in p.classes.filter(merged_into__isnull=True):

@@ -102,3 +102,9 @@ def rub_input(kopecks):
         return ""
     r, kop = divmod(abs(int(kopecks)), 100)
     return f"{r},{kop:02d}" if kop else str(r)
+
+
+@register.filter
+def split(value, sep=","):
+    """«0,1,2» → ["0", "1", "2"] — для кнопок в шаблоне."""
+    return str(value).split(sep)

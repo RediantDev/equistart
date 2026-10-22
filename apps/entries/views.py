@@ -403,24 +403,37 @@ def proposal_decide(request, pk):
 
 # ---------------- рассмотрение (судья / организатор) ----------------
 
+def _manage_qs(t, f):
+    qs = Entry.objects.filter(tournament=t)
+    if f.get("q"):
+        q = f["q"]
+        qs = qs.filter(Q(athlete_snapshot__name__icontains=q) | Q(horse_snapshot__name__icontains=q) | Q(application__contact_name__icontains=q))
+    if f.get("decision"):
+        qs = qs.filter(decision=f["decision"])
+    if str(f.get("program", "")).isdigit():
+        qs = qs.filter(program_id=int(f["program"]))
+    return qs
+
+
+PAGE_SIZE = 50
+
+
 @login_required
 def manage(request, pk):
+    from django.core.paginator import Paginator
+
     t = get_object_or_404(Tournament, pk=pk)
     services.require_judge(request.user, t)
-    qs = Entry.objects.filter(tournament=t).select_related("application", "tclass").prefetch_related("proposals")
     f = {k: request.GET.get(k, "") for k in ("q", "decision", "program")}
-    if f["q"]:
-        qs = qs.filter(Q(athlete_snapshot__name__icontains=f["q"]) | Q(horse_snapshot__name__icontains=f["q"]) | Q(application__contact_name__icontains=f["q"]))
-    if f["decision"]:
-        qs = qs.filter(decision=f["decision"])
-    if f["program"].isdigit():
-        qs = qs.filter(program_id=int(f["program"]))
-    entries = list(qs)
+    qs = _manage_qs(t, f).select_related("application", "tclass").prefetch_related("proposals").order_by("day", "program_id", "pk")
+    page = Paginator(qs, PAGE_SIZE).get_page(request.GET.get("page"))
+    entries = list(page.object_list)
     for e in entries:
         e.pending_proposal = next((p for p in e.proposals.all() if p.state == ChangeProposal.State.PENDING), None)
+    params = "&".join(f"{k}={v}" for k, v in f.items() if v)
     return render(request, "entries/manage.html", {
-        "t": t, "entries": entries, "f": f, "programs": t.programs.all(), "actions": services.ACTIONS,
-        "decisions": Entry.Decision.choices,
+        "t": t, "entries": entries, "page": page, "total": page.paginator.count, "params": params, "f": f,
+        "programs": t.programs.all(), "actions": services.ACTIONS, "decisions": Entry.Decision.choices,
         "counts": services.summarize(Entry.objects.filter(tournament=t)),
     })
 
@@ -430,21 +443,42 @@ def manage(request, pk):
 def manage_decide(request, pk):
     t = get_object_or_404(Tournament, pk=pk)
     services.require_judge(request.user, t)
-    ids = [i for i in request.POST.getlist("entry") if i.isdigit()]
     action = request.POST.get("action", "")
+    back = request.POST.get("next") or reverse("entries:manage", args=[t.pk])
+    if request.POST.get("scope") == "filter":
+        # «Применить ко всем по фильтру»: состав берётся заново на сервере, без передачи сотен полей
+        f = {k: request.POST.get(f"f_{k}", "") for k in ("q", "decision", "program")}
+        qs = _manage_qs(t, f).exclude(decision=Entry.Decision.CANCELLED)
+        ids = [str(i) for i in qs.values_list("pk", flat=True)]
+        revs = dict(qs.values_list("pk", "revision"))
+    else:
+        ids = [i for i in request.POST.getlist("entry") if i.isdigit()]
+        revs = None
     if not ids:
-        messages.error(request, "Выберите строки.")
-        return redirect(request.POST.get("next") or reverse("entries:manage", args=[t.pk]))
+        messages.error(request, "Выберите строки — отметьте их галочкой или нажмите «Выбрать все по фильтру».")
+        return redirect(back)
     if request.POST.get("confirm") != "1":
-        entries = Entry.objects.filter(tournament=t, pk__in=ids)
-        return render(request, "entries/decide_confirm.html", {"t": t, "entries": entries, "action": action, "label": services.ACTIONS.get(action, ""), "next": request.POST.get("next", "")})
+        entries = list(Entry.objects.filter(tournament=t, pk__in=ids).order_by("day", "program_id", "pk"))
+        # состав и версии строк уходят одним полем «id:версия,…» — без лимита на число полей формы
+        items = ",".join(f"{e.pk}:{request.POST.get(f'rev-{e.pk}') or (revs or {}).get(e.pk) or e.revision}" for e in entries)
+        return render(request, "entries/decide_confirm.html", {"t": t, "entries": entries[:100], "more": max(0, len(entries) - 100),
+                                                              "count": len(entries), "items": items, "action": action,
+                                                              "label": services.ACTIONS.get(action, ""), "next": back})
     try:
-        results = services.decide(request.user, t.pk, [(int(i), request.POST.get(f"rev-{i}")) for i in ids], action, request.POST.get("reason", ""))
+        if request.POST.get("items"):
+            items = []
+            for chunk in request.POST["items"].split(","):
+                i, _, rev = chunk.partition(":")
+                if i.isdigit():
+                    items.append((int(i), rev))
+        else:
+            items = [(int(i), request.POST.get(f"rev-{i}") or (revs or {}).get(int(i))) for i in ids]
+        results = services.decide(request.user, t.pk, items, action, request.POST.get("reason", ""))
     except ValueError as ex:
         messages.error(request, str(ex))
-        return redirect(request.POST.get("next") or reverse("entries:manage", args=[t.pk]))
+        return redirect(back)
     _report(request, results)
-    return redirect(request.POST.get("next") or reverse("entries:manage", args=[t.pk]))
+    return redirect(back)
 
 
 def _report(request, results):
@@ -452,5 +486,9 @@ def _report(request, results):
     bad = [r for r in results if not r.ok]
     if ok:
         messages.success(request, f"Выполнено для {len(ok)} из {len(results)}.")
+    reasons = {}
     for r in bad:
-        messages.error(request, f"Позиция #{r.entry_id}: {r.text}.")
+        reasons.setdefault(r.text, []).append(r.entry_id)
+    for text, ids in reasons.items():
+        tail = ", ".join(f"#{i}" for i in ids[:5]) + (f" и ещё {len(ids) - 5}" if len(ids) > 5 else "")
+        messages.error(request, f"Не выполнено для {len(ids)}: {text} ({tail}).")

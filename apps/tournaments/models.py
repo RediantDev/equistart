@@ -80,7 +80,7 @@ class Tournament(models.Model):
     level = models.CharField("статус соревнований", max_length=12, choices=Level.choices, default=Level.CLUB)
     classification = models.BooleanField("классификационные (присвоение разрядов)", default=False)
     entry_deadline = models.DateField("последний день подачи заявок", null=True, blank=True)
-    cancel_terms = models.TextField("условия отмены и возврата", blank=True)
+    cancel_terms = models.TextField("условия отмены", blank=True)
     regulation = models.FileField("положение (PDF)", upload_to="regulations/%Y/%m/", blank=True)
 
     status = models.CharField("рабочая копия", max_length=16, choices=Status.choices, default=Status.DRAFT)

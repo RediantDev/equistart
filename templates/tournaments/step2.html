@@ -28,15 +28,19 @@
             </div>
             <span class="tag tag--{{ p.discipline_color }}">{{ p.get_discipline_display }}</span>
           </div>
+          <details class="prog-card__body"{% if p.expanded %} open{% endif %}>
+          <summary class="prog-card__toggle">Зачётов: {{ p.classes.all|length }}{% for c in p.classes.all %} · {{ c.label }}{% endfor %}</summary>
 
           {% if p.classes.all %}
             <ul class="list">
               {% for c in p.classes.all %}
-                <li class="list__row">
-                  <span style="flex: 1; min-width: 0;"><strong>{{ c.label }}</strong><span class="table__sub">{{ c.conditions|default:"без ограничений" }}{% if c.note %} · {{ c.note }}{% endif %}</span></span>
+                <li class="list__row class-row">
+                  <span class="class-row__text"><strong>{{ c.label }}</strong><span class="table__sub">{{ c.conditions|default:"без ограничений" }}{% if c.note %} · {{ c.note }}{% endif %}</span></span>
                   {% if not t.is_locked %}
-                    <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:class_edit' t.pk p.pk c.pk %}#class-form-{{ p.pk }}">Изменить</a>
-                    <form method="post" action="{% url 'tournaments:class_delete' t.pk p.pk c.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}"><button type="submit" class="btn btn--danger btn--sm" aria-label="Удалить зачёт {{ c.name }}">Удалить</button></form>
+                    <span class="class-row__actions">
+                      <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:class_edit' t.pk p.pk c.pk %}#class-form-{{ p.pk }}">Изменить</a>
+                      <form method="post" action="{% url 'tournaments:class_delete' t.pk p.pk c.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}"><button type="submit" class="btn btn--danger btn--sm" aria-label="Удалить зачёт {{ c.name }}">Удалить</button></form>
+                    </span>
                   {% endif %}
                 </li>
               {% endfor %}
@@ -60,9 +64,10 @@
                       <button type="submit" name="template" value="{{ tpl.pk }}" class="btn btn--ghost btn--sm" title="{{ tpl.note }}">{{ tpl.name }}</button>
                     {% endif %}{% endfor %}
                   </form>
-                  <p class="caption muted" style="margin: var(--space-3) 0 var(--space-2);">ИЛИ СВОЙ ЗАЧЁТ</p>
+                  {% if not p.form %}<p style="margin-top: var(--space-3);"><a class="btn btn--ghost btn--sm" href="?custom={{ p.pk }}#class-form-{{ p.pk }}">Свой зачёт — задать условия вручную</a></p>{% else %}<p class="caption muted" style="margin: var(--space-3) 0 var(--space-2);">ИЛИ СВОЙ ЗАЧЁТ</p>{% endif %}
                 </div>
               {% endif %}
+              {% if p.form %}
               <form method="post" novalidate class="form" action="{% if p.editing_class %}{% url 'tournaments:class_save' t.pk p.pk p.editing_class.pk %}{% else %}{% url 'tournaments:class_add' t.pk p.pk %}{% endif %}">
                 {% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}">
                 {% for error in p.form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
@@ -99,12 +104,14 @@
                   <button type="submit" class="btn btn--dark">Сохранить зачёт</button>
                 </div>
               </form>
+              {% endif %}
             </details>
             <div class="prog-card__actions">
               <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:program_edit' t.pk p.pk %}#program-form">Изменить {% if p.is_dressage %}езду{% else %}маршрут{% endif %}</a>
               <form method="post" action="{% url 'tournaments:program_delete' t.pk p.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}"><button type="submit" class="btn btn--danger btn--sm" aria-label="Удалить {{ p.name }}">Удалить</button></form>
             </div>
           {% endif %}
+          </details>
         </section>
       {% empty %}
         <p class="muted">В этот день программы пока нет.</p>
@@ -175,5 +182,13 @@
     form.addEventListener("change", sync);
     sync();
   })();
+</script>
+<script>
+(function () { // открыть карточку, к которой ведёт ссылка (#program-N), после сохранения
+  var id = location.hash.replace("#", ""); if (!id) return;
+  var el = document.getElementById(id) || null; if (!el) return;
+  var card = el.closest(".prog-card"); if (card) { var d = card.querySelector(".prog-card__body"); if (d) d.open = true; }
+  var det = el.tagName === "DETAILS" ? el : null; if (det) det.open = true;
+})();
 </script>
 {% endblock %}

@@ -73,7 +73,7 @@ def finish(request, pk):
     t.revision += 1
     t.save()
     audit(request.user, "tournament.finish", t, warnings=services.finish_warnings(t))
-    messages.success(request, "Турнир завершён. Опубликованные сведения остаются в архиве; долги и возвраты можно закрывать и дальше.")
+    messages.success(request, "Турнир завершён. Опубликованные протоколы и результаты остаются в архиве и доступны всем.")
     return redirect("conduct:overview", pk=t.pk)
 
 
@@ -98,6 +98,7 @@ def program(request, pk, program_id):
         "published": p.start_publications.first(),
         "fields": [(f, RESULT_FIELDS.get(f, f)) for f in p.result_fields], "statuses": Result.Status.choices,
         "auto": not p.is_manual,
+        "can_publish": not (p.is_dressage and not p.is_manual) or scoring.is_scorer(request.user, p) or can_manage(request.user, t),
     }
     if not p.is_manual:
         for s in slots:

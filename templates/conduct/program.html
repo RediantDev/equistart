@@ -134,7 +134,8 @@
   <ul class="list">{% for r in classes %}
     <li class="list__row"><span style="flex: 1;"><strong>{{ r.c.label }}</strong><span class="table__sub">результатов введено: {{ r.count }}</span></span>
       {% if r.published %}<span class="chip chip--info">Опубликовано v{{ r.published.version }}</span>{% endif %}
-      <form method="post" action="{% url 'conduct:action' t.pk p.pk 'publish_results' %}">{% csrf_token %}<input type="hidden" name="tclass" value="{{ r.c.pk }}"><button class="btn btn--primary btn--sm"{% if not r.count %} disabled{% endif %}>{% if r.published %}Опубликовать исправление{% else %}Опубликовать результаты{% endif %}</button></form>
+      {% if can_publish %}<form method="post" action="{% url 'conduct:action' t.pk p.pk 'publish_results' %}">{% csrf_token %}<input type="hidden" name="tclass" value="{{ r.c.pk }}"><button class="btn btn--primary btn--sm"{% if not r.count %} disabled{% endif %}>{% if r.published %}Опубликовать исправление{% else %}Опубликовать результаты{% endif %}</button></form>
+      {% else %}<span class="table__sub">Публикует судья-подсчёт</span>{% endif %}
     </li>{% endfor %}</ul>
 </section>
 {% endblock %}
