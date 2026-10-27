@@ -13,11 +13,8 @@ from apps.entries.tests.test_entries import TMP, Base, mkuser
 
 
 def png():
-    from PIL import Image
-
-    buf = io.BytesIO()
-    Image.new("RGB", (8, 8), "red").save(buf, "PNG")
-    return SimpleUploadedFile("a.png", buf.getvalue(), content_type="image/png")
+    # Без Pillow: в CI его нет, а сервис проверяет картинку по сигнатуре
+    return SimpleUploadedFile("a.png", b"\x89PNG\r\n\x1a\n" + b"0" * 100, content_type="image/png")
 
 
 class SearchUnitTests(TestCase):
