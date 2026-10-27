@@ -32,7 +32,7 @@ ACCOUNTS = [
     ("+79990000003", "Соколова", "Мария", {"is_coach": True}, "Тренер: ведёт спортсменов и лошадей"),
     ("+79990000004", "Смирнова", "Лиза", {"is_athlete": True}, "Спортсмен, связан с профилем у тренера"),
     ("+79990000005", "Петрова", "Ольга", {}, "Судья: конкур у поля; выездка — буквы C и E"),
-    ("+79990000006", "Кузнецов", "Павел", {}, "Второй судья: выездка — буква B и судья-подсчёт"),
+    ("+79990000006", "Кузнецов", "Павел", {}, "Второй судья: выездка — буква B и судья по итогам"),
     ("+79990000007", "Морозова", "Наталья", {}, "Конюшня и услуги"),
 ]
 
@@ -101,7 +101,7 @@ class Command(BaseCommand):
         y = start.year
         people = [("Смирнова", "Лиза", y - 13, "2y", kid), ("Орлов", "Дмитрий", 1996, "2", None), ("Белова", "Анна", 2001, "3", None),
                   ("Петров", "Иван", 1990, "1", None), ("Ким", "Алина", y - 12, "none", None)]
-        athletes = [Athlete.objects.create(last_name=l, first_name=f, birth_date=datetime.date(by, 3, 15), rank_jumping=r, rank_dressage=r if r != "1" else "2", coach_name="Соколова М.", club="КСК «Белая роща»",
+        athletes = [Athlete.objects.create(last_name=l, first_name=f, birth_date=datetime.date(by, 3, 15), rank=r, coach_name="Соколова М.", club="КСК «Белая роща»",
                                            region="Московская область", manager=coach, linked_user=lu, consent_confirmed_at=now)
                     for l, f, by, r, lu in people]
         horses = [Horse.objects.create(name=n, birth_year=b, color=c, sex=s, breed=br, manager=coach)

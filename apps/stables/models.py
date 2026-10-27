@@ -51,7 +51,7 @@ class Booking(models.Model):
     arrive = models.DateField("заезд")
     depart = models.DateField("выезд")
     required = models.BooleanField("без денника выступления невозможны", default=False)
-    contact_phone = models.CharField("телефон для связи по брони", max_length=13, blank=True)
+    contact_phone = models.CharField("телефон для связи по брони", max_length=16, blank=True)
     comment = models.CharField("комментарий", max_length=500, blank=True)
     state = models.CharField(max_length=10, choices=State.choices, default=State.PENDING)
     reason = models.CharField("причина", max_length=300, blank=True)

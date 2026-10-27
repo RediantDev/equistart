@@ -21,7 +21,10 @@
   </section>
 
   <section class="card">
-    {% if t.status == "review" %}
+    {% if t.status == "rejected" %}
+      <h2 class="h3">Отклонено</h2>
+      <p class="muted">Модератор отклонил соревнование. Причина — вверху страницы.</p>
+    {% elif t.status == "review" %}
       <h2 class="h3">На проверке</h2>
       <p class="muted">Отправлено {{ t.submitted_at|date:"j E в H:i" }}. Модератор проверит положение, даты, место и программу с зачётами.</p>
     {% elif t.status == "approved" %}
@@ -30,7 +33,7 @@
     {% else %}
       <h2 class="h3">Отправить на проверку</h2>
       <p class="muted">Модератор проверит положение и сведения. После одобрения турнир появится в календаре.</p>
-      <form method="post" class="form-actions" style="justify-content: flex-start;">
+      <form method="post" class="form-actions" style="justify-content: flex-start; margin-top: var(--space-4);">
         {% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}">
         <button type="submit" class="btn btn--primary"{% if problems %} disabled{% endif %}>Отправить на проверку</button>
       </form>
@@ -60,8 +63,9 @@
   {% if history %}
   <details class="card">
     <summary class="h3">История</summary>
+    <p class="table__sub" style="margin: 6px 0 0;">Ключевые события. Мелкие правки между ними собраны в одну строку.</p>
     <ul class="list">
-      {% for h in history %}<li class="list__row"><span class="num muted" style="min-width: 120px;">{{ h.created_at|date:"d.m.Y H:i" }}</span><span style="flex: 1;">{{ h.label }}{% if h.data.name %} «{{ h.data.name }}»{% endif %}{% if h.data.comment %}: «{{ h.data.comment }}»{% endif %}</span><span class="muted">{{ h.actor.short_name|default:"" }}</span></li>{% endfor %}
+      {% for h in history %}<li class="list__row{% if h.minor %} is-minor{% endif %}"><span class="num muted" style="min-width: 120px;">{{ h.created_at|date:"d.m.Y H:i" }}</span><span style="flex: 1;">{% if h.minor %}<span class="muted">{{ h.label }} · {{ h.count }}</span>{% else %}<strong>{{ h.label }}</strong>{% if h.comment %}: «{{ h.comment }}»{% endif %}{% endif %}</span><span class="muted">{{ h.actor.short_name|default:"" }}</span></li>{% endfor %}
     </ul>
   </details>
   {% endif %}

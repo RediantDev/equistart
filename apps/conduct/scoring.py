@@ -197,7 +197,7 @@ def save_round(user, entry_id, stage, data: dict, client_key: str = "") -> JumpR
         except Exception:
             raise ValueError("Время — число секунд, например 38,41.")
         if t <= 0 or t > 999:
-            raise ValueError("Проверьте время.")
+            raise ValueError("Время — больше 0 и не больше 999 секунд, например 38,41.")
         digits = 1 if course(program)["timing"] == "manual" else 2
         t = t.quantize(Decimal(10) ** -digits)
     jr = existing or JumpRound(entry=e, round=stage)
@@ -294,7 +294,7 @@ def save_mark(user, entry_id, letter, part_key, index, value, comment=None) -> D
         raise ValueError("Нет такого пункта листа.")
     sh = DressageSheet.objects.select_for_update().filter(entry=e, position=pos).first() or sheet_for(e, pos)
     if sh.signed:
-        raise ValueError("Лист подписан. Исправить оценку можно, только если судья-подсчёт вернёт лист.")
+        raise ValueError("Лист подписан. Исправить оценку можно, только если судья по итогам вернёт лист.")
     marks = sh.marks or _blank_marks(test)
     row = list(marks.get(part_key) or [None] * len(items))
     old = row[index]
@@ -379,14 +379,14 @@ def return_sheet(user, entry_id, letter, reason) -> DressageSheet:
 
 @transaction.atomic
 def set_flags(user, entry_id, errors=None, technical=None, eliminated=None, reason=None) -> DressageFlags:
-    """DRS-05: ошибки в схеме, технические нарушения и исключение отмечает судья на C (или судья-подсчёт)."""
+    """DRS-05: ошибки в схеме, технические нарушения и исключение отмечает судья на C (или судья по итогам)."""
     e = Entry.objects.select_related("program__tournament").get(pk=entry_id)
     pos = my_position(user, e.program, "C")
     if not pos and not is_scorer(user, e.program):
         raise PermissionDenied
     f, _ = DressageFlags.objects.select_for_update().get_or_create(entry=e)
     if f.approved_at:
-        raise ValueError("Результат уже утверждён — сначала судья-подсчёт должен вернуть лист.")
+        raise ValueError("Результат уже утверждён — сначала судья по итогам должен вернуть лист.")
     before = (f.errors, f.technical, f.eliminated)
     if errors is not None:
         f.errors = max(0, min(5, int(errors)))
@@ -402,6 +402,25 @@ def set_flags(user, entry_id, errors=None, technical=None, eliminated=None, reas
     audit(user, "dressage.flags", e, before=before, after=(f.errors, f.technical, f.eliminated), reason=f.reason)
     recompute(e.program)
     return f
+
+
+@transaction.atomic
+def toggle_error_item(user, entry_id, item: str) -> DressageFlags:
+    """«Сбой» у элемента (ошибка в схеме): отметка ставится/снимается, число ошибок пересчитывается."""
+    e = Entry.objects.select_related("program__tournament").get(pk=entry_id)
+    if not my_position(user, e.program, "C") and not is_scorer(user, e.program):
+        raise PermissionDenied
+    f, _ = DressageFlags.objects.select_for_update().get_or_create(entry=e)
+    items = list(f.error_items or [])
+    if item in items:
+        items.remove(item)
+    else:
+        if len(items) >= 5:
+            raise ValueError("Больше 5 ошибок в схеме не бывает: после третьей пара исключается.")
+        items.append(item)
+    f.error_items = items
+    f.save(update_fields=["error_items"])
+    return set_flags(user, entry_id, errors=len(items))
 
 
 def pair_scores(program) -> dict:
@@ -690,7 +709,7 @@ def save_panel(user, program, rows: list[dict]) -> list[JudgePosition]:
     if len(letters_) not in (1, 2, 3, 5):
         raise ValueError("На буквах — 3 или 5 судей (на клубных стартах допускается 1–2).")
     if "SCORER" not in seen:
-        raise ValueError("Назначьте судью-подсчёт: он сводит оценки и утверждает результат.")
+        raise ValueError("Назначьте судью по итогам: он сводит оценки и утверждает результат.")
     if kind == "children":
         roles = {c["role"] for c in letters_}
         if "all" not in roles and not {"technique", "quality"} <= roles:

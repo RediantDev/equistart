@@ -1,9 +1,41 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Денники и услуги — {{ t.pub_title }} — EquiStart{% endblock %}
+{% block title %}Денники и услуги — {{ t.pub_title }} — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head"><div><a class="back" href="{% url 'tournaments:public' t.pk %}">← {{ t.pub_title }}</a><h1 class="h1">Денники и услуги</h1><p class="muted">Выберите категорию и свой период — конкретный денник назначит конюшня после подтверждения. Оплата — в кассе турнира.</p></div><a class="btn btn--ghost" href="{% url 'stables:my' %}">Мои брони и заказы</a></div>
+<div class="page-head"><div>{% if staff %}{% url 'stables:manage' t.pk as sm %}{% include "partials/crumbs.html" with mid="Денники и услуги" mid_url=sm here="Ручная бронь" %}{% else %}<a class="back" href="{% url 'tournaments:public' t.pk %}">← {{ t.pub_title }}</a>{% endif %}<h1 class="h1">{% if staff %}Бронь и заказ за участника{% else %}Денники и услуги{% endif %}</h1><p class="muted">{% if staff %}Вы в команде турнира: можно выбрать лошадей любой заявки или вписать лошадь вручную.{% else %}Выберите категорию, свой период и лошадей — конкретный денник назначит конюшня после подтверждения.{% endif %}</p></div></div>
 {% if not open %}<div class="alert">Бронирование закрыто: турнир {% if t.publication == "cancelled" %}отменён{% else %}завершён{% endif %}.</div>{% endif %}
+
+{% if my_bookings or my_orders %}
+<section class="stb-mine" id="mine" aria-labelledby="mine-h">
+  <h2 class="h2" id="mine-h">Мои брони и заказы на этом турнире</h2>
+  {% if my_bookings %}<div class="list-cards">{% for b in my_bookings %}
+    <article class="row-card stb-booking" id="b{{ b.pk }}">
+      <div class="stb-booking__main"><strong>{{ b.horse_name }}</strong> · {{ b.category.name }}
+        <span class="table__sub">{{ b.arrive|date:"j E" }} — {{ b.depart|date:"j E" }}, суток: {{ b.nights }}</span>
+        {% if b.required %}<span class="table__sub">Без денника выступления невозможны{% if b.state == "pending" or b.state == "rejected" %} — выступления лошади ждут подтверждения брони{% endif %}</span>{% endif %}
+        {% if b.reason and b.state != "pending" %}<span class="table__sub">Причина: {{ b.reason }}</span>{% endif %}</div>
+      <div class="chips"><span class="chip{% if b.state == 'confirmed' %} chip--success{% elif b.state == 'pending' %} chip--warning{% elif b.state == 'rejected' %} chip--danger{% endif %}">{{ b.get_state_display }}</span>{% if b.box_number %}<span class="chip chip--info">Денник {{ b.box_number }}</span>{% endif %}</div>
+      {% if b.is_holding and open %}<div class="stb-booking__acts">
+        {% if b.state == "pending" %}<details class="inline-details stb-edit"><summary class="btn btn--ghost btn--sm">Изменить</summary>
+          <form method="post" action="{% url 'stables:my_edit' b.pk %}" class="form stb-edit__form" data-period-form>{% csrf_token %}<input type="hidden" name="revision" value="{{ b.revision }}">
+            <div class="field"><label class="field__label" for="e{{ b.pk }}-cat">Категория</label><select id="e{{ b.pk }}-cat" name="category" required><option value="">— выберите —</option>{% for c in cats %}<option value="{{ c.pk }}" data-from="{{ c.available_from|date:'Y-m-d' }}" data-to="{{ c.available_to|date:'Y-m-d' }}"{% if c.pk == b.category_id %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+            <div class="form-row" data-dates><div class="field"><label class="field__label" for="e{{ b.pk }}-a">Заезд</label><input id="e{{ b.pk }}-a" type="date" name="arrive" value="{{ b.arrive|date:'Y-m-d' }}" required{% if date_min %} min="{{ date_min|date:'Y-m-d' }}" max="{{ date_max|date:'Y-m-d' }}"{% endif %}></div><div class="field"><label class="field__label" for="e{{ b.pk }}-d">Выезд</label><input id="e{{ b.pk }}-d" type="date" name="depart" value="{{ b.depart|date:'Y-m-d' }}" required{% if date_min %} min="{{ date_min|date:'Y-m-d' }}" max="{{ date_max|date:'Y-m-d' }}"{% endif %}></div></div>
+            <p class="field__error" data-date-error role="alert" hidden></p>
+            <p class="field__help" data-nights></p>
+            <button class="btn btn--primary btn--sm">Сохранить изменения</button>
+          </form></details>{% endif %}
+        <details class="inline-details"><summary class="btn btn--ghost btn--sm">Отменить</summary><form method="post" action="{% url 'stables:my_cancel' 'booking' b.pk %}" class="inline-row">{% csrf_token %}<input type="hidden" name="next" value="{{ here }}#mine"><input type="text" name="reason" placeholder="Причина (необязательно)" aria-label="Причина"><button class="btn btn--danger btn--sm">Отменить бронь</button></form></details>
+      </div>{% endif %}
+    </article>{% endfor %}</div>{% endif %}
+  {% if my_orders %}<h3 class="h3 stb-mine__sub">Услуги</h3><div class="list-cards">{% for o in my_orders %}
+    <article class="row-card"><div class="stb-booking__main"><strong>{{ o.service.name }}</strong> × {{ o.quantity }} {{ o.service.unit }} · {{ o.recipient_label }}{% if o.for_date %}<span class="table__sub">на {{ o.for_date|date:"j E" }}</span>{% endif %}</div>
+      <span class="chip{% if o.delivered == o.quantity %} chip--success{% elif o.delivered %} chip--warning{% elif o.state == 'cancelled' %} chip--danger{% endif %}">{{ o.delivery_state }}</span>
+      {% if o.state == "ordered" and not o.delivered and open %}<form method="post" action="{% url 'stables:my_cancel' 'order' o.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ here }}#mine"><button class="btn btn--ghost btn--sm">Отменить</button></form>{% endif %}
+    </article>{% endfor %}</div>{% endif %}
+  {% if contacts %}<div class="card stb-contact"><div class="caption muted">ВОПРОСЫ ПО ДЕННИКАМ И УСЛУГАМ</div>{% for c in contacts %}
+    <div class="stb-contact__row"><span><strong>{{ c.name }}</strong><span class="table__sub">{{ c.role }}</span></span>{% if c.phone %}<a class="btn btn--ghost btn--sm" href="tel:{{ c.phone }}">{{ c.phone|phone }}</a>{% endif %}</div>{% endfor %}</div>{% endif %}
+</section>
+{% endif %}
 
 <div class="wizard-grid wizard-grid--aside-first">
   <div class="wizard-main">
@@ -19,50 +51,116 @@
     {% else %}<div class="card empty"><h3 class="h3">Организатор пока не добавил денники</h3></div>{% endif %}
 
     <h2 class="h2" id="services" style="margin-top: var(--space-5);">Услуги</h2>
-    {% if svcs %}<div class="list-cards">{% for s in svcs %}
-      <form method="post" action="{% url 'stables:order' t.pk %}" class="row-card" style="align-items: flex-end;">{% csrf_token %}<input type="hidden" name="service" value="{{ s.pk }}"><input type="hidden" name="key" value="{{ okey }}-{{ s.pk }}">
-        <div style="flex: 1 1 200px; min-width: 0;"><strong>{{ s.name }}</strong><div class="table__sub">единица: {{ s.unit }} · получатель: {{ s.get_recipient_display|lower }}{% if s.available_from %} · с {{ s.available_from|date:"j E" }}{% endif %}{% if s.available_to %} по {{ s.available_to|date:"j E" }}{% endif %}</div></div>
-        {% if open %}
-        {% if s.recipient == "horse" %}<label class="field" style="flex: 1 1 150px;"><span class="field__label">Лошадь</span><select name="horse" required><option value="">—</option>{% for h in horses %}<option value="{{ h.pk }}">{{ h.name }}</option>{% endfor %}</select></label>
-        {% elif s.recipient == "trailer" %}<label class="field" style="flex: 1 1 150px;"><span class="field__label">Номер коневоза</span><input type="text" name="trailer" required maxlength="40"></label>{% endif %}
-        {% if s.available_from or s.available_to %}<label class="field" style="flex: 0 1 160px;"><span class="field__label">На дату</span><input type="date" name="for_date"{% if s.available_from %} min="{{ s.available_from|date:'Y-m-d' }}"{% endif %}{% if s.available_to %} max="{{ s.available_to|date:'Y-m-d' }}"{% endif %}></label>{% endif %}
-        <label class="field" style="flex: 0 1 90px;"><span class="field__label">Кол-во</span><input type="number" name="quantity" min="1" value="1" required></label>
-        <button class="btn btn--dark btn--sm">Заказать</button>{% endif %}
-      </form>{% endfor %}</div>
+    {% if svc_rows %}
+    <form method="post" action="{% url 'stables:order' t.pk %}" id="order" class="stb-order">{% csrf_token %}<input type="hidden" name="key" value="{{ okey }}">
+      {% for e in order_general %}<div class="field field--error"><p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ e }}</p></div>{% endfor %}
+      <div class="list-cards">{% for r in svc_rows %}{% with s=r.s %}
+        <article class="card stb-svc{% if r.errors %} field--error{% endif %}" id="s{{ s.pk }}">
+          <div><strong>{{ s.name }}</strong><div class="table__sub">единица: {{ s.unit }} · получатель: {{ s.get_recipient_display|lower }}{% if s.available_from %} · с {{ s.available_from|date:"j E" }}{% endif %}{% if s.available_to %} по {{ s.available_to|date:"j E" }}{% endif %}</div></div>
+          {% for e in r.errors %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ e }}</p>{% endfor %}
+          {% if open %}
+            {% if s.recipient == "horse" and not horses %}<p class="table__sub">Услуга заказывается на лошадь. <a href="{% url 'profiles:horse_new' %}">+ Добавить лошадь</a></p>
+            {% else %}
+            {% if s.recipient == "trailer" %}<div class="field"><label class="field__label" for="tr-{{ s.pk }}">Номер коневоза</label><input id="tr-{{ s.pk }}" type="text" name="trailer-{{ s.pk }}" value="{{ r.trailer }}" maxlength="40" autocomplete="off"></div>{% endif %}
+            <div class="stb-qty">{% for q in r.rows %}
+              <label class="stb-qty__row"><span class="stb-qty__label">{{ q.label }}</span><input class="stb-qty__input" type="number" name="{{ q.name }}" value="{{ q.value }}" min="0" step="1" inputmode="numeric" placeholder="0" aria-label="{{ s.name }}, {{ q.label }}, {{ s.unit }}"><span class="stb-qty__unit">{{ s.unit }}</span></label>{% endfor %}</div>
+            {% if s.available_from or s.available_to %}<div class="field stb-svc__date"><label class="field__label" for="sd-{{ s.pk }}">На дату <span class="field__optional">необязательно</span></label><input id="sd-{{ s.pk }}" type="date" name="date-{{ s.pk }}" value="{{ r.date }}"{% if s.available_from %} min="{{ s.available_from|date:'Y-m-d' }}"{% endif %}{% if s.available_to %} max="{{ s.available_to|date:'Y-m-d' }}"{% endif %}></div>{% endif %}
+            {% endif %}
+          {% endif %}
+        </article>{% endwith %}{% endfor %}</div>
+      {% if open %}<div class="stb-order__bar"><span class="stb-order__count" data-order-count>Ничего не выбрано</span><button class="btn btn--primary" data-order-submit>Заказать</button></div>{% endif %}
+    </form>
     {% else %}<p class="muted">Услуг нет.</p>{% endif %}
   </div>
 
   <aside class="wizard-aside">
     {% if open and cats %}
-    <form method="post" class="card form" id="book">{% csrf_token %}<input type="hidden" name="key" value="{{ form.key }}">
+    <form method="post" class="card form" id="book" data-period-form>{% csrf_token %}<input type="hidden" name="key" value="{{ form.key }}">
       <h2 class="h3">Забронировать денник</h2>
-      {% for e in errors %}<div class="alert alert--error">{{ e }}</div>{% endfor %}
-      {% if not horses %}<div class="alert">Сначала добавьте лошадь в <a href="{% url 'profiles:horses' %}">«Лошади»</a> — бронь оформляется на лошадь.</div>{% endif %}
-      <div class="field"><label class="field__label" for="b-cat">Категория</label><select id="b-cat" name="category" required><option value="">—</option>{% for c in cats %}<option value="{{ c.pk }}"{% if form.category == c.pk|stringformat:"s" %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
-      <div class="field"><label class="field__label" for="b-horse">Лошадь</label><select id="b-horse" name="horse" required><option value="">—</option>{% for h in horses %}<option value="{{ h.pk }}"{% if form.horse == h.pk|stringformat:"s" %} selected{% endif %}>{{ h.name }}</option>{% endfor %}</select></div>
-      <div class="form-row"><div class="field"><label class="field__label" for="b-a">Заезд</label><input id="b-a" type="date" name="arrive" value="{{ form.arrive }}" required></div><div class="field"><label class="field__label" for="b-d">Выезд</label><input id="b-d" type="date" name="depart" value="{{ form.depart }}" required></div></div>
-      <label class="check"><input type="checkbox" name="required"{% if form.required %} checked{% endif %}><span>Без денника выступления этой лошади невозможны</span></label>
+      {% for e in errors %}<div class="field field--error"><p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ e }}</p></div>{% endfor %}
+      {% if not horses and not staff %}<div class="alert">Бронь оформляется на лошадь. Добавьте её в профиль: <a href="{% url 'profiles:horse_new' %}">+ Добавить лошадь</a> — это займёт минуту.</div>{% endif %}
+      <div class="field{% if fe.category %} field--error{% endif %}"><label class="field__label" for="b-cat">Категория</label><select id="b-cat" name="category" required><option value="">— выберите —</option>{% for c in cats %}<option value="{{ c.pk }}" data-from="{{ c.available_from|date:'Y-m-d' }}" data-to="{{ c.available_to|date:'Y-m-d' }}"{% if form.category == c.pk|stringformat:"s" %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</select>
+        {% if fe.category %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ fe.category }}</p>{% endif %}</div>
+      {% if horses or staff %}<fieldset class="field stb-horses{% if fe.horse %} field--error{% endif %}"><legend class="field__label">Лошади</legend>
+        <div class="choices">{% for h in horses %}<label class="choice"><input type="checkbox" name="horse" value="{{ h.pk }}"{% if h.checked %} checked{% endif %}><span>{{ h.name }}</span></label>{% endfor %}
+        {% if staff %}<label class="choice"><input type="checkbox" name="add_new"{% if form.add_new %} checked{% endif %}><span>+ Вписать лошадь вручную</span></label>{% endif %}</div>
+        <p class="field__help">Можно отметить несколько: на каждую лошадь — своя бронь, все на одни даты.</p>
+        {% if fe.horse %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ fe.horse }}</p>{% endif %}</fieldset>{% endif %}
+      {% if staff %}<div data-show-when="add_new:checked" class="form-row">
+        <div class="field{% if fe.new_horse %} field--error{% endif %}"><label class="field__label" for="b-nh">Кличка</label><input id="b-nh" name="new_horse" value="{{ form.new_horse }}" placeholder="Обязательно">{% if fe.new_horse %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ fe.new_horse }}</p>{% endif %}</div>
+        <div class="field"><label class="field__label" for="b-no">Владелец или всадник</label><input id="b-no" name="new_owner" value="{{ form.new_owner }}" placeholder="Необязательно"></div>
+      </div>{% endif %}
+      <div class="form-row" data-dates><div class="field{% if fe.dates %} field--error{% endif %}"><label class="field__label" for="b-a">Заезд</label><input id="b-a" type="date" name="arrive" value="{{ form.arrive }}" required{% if date_min %} min="{{ date_min|date:'Y-m-d' }}" max="{{ date_max|date:'Y-m-d' }}"{% endif %}></div><div class="field{% if fe.dates %} field--error{% endif %}"><label class="field__label" for="b-d">Выезд</label><input id="b-d" type="date" name="depart" value="{{ form.depart }}" required{% if date_min %} min="{{ date_min|date:'Y-m-d' }}" max="{{ date_max|date:'Y-m-d' }}"{% endif %}></div></div>
+      <p class="field__error" data-date-error role="alert"{% if not fe.dates %} hidden{% endif %}>{% if fe.dates %}<span aria-hidden="true">!</span> {{ fe.dates }}{% endif %}</p>
+      <p class="field__help" data-nights></p>
+      <label class="check"><input type="checkbox" name="required"{% if form.required %} checked{% endif %}><span>Без денника выступления этих лошадей невозможны</span></label>
       <p class="field__help">Тогда выступления лошади попадут в стартовый протокол только после подтверждения брони.</p>
-      <div class="field"><label class="field__label" for="b-p">Телефон для связи по брони <span class="field__optional">необязательно</span></label><input id="b-p" type="tel" name="contact_phone" value="{{ form.contact_phone }}" placeholder="+7 900 000-00-00"><p class="field__help">Увидит только конюшня турнира.</p></div>
-      <div class="field"><label class="field__label" for="b-c">Комментарий <span class="field__optional">необязательно</span></label><input id="b-c" type="text" name="comment" value="{{ form.comment }}" maxlength="500"></div>
+      <div class="field{% if fe.contact_phone %} field--error{% endif %}"><label class="field__label" for="b-p">Телефон для связи по брони</label><input id="b-p" placeholder="Необязательно" type="tel" name="contact_phone" value="{{ form.contact_phone }}"><p class="field__help">Увидит только конюшня турнира.</p>{% if fe.contact_phone %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ fe.contact_phone }}</p>{% endif %}</div>
+      <div class="field"><label class="field__label" for="b-c">Комментарий</label><input id="b-c" placeholder="Необязательно" type="text" name="comment" value="{{ form.comment }}" maxlength="500"></div>
       {% if preview %}
         <div class="summary-box">
           <div class="caption muted">ПРОВЕРЬТЕ БРОНЬ</div>
-          <div class="stat__value">суток: {{ preview.nights }}</div>
-          <div class="table__sub">{{ preview.c.name }} · {{ preview.h.name }} · {{ preview.arrive|date:"j E" }} — {{ preview.depart|date:"j E" }} · свободно мест: {{ preview.free }}</div>
+          <div class="stat__value">суток: {{ preview.nights }}{% if preview.horses|length > 1 %} · лошадей: {{ preview.horses|length }}{% endif %}</div>
+          <div class="table__sub">{{ preview.c.name }} · {% for h in preview.horses %}{{ h.name }}{% if not forloop.last %}, {% endif %}{% endfor %} · {{ preview.arrive|date:"j E" }} — {{ preview.depart|date:"j E" }} · свободно мест: {{ preview.free }}</div>
         </div>
         <input type="hidden" name="confirm" value="1">
-        <button class="btn btn--primary btn--block">Забронировать</button>
+        <button class="btn btn--primary btn--block" data-period-submit>Забронировать</button>
       {% else %}
-        <button class="btn btn--dark btn--block"{% if not horses %} disabled{% endif %}>Проверить даты</button>
+        <button class="btn btn--dark btn--block" data-period-submit{% if not horses and not staff %} disabled{% endif %}>Проверить даты</button>
       {% endif %}
     </form>
     {% endif %}
   </aside>
 </div>
 <script>
-document.querySelectorAll("#book select, #book input[type=date]").forEach(function (el) {
-  el.addEventListener("change", function () { var c = document.querySelector("#book input[name=confirm]"); if (c) { c.remove(); var b = document.querySelector("#book button.btn--primary"); if (b) { b.className = "btn btn--dark btn--block"; b.textContent = "Пересчитать сумму"; } } });
-});
+(function () {
+  function fmt(iso) { var p = iso.split("-"); return p[2] + "." + p[1]; }
+  // Мгновенная проверка дат: выезд позже заезда и внутри периода категории. Сервер проверяет то же самое.
+  document.querySelectorAll("[data-period-form]").forEach(function (form) {
+    var cat = form.querySelector("select[name=category]"), a = form.querySelector("input[name=arrive]"), d = form.querySelector("input[name=depart]");
+    var box = form.querySelector("[data-date-error]"), nights = form.querySelector("[data-nights]"), row = form.querySelector("[data-dates]");
+    var btn = form.querySelector("[data-period-submit]") || form.querySelector("button:not([type=button])");
+    var serverMsg = box && !box.hidden;
+    function check(e) {
+      if (e && serverMsg) serverMsg = false;
+      if (serverMsg) return;
+      var av = a.value, dv = d.value, o = cat && cat.options[cat.selectedIndex], msg = "";
+      if (av && dv && dv <= av) msg = "Выезд должен быть позже заезда (минимум одни сутки).";
+      else if (o && o.dataset.from && ((av && av < o.dataset.from) || (dv && dv > o.dataset.to)))
+        msg = "«" + o.textContent + "» доступна с " + fmt(o.dataset.from) + " по " + fmt(o.dataset.to) + ".";
+      box.hidden = !msg;
+      box.innerHTML = msg ? '<span aria-hidden="true">!</span> ' : "";
+      if (msg) box.appendChild(document.createTextNode(msg));
+      row.querySelectorAll(".field").forEach(function (f) { f.classList.toggle("field--error", !!msg); });
+      if (btn && btn.dataset.wasDisabled === undefined) btn.dataset.wasDisabled = btn.disabled ? "1" : "0";
+      if (btn) btn.disabled = !!msg || btn.dataset.wasDisabled === "1";
+      if (nights) {
+        var n = av && dv && !msg ? Math.round((Date.parse(dv) - Date.parse(av)) / 864e5) : 0;
+        nights.textContent = n > 0 ? "Суток: " + n : "";
+      }
+    }
+    form.addEventListener("change", function (e) {
+      if (e.target === cat || e.target === a || e.target === d) check(e);
+      // любое изменение после «Проверить даты» требует новой проверки
+      var c = form.querySelector("input[name=confirm]");
+      if (c && form.id === "book") { c.remove(); var b = form.querySelector("button.btn--primary"); if (b) { b.className = "btn btn--dark btn--block"; b.textContent = "Проверить снова"; } }
+    });
+    check();
+  });
+  // Корзина услуг: счётчик выбранных позиций и одна кнопка «Заказать».
+  var order = document.getElementById("order");
+  if (order) {
+    var count = order.querySelector("[data-order-count]"), sub = order.querySelector("[data-order-submit]");
+    var sync = function () {
+      var n = 0;
+      order.querySelectorAll(".stb-qty__input").forEach(function (i) { if (parseInt(i.value, 10) > 0) n++; });
+      if (count) count.textContent = n ? "Позиций в заказе: " + n : "Укажите количество";
+      if (sub) sub.disabled = !n;
+    };
+    order.addEventListener("input", sync);
+    order.addEventListener("change", sync);
+    sync();
+  }
+})();
 </script>
 {% endblock %}

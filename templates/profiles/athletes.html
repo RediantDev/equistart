@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Спортсмены — EquiStart{% endblock %}
+{% block title %}Спортсмены — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
@@ -8,7 +8,8 @@
     <p class="muted">Те, кем вы управляете, кто разрешил вам подавать заявки, и ваш собственный профиль.</p>
   </div>
   <div class="form-actions">
-    {% if user.is_athlete %}<a class="btn btn--ghost" href="{% url 'profiles:athlete_new' %}?me=1">Мой профиль спортсмена</a>{% endif %}
+    {# Тест 5, п. 12.2: свой профиль уже в списке («Это вы») — кнопка нужна, только пока его нет #}
+    {% if user.is_athlete %}{% with own=rows|dictsort:"own"|last %}{% if not own.own %}<a class="btn btn--ghost" href="{% url 'profiles:athlete_new' %}?me=1">Создать мой профиль спортсмена</a>{% endif %}{% endwith %}{% endif %}
     <a class="btn btn--primary" href="{% url 'profiles:athlete_new' %}">+ Добавить спортсмена</a>
   </div>
 </div>

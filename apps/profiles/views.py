@@ -5,6 +5,7 @@ from django.db import IntegrityError, transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.accounts.models import User
@@ -48,13 +49,16 @@ def athlete_edit(request, pk=None):
                 a.manager = request.user
                 if myself:
                     a.linked_user = request.user
-            if form.cleaned_data.get("consent") and not a.consent_confirmed_at:
-                a.consent_confirmed_at = timezone.now()
+            if not a.consent_confirmed_at:
+                a.consent_confirmed_at = timezone.now()  # тест 4: отдельной галочки нет, согласие даётся при регистрации
             a.save()
             audit(request.user, "athlete.save", a, created=not athlete)
         messages.success(request, f"Спортсмен «{a.full_name}» сохранён.")
+        nxt = _back_to(request)
+        if nxt:
+            return redirect(nxt if athlete else _with_param(nxt, "athlete", a.pk))
         return redirect("profiles:athlete", pk=a.pk)
-    return render(request, "profiles/athlete_form.html", {"form": form, "athlete": athlete, "myself": myself})
+    return render(request, "profiles/athlete_form.html", {"form": form, "athlete": athlete, "myself": myself, "next": _back_to(request)})
 
 
 @login_required
@@ -119,11 +123,25 @@ def athlete_action(request, pk, action):
     return redirect("profiles:athlete", pk=a.pk)
 
 
+def _back_to(request):
+    """Адрес возврата (например, в заявку), если он безопасный."""
+    nxt = request.POST.get("next") or request.GET.get("next") or ""
+    if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        return nxt
+    return ""
+
+
+def _with_param(url, key, value):
+    base, _, frag = url.partition("#")
+    base += ("&" if "?" in base else "?") + f"{key}={value}"
+    return base + "#add"
+
+
 # ---------------- лошади ----------------
 
 @login_required
 def horses(request):
-    items = Horse.objects.filter(manager=request.user, archived=False)
+    items = Horse.objects.filter(manager=request.user, archived=False, added_by_judge=False)
     return render(request, "profiles/horses.html", {"horses": items})
 
 
@@ -152,8 +170,11 @@ def horse_edit(request, pk=None):
                 form.add_error("fksr_number", "Лошадь с таким номером ФКСР уже есть в сервисе.")
             else:
                 messages.success(request, f"Лошадь «{h.name}» сохранена. Внутренний код: {h.code}.")
+                nxt = _back_to(request)
+                if nxt and not horse:
+                    return redirect(_with_param(nxt, "horse", h.pk))
                 return redirect("profiles:horse", pk=h.pk)
-    return render(request, "profiles/horse_form.html", {"form": form, "horse": horse, "similar": similar})
+    return render(request, "profiles/horse_form.html", {"form": form, "horse": horse, "similar": similar, "next": _back_to(request)})
 
 
 @login_required
@@ -206,8 +227,13 @@ def horse_action(request, pk, action):
             audit(request.user, "horse.document", h, document=d.pk, kind=d.kind)
             messages.success(request, "Документ загружен.")
         else:
-            for errs in form.errors.values():
-                messages.error(request, "; ".join(errs))
+            # Тест 5, п. 16.2: понятно, какое поле не заполнено
+            labels = {"file": "Файл", "kind": "Тип", "title": "Название", "valid_until": "Действует до"}
+            for name, errs in form.errors.items():
+                msg = "; ".join(errs)
+                if name == "file" and "Обязательное" in msg:
+                    msg = "выберите файл документа"
+                messages.error(request, f"{labels.get(name, 'Документ')}: {msg}")
     elif action == "delete_doc":
         HorseDocument.objects.filter(horse=h, pk=request.POST.get("document")).delete()
         audit(request.user, "horse.document_delete", h)
@@ -223,7 +249,7 @@ def horse_document(request, pk, doc_id):
     if not services.can_view_horse_documents(request.user, h):
         raise PermissionDenied
     d = get_object_or_404(HorseDocument, pk=doc_id, horse=h)
-    ext = {"application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg"}.get(d.content_type, "bin")
+    ext = {"application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/heic": "heic"}.get(d.content_type, "bin")
     resp = FileResponse(d.file.open("rb"), content_type=d.content_type, filename=f"{h.code}-{d.kind}.{ext}")
     resp["X-Content-Type-Options"] = "nosniff"
     resp["Content-Security-Policy"] = "sandbox"
@@ -233,7 +259,7 @@ def horse_document(request, pk, doc_id):
 @login_required
 def horse_search(request):
     q = request.GET.get("q", "")
-    mode = request.GET.get("mode", "name")
+    mode = request.GET.get("mode", "auto")
     results = services.search_horses(q, mode)
     return render(request, "profiles/horse_search.html", {"q": q, "mode": mode, "results": results, "next": request.GET.get("next", "")})
 

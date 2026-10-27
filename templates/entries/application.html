@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Заявка №{{ app.pk }} — EquiStart{% endblock %}
+{% block title %}Заявка №{{ app.pk }} — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
@@ -21,33 +21,42 @@
           <h2 class="h3" style="margin: 0;">Выступления</h2>
           {% if owner %}<button class="btn btn--danger btn--sm" type="submit">Отменить выбранные…</button>{% endif %}
         </div>
-        <div class="list-cards">
-          {% for e in entries %}
-            <article class="entry-row{% if not e.is_active %} is-muted{% endif %}">
-              {% if owner %}<input type="checkbox" name="entry" value="{{ e.pk }}" aria-label="Выбрать {{ e.athlete_snapshot.name }} / {{ e.horse_snapshot.name }}"{% if not e.is_active or e.is_started %} disabled{% endif %}><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}">{% endif %}
-              <div class="entry-row__main">
-                <strong>{{ e.athlete_snapshot.name }}</strong> на <strong>{{ e.horse_snapshot.name }}</strong>
-                <span class="table__sub">{{ e.program_name }} · {{ e.class_name }} · {{ e.day|date:"j E" }}</span>
-                {% if e.height %}<span class="table__sub">{{ e.height }} см</span>{% endif %}
-                {% if e.program.is_dressage and e.program.test_snapshot and e.result %}<a class="table__sub" href="{% url 'conduct:my_sheets' e.pk %}">Листы судей</a>{% endif %}
-                {% if e.decision == "rejected" and e.decision_reason and show_contacts %}<span class="table__sub" style="color: var(--danger);">Причина: {{ e.decision_reason }}</span>{% endif %}
-                {% if e.decision == "cancelled" and e.cancel_reason and show_contacts %}<span class="table__sub">Причина отмены: {{ e.cancel_reason }}</span>{% endif %}
-                {% if e.pending_proposal %}
-                  <div class="proposal">Предложено: {{ e.pending_proposal.describe }}
-                    {% if judge %}
-                      <span class="proposal__actions">
-                        <button class="btn btn--primary btn--sm" form="pp-{{ e.pending_proposal.pk }}" name="decision" value="accept">Принять изменение</button>
-                        <button class="btn btn--ghost btn--sm" form="pp-{{ e.pending_proposal.pk }}" name="decision" value="reject">Отклонить</button>
-                      </span>
+        <div class="rider-groups">
+          {% for g in groups %}
+            <details class="rider-group"{% if groups|length <= 2 or forloop.first %} open{% endif %}>
+              <summary class="rider-group__head">
+                <span class="rider-group__name"><strong>{{ g.name }}</strong><span class="table__sub">выступлений: {{ g.entries|length }}</span></span>
+                <span class="chips">{% for label, n, color in g.summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</span>
+              </summary>
+              <div class="list-cards rider-group__body">
+              {% for e in g.entries %}
+                <article class="entry-row{% if not e.is_active %} is-muted{% endif %}">
+                  {% if owner %}<label class="entry-row__pick"><input type="checkbox" name="entry" value="{{ e.pk }}" aria-label="Выбрать {{ e.athlete_snapshot.name }} / {{ e.horse_snapshot.name }}"{% if not e.is_active or e.is_started %} disabled{% endif %}></label><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}">{% endif %}
+                  <div class="entry-row__main">
+                    <strong>{{ e.horse_snapshot.name }}</strong>
+                    <span class="table__sub">{{ e.program_name }} · {{ e.class_name }}{% if e.height %} · {{ e.height }} см{% endif %} · {{ e.day|date:"j E" }}</span>
+                    {% if e.program.is_dressage and e.program.test_snapshot and e.result %}<a class="table__sub" href="{% url 'conduct:my_sheets' e.pk %}">Листы судей</a>{% endif %}
+                    {% if e.decision == "rejected" and e.decision_reason and show_contacts %}<span class="table__sub" style="color: var(--danger);">Причина: {{ e.decision_reason }}</span>{% endif %}
+                    {% if e.decision == "cancelled" and e.cancel_reason and show_contacts %}<span class="table__sub">Причина отмены: {{ e.cancel_reason }}</span>{% endif %}
+                    {% if e.pending_proposal %}
+                      <div class="proposal">Предложено: {{ e.pending_proposal.describe }}
+                        {% if judge %}
+                          <span class="proposal__actions">
+                            <button class="btn btn--primary btn--sm" form="pp-{{ e.pending_proposal.pk }}" name="decision" value="accept">Принять изменение</button>
+                            <button class="btn btn--ghost btn--sm" form="pp-{{ e.pending_proposal.pk }}" name="decision" value="reject">Отклонить</button>
+                          </span>
+                        {% endif %}
+                      </div>
                     {% endif %}
                   </div>
-                {% endif %}
+                  <div class="entry-row__side">
+                    {% include "entries/_entry_chips.html" %}
+                    {% if owner and e.is_active and not e.is_started and not e.pending_proposal %}<a class="btn btn--ghost btn--sm" href="{% url 'entries:propose' e.pk %}">Предложить замену</a>{% endif %}
+                  </div>
+                </article>
+              {% endfor %}
               </div>
-              <div class="entry-row__side">
-                {% include "entries/_entry_chips.html" %}
-                {% if owner and e.is_active and not e.is_started and not e.pending_proposal %}<a class="btn btn--ghost btn--sm" href="{% url 'entries:propose' e.pk %}">Предложить замену</a>{% endif %}
-              </div>
-            </article>
+            </details>
           {% endfor %}
         </div>
       </section>

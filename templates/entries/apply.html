@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Заявка — {{ s.title }} — EquiStart{% endblock %}
+{% block title %}Заявка — {{ s.title }} — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
@@ -16,6 +16,7 @@
     <ul style="margin: 6px 0 0; padding-left: 1.2em;">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
   </div>
 {% endif %}
+<div id="apply-warnings">
 {% if warnings %}
   <div class="alert alert--warning" style="margin-bottom: var(--space-4);">
     <strong>Ограничения Правил — проверьте перед отправкой:</strong>
@@ -23,9 +24,11 @@
     <p class="table__sub" style="margin-top: 6px;">Подачу это не запрещает: решение — за судьями турнира.</p>
   </div>
 {% endif %}
+</div>
 
 <div class="wizard-grid">
   <div class="wizard-main">
+    <div id="pairs" class="pairs">
     {% for pair in pairs %}
       <section class="card pair{% if not pair.open %} pair--closed{% endif %}" id="pair-{{ pair.a.pk }}-{{ pair.h.pk }}">
         <div class="section-head">
@@ -34,59 +37,80 @@
             <span class="table__sub">{{ pair.a.summary|default:"разряд и год рождения не указаны" }} · {{ pair.h.summary }}{% if pair.h.is_pony %} · пони{% if pair.h.height_cm %} {{ pair.h.height_cm }} см{% endif %}{% endif %}</span>
           </div>
           <div class="chips">
-            {% if not pair.open %}<a class="btn btn--dark btn--sm" href="?{% if late %}late=1&{% endif %}open={{ pair.a.pk }}-{{ pair.h.pk }}#pair-{{ pair.a.pk }}-{{ pair.h.pk }}">{% if pair.count %}Изменить{% else %}Выбрать маршруты{% endif %}</a>{% endif %}
-            <form method="post">{% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="a" value="{{ pair.a.pk }}"><input type="hidden" name="h" value="{{ pair.h.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="pair_remove">Убрать пару</button></form>
+            {% if not pair.open %}<a class="btn btn--dark btn--sm" href="?{% if late %}late=1&amp;{% endif %}open={{ pair.a.pk }}-{{ pair.h.pk }}#pair-{{ pair.a.pk }}-{{ pair.h.pk }}"
+               hx-get="{{ apply_url }}{% if late %}&amp;{% else %}?{% endif %}open={{ pair.a.pk }}-{{ pair.h.pk }}" hx-target="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-select="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-swap="outerHTML transition:true show:top" hx-push-url="false">{% if pair.count %}Изменить{% else %}Выбрать маршруты{% endif %}</a>{% endif %}
+            <form method="post" action="{{ apply_url }}" hx-post="{{ apply_url }}" hx-target="#pairs" hx-select="#pairs" hx-select-oob="#apply-count,#apply-submit,#apply-warnings" hx-swap="outerHTML transition:true" hx-push-url="false">{% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="a" value="{{ pair.a.pk }}"><input type="hidden" name="h" value="{{ pair.h.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="pair_remove">Убрать пару</button></form>
           </div>
         </div>
         {% if not pair.open %}
-          {% if pair.mine %}<ul class="pair-summary">{% for i, l in pair.mine %}<li><span class="chip chip--success">✓</span> {{ l.tclass.program.name }} — {{ l.tclass.label }}{% if l.height and not l.tclass.height %} · {{ l.height }} см{% endif %}</li>{% endfor %}</ul>
+          {% if pair.summary %}<ul class="pair-summary pair-summary--routes">{% for g in pair.summary %}<li><span class="pair-summary__route">{{ g.p.name }}</span><span class="pair-summary__classes">{% for l in g.lines %}<span class="chip chip--success">✓ {{ l.tclass.label }}{% if l.height and not l.tclass.height %} · {{ l.height }} см{% endif %}</span>{% endfor %}</span></li>{% endfor %}</ul>
           {% else %}<p class="table__sub">Маршруты ещё не выбраны.</p>{% endif %}
         {% else %}
-          <form method="post" class="pair-form">
+          <form method="post" action="{{ apply_url }}" class="pair-form" hx-post="{{ apply_url }}" hx-target="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-select="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-select-oob="#apply-count,#apply-submit,#apply-warnings" hx-swap="outerHTML transition:true show:top" hx-push-url="false">
             {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="a" value="{{ pair.a.pk }}"><input type="hidden" name="h" value="{{ pair.h.pk }}"><input type="hidden" name="open" value="{{ pair.a.pk }}-{{ pair.h.pk }}">
-            <p class="table__sub">Выберите зачёт в нужных маршрутах и нажмите «Добавить выбранные». Недоступные зачёты показаны с причиной.</p>
+            {% if pair.errors %}
+              <div class="alert alert--error" role="alert">
+                <ul style="margin: 0; padding-left: 1.2em;">{% for e in pair.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+              </div>
+            {% endif %}
             {% for row in pair.programs %}
               <div class="pair-prog">
                 <div class="pair-prog__head">
                   <span class="tag tag--{{ row.p.discipline_color }}">{{ row.p.day|date:"j E" }}{% if row.p.start_time %} · {{ row.p.start_time|time:"H:i" }}{% endif %}</span>
                   <strong>{{ row.p.name }}</strong>
-                  <span class="table__sub">{{ row.p.program_type_name }}{% if row.p.heights %} · {{ row.p.heights_label }}{% endif %}</span>
+                  {# тест 5: высота уже в названии маршрута — не повторяем её в подписи #}
+                  <span class="table__sub">{{ row.p.program_type_name }}{% if row.p.heights and row.p.heights_label not in row.p.name %} · {{ row.p.heights_label }}{% endif %}</span>
                 </div>
-                {% for i, l in row.added %}
+                {% for key, l in row.added %}
                   <div class="pair-prog__added"><span class="chip chip--success">✓ {{ l.tclass.label }}{% if l.height and not l.tclass.height %} · {{ l.height }} см{% endif %}</span>
-                    <button class="btn btn--ghost btn--sm" name="remove" value="{{ i }}" aria-label="Убрать {{ l.tclass.label }}">Убрать</button></div>
+                    <button class="btn btn--ghost btn--sm" name="remove" value="{{ key }}" aria-label="Убрать {{ l.tclass.label }}">Убрать</button></div>
                 {% endfor %}
                 {% if row.opts %}
-                  <select name="sel_{{ row.p.pk }}" aria-label="Зачёт: {{ row.p.name }}" class="pair-prog__select">
-                    <option value="">— не участвует —</option>
-                    {% for o in row.opts %}<option value="{{ o.value }}"{% if o.why %} disabled{% endif %}>{{ o.label }}{% if o.why %} — {{ o.why|join:"; " }}{% elif o.conditions %} · {{ o.conditions }}{% endif %}</option>{% endfor %}
-                  </select>
+                  <div class="opt-grid" data-single="{% if row.p.heights|length > 1 %}0{% else %}1{% endif %}">
+                    {% for o in row.opts %}
+                      {% if o.added %}
+                        <div class="opt is-added"><span class="opt__mark" aria-hidden="true">✓</span>
+                          <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">В заявке</span></span>
+                          <button class="btn btn--ghost btn--sm opt__remove" name="remove" value="{{ o.remove }}" aria-label="Убрать {{ o.label }}">Убрать</button></div>
+                      {% else %}
+                        <label class="opt{% if o.why %} is-off{% endif %}"><input type="checkbox" name="sel_{{ row.p.pk }}" value="{{ o.value }}"{% if o.why %} disabled{% endif %}>
+                          <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">{% if o.why %}{{ o.why|join:"; " }}{% else %}{{ o.conditions|default:"без ограничений" }}{% endif %}</span></span></label>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                  {% if row.p.heights|length > 1 %}<p class="table__sub" style="margin: 0;">Можно отметить несколько высот.</p>{% endif %}
                   {% if not row.has_ok %}<p class="table__sub">Паре не подходит ни один зачёт этого маршрута.</p>{% endif %}
-                  {% if row.never %}<label class="check"><input type="checkbox" name="confirm_{{ row.p.pk }}" value="1"><span>Подтверждаю: не выполнял норматив, указанный в зачёте</span></label>{% endif %}
+                  {% if row.need_birth %}<p class="table__sub">Часть зачётов закрыта: <a href="{% url 'profiles:athlete_edit' pair.a.pk %}?next={{ request.get_full_path|urlencode }}">укажите дату рождения всадника</a> — после сохранения вернётесь в заявку.</p>{% endif %}
+                  {% if row.never %}<label class="check"><input type="checkbox" name="confirm_{{ row.p.pk }}" value="1"><span>Подтверждаю: не выполнял норматив, указанный в зачёте</span></label>
+                    <p class="table__sub" style="margin: 0;">Разряд всадника не указан. <a href="{% url 'profiles:athlete_edit' pair.a.pk %}?next={{ request.get_full_path|urlencode }}">Укажите его в профиле</a> — тогда подтверждать не нужно.</p>{% endif %}
                 {% else %}<p class="table__sub">Зачётов нет.</p>{% endif %}
               </div>
             {% endfor %}
-            <div class="pair-form__actions"><button class="btn btn--primary btn--lg" name="action" value="add_many">Добавить выбранные</button></div>
+            <div class="pair-form__actions"><button class="btn btn--primary btn--lg" name="action" value="add_many" data-add-many>Добавить выбранные</button></div>
           </form>
         {% endif %}
       </section>
     {% empty %}
       <section class="card empty"><h2 class="h3">Добавьте первую пару</h2><p class="muted">Всадник и лошадь — затем выберете маршруты и езды для этой пары.</p></section>
     {% endfor %}
+    </div>
     <section class="card" id="add">
       <h2 class="h3">Добавить пару «всадник + лошадь»</h2>
       {% if not athletes %}
-        <div class="alert alert--warning">Сначала <a href="{% url 'profiles:athlete_new' %}">добавьте спортсмена</a>{% if user.is_athlete %} или <a href="{% url 'profiles:athlete_new' %}?me=1">создайте свой профиль спортсмена</a>{% endif %}.</div>
+        <div class="alert alert--warning">Сначала <a href="{% url 'profiles:athlete_new' %}?next={{ request.path|urlencode }}">добавьте спортсмена</a>{% if user.is_athlete %} или <a href="{% url 'profiles:athlete_new' %}?me=1&amp;next={{ request.path|urlencode }}">создайте свой профиль спортсмена</a>{% endif %}. После сохранения вы вернётесь сюда.</div>
       {% else %}
       <form method="post" class="form" novalidate>
         {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}">
         <div class="grid-2">
           <div class="field"><label class="field__label" for="athlete">Всадник</label>
-            <select id="athlete" name="athlete"><option value="">— выберите —</option>{% for a in athletes %}<option value="{{ a.pk }}">{{ a.full_name }}{% if a.birth_year %} ({{ a.birth_year }}){% endif %}</option>{% endfor %}</select>
-            <p class="field__help"><a href="{% url 'profiles:athlete_new' %}">+ новый спортсмен</a> — регистрация ему не нужна.</p></div>
+            <select id="athlete" name="athlete"><option value="">— выберите —</option>{% for a in athletes %}<option value="{{ a.pk }}"{% if a.pk == sel_a %} selected{% endif %}>{{ a.full_name }}{% if a.birth_year %} ({{ a.birth_year }}){% endif %}</option>{% endfor %}</select>
+            <p class="field__help"><a href="{% url 'profiles:athlete_new' %}?next={{ request.path|urlencode }}">+ новый спортсмен</a> — регистрация ему не нужна.</p></div>
           <div class="field"><label class="field__label" for="horse">Лошадь</label>
-            <select id="horse" name="horse"><option value="">— выберите —</option>{% for h in horses %}<option value="{{ h.pk }}">{{ h.name }} · {{ h.summary }}</option>{% endfor %}</select>
-            <p class="field__help"><a href="{% url 'profiles:horse_search' %}?next={{ request.get_full_path|urlencode }}">Найти лошадь в сервисе</a> или <a href="{% url 'profiles:horse_new' %}">добавить свою</a>.</p></div>
+            {% if horses %}<select id="horse" name="horse"><option value="">— выберите —</option>{% for h in horses %}<option value="{{ h.pk }}"{% if h.pk == sel_h %} selected{% endif %}>{{ h.name }} · {{ h.summary }}</option>{% endfor %}</select>
+            <p class="field__help"><a href="{% url 'profiles:horse_new' %}?next={{ request.path|urlencode }}">+ добавить свою лошадь</a> или <a href="{% url 'profiles:horse_search' %}?next={{ request.get_full_path|urlencode }}">найти в сервисе</a>.</p>
+            {% else %}<p class="muted" style="margin: 0 0 var(--space-2);">У вас пока нет лошадей.</p>
+            <a class="btn btn--primary" href="{% url 'profiles:horse_new' %}?next={{ request.path|urlencode }}">+ Добавить лошадь</a>
+            <p class="field__help">После сохранения вы вернётесь в заявку. Лошадь уже есть в сервисе? <a href="{% url 'profiles:horse_search' %}?next={{ request.get_full_path|urlencode }}">Найти её</a>.</p>{% endif %}</div>
         </div>
         <div class="form-actions"><button class="btn btn--dark" name="action" value="pair_add">+ Добавить пару</button></div>
       </form>
@@ -97,17 +121,66 @@
   <aside class="wizard-aside">
     <section class="card">
       <h2 class="h3">Отправка</h2>
-      <p class="muted">Выступлений в заявке: <strong>{{ lines|length }}</strong>{% if pairs|length > 1 %} · пар: {{ pairs|length }}{% endif %}</p>
-      <form method="post" class="form" style="margin-top: var(--space-3);">
+      <p class="muted" id="apply-count">Выступлений в заявке: <strong>{{ lines|length }}</strong>{% if pairs|length > 1 %} · пар: {{ pairs|length }}{% endif %}</p>
+      <form method="post" action="{{ apply_url }}" class="form" style="margin-top: var(--space-3);">
         {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="key" value="{{ key }}">
-        <div class="field"><label class="field__label" for="cn">Контактное лицо</label><input id="cn" name="contact_name" type="text" value="{{ user.full_name }}"></div>
-        <div class="field"><label class="field__label" for="cp">Телефон для связи</label><input id="cp" name="contact_phone" type="tel" value="{{ user.phone_display }}"><p class="field__help">Виден только организатору и судьям турнира.</p></div>
-        <div class="field"><label class="field__label" for="cm">Комментарий <span class="field__optional">необязательно</span></label><textarea id="cm" name="comment" rows="3"></textarea></div>
+        <div class="field"><label class="field__label" for="cn">Контактное лицо</label><input id="cn" name="contact_name" type="text" value="{% if request.POST.contact_name %}{{ request.POST.contact_name }}{% else %}{{ user.full_name }}{% endif %}"></div>
+        <div class="field"><label class="field__label" for="cp">Телефон для связи</label><input id="cp" name="contact_phone" type="tel" value="{% if request.POST.contact_phone %}{{ request.POST.contact_phone }}{% else %}{{ user.phone_display }}{% endif %}"><p class="field__help">Виден только организатору и судьям турнира.</p></div>
+        <div class="field"><label class="field__label" for="cm">Комментарий</label><textarea id="cm" name="comment" rows="3" maxlength="1000" placeholder="Необязательно">{{ request.POST.comment }}</textarea></div>
         <p class="field__help">Публично в протоколах будут: фамилия и имя, год рождения, разряд, клуб, тренер; кличка, год, пол, масть, порода лошади.</p>
         <p class="field__help">Денник и услуги для лошади можно заказать на странице турнира после отправки.</p>
-        <button class="btn btn--primary btn--block" name="action" value="submit"{% if not lines %} disabled{% endif %}>Отправить заявку</button>
+        {# тест 5: условия отмены — при подаче заявки, рядом с отправкой #}
+        {% if s.cancel_terms %}<div class="alert apply-cancel-terms" id="cancel-terms"><strong>Условия отмены:</strong> {{ s.cancel_terms|linebreaksbr }} <span class="muted">Условия задаёт организатор.</span></div>{% endif %}
+        <div class="alert alert--warning" data-pending hidden style="margin-bottom: var(--space-3);">
+          Отмечено зачётов: <strong data-pending-count>0</strong> — они ещё не в заявке.
+          <button type="button" class="btn btn--dark btn--sm btn--block" style="margin-top: 8px;" data-add-pending>Добавить выбранные</button>
+        </div>
+        <div id="apply-submit">
+          <button class="btn btn--primary btn--block" name="action" value="submit" data-submit{% if not lines %} disabled{% endif %}>Отправить заявку</button>
+          {% if not lines %}<p class="field__help" data-submit-hint>Кнопка станет активной, когда в заявке будет хотя бы одно выступление: отметьте зачёт у пары и нажмите «Добавить выбранные».</p>{% endif %}
+        </div>
       </form>
     </section>
   </aside>
 </div>
+<script>
+(function () {
+  // Тест 5: карточки пар обновляются через HTMX, поэтому обработчики — на документе, а не на элементах
+  function forms() { return Array.prototype.slice.call(document.querySelectorAll(".pair-form")); }
+  function count(f) { return f.querySelectorAll(".opt-grid input[type=checkbox]:checked").length; }
+  function total() { return forms().reduce(function (n, f) { return n + count(f); }, 0); }
+  function sync() {
+    forms().forEach(function (f) {
+      var b = f.querySelector("[data-add-many]"), n = count(f);
+      if (!b) return;
+      b.textContent = n ? "Добавить выбранные (" + n + ")" : "Добавить выбранные";
+      b.disabled = !n;
+    });
+    var box = document.querySelector("[data-pending]"), cnt = document.querySelector("[data-pending-count]"), n = total();
+    if (box) { box.hidden = !n; cnt.textContent = n; }
+  }
+  document.addEventListener("change", function (e) {
+    var g = e.target.closest && e.target.closest('.opt-grid[data-single="1"]');
+    if (g && e.target.checked) { // в маршруте с одной высотой — один зачёт
+      g.querySelectorAll("input[type=checkbox]").forEach(function (c) { if (c !== e.target) c.checked = false; });
+    }
+    if (e.target.closest && e.target.closest(".pair-form")) sync();
+  });
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest || !e.target.closest("[data-add-pending]")) return;
+    var f = forms().filter(count)[0];
+    if (!f) return;
+    var b = f.querySelector("[data-add-many]");
+    if (f.requestSubmit) f.requestSubmit(b); else b.click();
+  });
+  document.addEventListener("submit", function (e) { // отмеченные, но не добавленные зачёты не теряются при отправке
+    if (!e.target.querySelector("[data-submit]") || !total()) return;
+    e.preventDefault(); e.stopPropagation();
+    var box = document.querySelector("[data-pending]");
+    if (box) box.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, true);
+  document.addEventListener("htmx:afterSettle", sync);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", sync); else sync();
+})();
+</script>
 {% endblock %}

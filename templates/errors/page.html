@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ page.title }} — EquiStart{% endblock %}
+{% block title %}{{ page.title }} — СтартЛист{% endblock %}
 {% block content %}
 <section class="card error-page" role="alert">
   <p class="caption muted">Ошибка {{ status }}</p>
@@ -12,6 +12,7 @@
     <a class="btn btn--ghost" href="javascript:history.back()">← Назад</a>
     <a class="btn btn--primary" href="/">В календарь</a>
     {% if user.is_authenticated %}<a class="btn btn--ghost" href="/cabinet/">В кабинет</a>{% endif %}
+    <a class="btn btn--ghost" href="/support/new/?topic=bug&amp;from={{ request.get_full_path|urlencode }}">Сообщить о проблеме</a>
   </div>
 </section>
 {% endblock %}

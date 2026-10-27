@@ -1,4 +1,4 @@
 <!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ page.title }} — EquiStart</title>
+<title>{{ page.title }} — СтартЛист</title>
 <style>body{font-family:Manrope,system-ui,sans-serif;background:#f6f4ef;color:#111;margin:0;padding:24px 16px}.c{max-width:560px;margin:40px auto;background:#fff;border-radius:16px;padding:24px}a{display:inline-block;margin-top:16px;background:#ffd21f;color:#111;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:600}</style></head>
 <body><div class="c"><p>Ошибка {{ status }}</p><h1>{{ page.title }}</h1>{% if page.detail %}<p><b>{{ page.detail }}</b></p>{% endif %}<p>{{ page.why }}</p><ul>{% for t in page.todo %}<li>{{ t }}</li>{% endfor %}</ul><a href="/">В календарь</a></div></body></html>

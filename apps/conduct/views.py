@@ -47,8 +47,30 @@ def overview(request, pk):
         programs.append({"p": p, "accepted": accepted, "ready": ready, "slots": slots_by.get(p.pk, 0), "published": last_pub.get(p.pk)})
     return render(request, "conduct/overview.html", {
         "t": t, "programs": programs, "manage": can_manage(request.user, t),
-        "warnings": services.finish_warnings(t) if t.publication == Tournament.Publication.PUBLISHED else [],
+        "warnings": _explain_warnings(t, services.finish_warnings(t)) if t.publication == Tournament.Publication.PUBLISHED else [],
     })
+
+
+def _explain_warnings(t, items):
+    """Тест 4, п. 124: у каждого незакрытого пункта — что это значит и куда перейти, чтобы исправить."""
+    stables = reverse("stables:manage", args=[t.pk])
+    out = []
+    for w in items:
+        if w.startswith("Брони без решения"):
+            out.append((w, "Подтвердите или отклоните брони денников.", stables, "Денники и услуги"))
+        elif w.startswith("Подтверждённые брони без номера"):
+            out.append((w, "Укажите номер денника в подтверждённых бронях.", stables, "Денники и услуги"))
+        elif w.startswith("Заказы услуг"):
+            out.append((w, "Отметьте выдачу опилок, сена и других услуг.", stables, "Денники и услуги"))
+        elif w.startswith("Не опубликованы результаты"):
+            name = w.split(": ", 1)[-1].rsplit(" · ", 1)[0]
+            prog = t.programs.filter(name=name).first()
+            out.append((w, "Опубликуйте результаты зачёта.", reverse("conduct:program", args=[t.pk, prog.pk]) + "?tab=results" if prog else "", "Результаты"))
+        elif w.startswith("Выступлений без итогового статуса"):
+            out.append((w, "Есть пары, которые не выступили и не отмечены «Не стартует». Откройте порядок маршрута и отметьте их.", "", ""))
+        else:
+            out.append((w, "", "", ""))
+    return out
 
 
 @login_required
@@ -88,10 +110,21 @@ def finish(request, pk):
     return redirect("conduct:overview", pk=t.pk)
 
 
+TABS = [("order", "Порядок"), ("entries", "Заявки"), ("protocol", "Стартовый протокол"), ("course", "Параметры маршрута"),
+        ("panel", "Судейская бригада"), ("results", "Результаты"), ("merge", "Объединение зачётов")]
+
+
 @login_required
 def program(request, pk, program_id):
     p = _program(request, pk, program_id)
     t = p.tournament
+    tab = request.GET.get("tab", "order")
+    # Тест 4: принятые после жеребьёвки сами встают в конец порядка — без кнопки «Добавить готовых в конец»
+    if p.slots.exists() and request.method == "GET":
+        before = set(p.slots.values_list("entry_id", flat=True))
+        if services.add_missing(request.user, p.pk):
+            names = [e.athlete_snapshot.get("name") for e in Entry.objects.filter(start_slot__program=p).exclude(pk__in=before)]
+            messages.info(request, "В конец порядка добавлены принятые после жеребьёвки: " + ", ".join(names) + ".")
     slots = list(p.slots.select_related("entry", "entry__result").order_by("position"))
     conf = services.conflicts(t, p)
     blocked = services.blocked_for(t.pk)
@@ -106,8 +139,23 @@ def program(request, pk, program_id):
     merged = [c for c in all_classes if c.merged_into_id]
     for c in p.classes.filter(merged_into__isnull=True):
         last = c.result_publications.first()
-        classes.append({"c": c, "published": last, "count": Entry.objects.filter(tclass__in=[c, *c.merged.all()], result__isnull=False).count()})
+        real = [e for e in Entry.objects.filter(tclass__in=[c, *c.merged.all()], decision=Entry.Decision.ACCEPTED, result__isnull=False).select_related("result")
+                if services.has_real_result(e.result)]
+        classes.append({"c": c, "published": last, "count": len(real)})
+    tabs = [x for x in TABS if not (x[0] == "course" and not (p.is_jumping and not p.route.manual))
+            and not (x[0] == "panel" and not (p.is_dressage and p.test_snapshot)) and not (x[0] == "merge" and len(all_classes) < 2)]
+    if tab not in dict(tabs):
+        tab = "order"
+    if tab == "entries":
+        ents = list(Entry.objects.filter(program=p).select_related("application", "tclass").order_by("decision", "tclass__position", "athlete_snapshot__name"))
+        order = {"pending": 0, "accepted": 1, "rejected": 2, "cancelled": 3}
+        ents.sort(key=lambda e: order.get(e.decision, 9))
+        ctx_entries = ents
+    else:
+        ctx_entries = []
     ctx = {
+        "program_entries": ctx_entries, "blocked_ids": blocked,
+        "tab": tab, "tabs": tabs, "others": t.programs.exclude(pk=p.pk).order_by("day", "start_time", "position"),
         "t": t, "p": p, "slots": slots, "outside": outside, "classes": classes,
         "published": p.start_publications.first(),
         "fields": [(f, RESULT_FIELDS.get(f, f)) for f in p.result_fields], "statuses": Result.Status.choices,
@@ -128,6 +176,7 @@ def program(request, pk, program_id):
         ctx["course"] = c
         ctx["course_rounds"] = [{"spec": r, "data": c["rounds"].get(r.key, {}), "params": scoring.round_params(p, r.key)}
                                 for r in J.rounds_of(p.route, p.variant)]
+        ctx["has_table_c"] = any(r["params"]["table"] == "C" for r in ctx["course_rounds"])
     if p.is_dressage and p.test_snapshot:
         ctx["has_panel"], ctx["panel"] = True, scoring.panel(p)
         ctx["my_letters"] = [x.letter for x in ctx["panel"] if x.user_id == request.user.pk and not x.is_scorer]
@@ -145,7 +194,7 @@ def _standings_tables(p):
     for (cid, height), items in groups.items():
         c = TournamentClass.objects.get(pk=cid)
         items.sort(key=lambda e: (e.result.place is None, e.result.place or 0, e.athlete_snapshot.get("name", "")))
-        out.append({"title": c.name + (f" · {height} см" if height and len(p.heights) > 1 else ""),
+        out.append({"title": c.name + (f" · {height} см" if height and len(p.heights) > 1 else ""), "published": c.result_publications.exists(),
                     "rows": [{"e": e, "r": e.result, "cells": scoring.result_cells(p, e.result)} for e in items]})
     return out
 
@@ -156,14 +205,26 @@ def program_action(request, pk, program_id, action):
     p = _program(request, pk, program_id)
     try:
         if action == "draw":
-            n = services.draw(request.user, p.pk)
-            messages.success(request, f"Жеребьёвка проведена. Добавлено новых: {n}. Начатые остались на местах.")
+            r = services.draw(request.user, p.pk)
+            if r["shuffled"] >= 2:
+                messages.success(request, f"Жеребьёвка проведена: порядок {r['shuffled']} пар перемешан случайно"
+                                          + (f", новых добавлено: {r['added']}" if r["added"] else "") + ". Выступившие и не стартующие остались на местах.")
+            elif r["added"]:
+                messages.success(request, f"В порядок добавлено пар: {r['added']}.")
+            else:
+                messages.info(request, "Перемешивать нечего: в порядке меньше двух пар, которые ещё не выступили.")
+        elif action == "participation":
+            sl = services.set_participation(request.user, int(request.POST["slot"]), request.POST.get("value") == "start")
+            messages.success(request, f"{sl.entry.athlete_snapshot.get('name')}: {'стартует' if request.POST.get('value') == 'start' else 'не стартует'}.")
+        elif action == "force":
+            n = services.force_add(request.user, p.pk, int(request.POST["entry"]))
+            messages.success(request, "Пара поставлена в конец порядка без подтверждённого денника.")
         elif action == "add":
             n = services.add_missing(request.user, p.pk)
             messages.success(request, f"Добавлено в конец порядка: {n}.")
         elif action == "move":
             services.move(request.user, int(request.POST["slot"]), int(request.POST["position"]))
-            messages.success(request, "Порядок изменён, время пересчитано.")
+            messages.success(request, "Порядок изменён." + (" Время стартов пересчитано." if p.timed_starts else ""))
         elif action == "swap":
             services.swap(request.user, int(request.POST["slot"]), int(request.POST["other"]))
             messages.success(request, "Участники поменялись местами.")
@@ -207,6 +268,38 @@ def program_action(request, pk, program_id, action):
 
 
 @login_required
+def pair_edit(request, pk, program_id, entry_id):
+    """Судья правит данные пары (для протоколов этого турнира) и зачёт."""
+    p = _program(request, pk, program_id)
+    e = get_object_or_404(Entry, pk=entry_id, program=p)
+    from apps.profiles.models import COLORS, RANKS, SEXES
+
+    if request.method == "POST":
+        g = request.POST.get
+        year = g("birth_year", "").strip()
+        hyear = g("h_birth_year", "").strip()
+        try:
+            services.edit_pair(request.user, e.pk,
+                               {"name": " ".join(g("name", "").split()), "birth_year": int(year) if year.isdigit() else None,
+                                "rank": g("rank", "").strip(), "club": g("club", "").strip(), "region": g("region", "").strip(), "coach": g("coach", "").strip()},
+                               {"name": g("h_name", "").strip(), "birth_year": int(hyear) if hyear.isdigit() else None, "sex": g("h_sex", "").strip(),
+                                "color": g("h_color", "").strip(), "breed": g("h_breed", "").strip()},
+                               g("tclass") or None)
+        except (ValueError, TournamentClass.DoesNotExist) as ex:
+            messages.error(request, str(ex) or "Проверьте данные.")
+        else:
+            messages.success(request, "Данные пары сохранены. В опубликованном протоколе они появятся после публикации новой версии.")
+            return redirect("conduct:program", pk=pk, program_id=p.pk)
+    from apps.profiles.models import COLOR_SHORT, RANK_SHORT, SEX_SHORT
+
+    return render(request, "conduct/pair_edit.html", {
+        "t": p.tournament, "p": p, "e": e, "a": e.athlete_snapshot, "h": e.horse_snapshot,
+        "ranks": list(dict.fromkeys(RANK_SHORT.values())), "sexes": list(SEX_SHORT.values()), "colors": list(COLOR_SHORT.values()),
+        "classes": p.classes.filter(merged_into__isnull=True),
+    })
+
+
+@login_required
 def live(request, pk, program_id):
     """Экран судьи у поля: текущий участник, следующие, быстрый ввод результата."""
     p = _program(request, pk, program_id)
@@ -218,7 +311,7 @@ def live(request, pk, program_id):
             return redirect("conduct:scorer", pk=pk, program_id=p.pk)
         if mine:
             return redirect("conduct:judge_sheet", pk=pk, program_id=p.pk, letter=mine[0].letter)
-        return redirect(reverse("conduct:program", args=[pk, p.pk]) + "#panel")
+        return redirect(reverse("conduct:program", args=[pk, p.pk]) + "?tab=panel")
     slots = list(p.slots.select_related("entry", "entry__result").order_by("position"))
     current = next((s for s in slots if s.status == StartSlot.Status.STARTED), None) or next((s for s in slots if s.status == StartSlot.Status.WAITING), None)
     upcoming = [s for s in slots if s.status == StartSlot.Status.WAITING and s != current][:4]
@@ -260,6 +353,8 @@ def _xlsx_response(data: bytes, name: str):
 def startlist_xlsx(request, pk, program_id):
     p = get_object_or_404(ProgramItem.objects.select_related("tournament"), pk=program_id, tournament_id=pk,
                           tournament__publication__in=["published", "finished", "cancelled"])
+    if not request.user.is_authenticated or not can_judge_or_manage(request.user, p.tournament):
+        raise Http404  # тест 4.2: выгрузка — только судьям и организаторам этого турнира
     pub = p.start_publications.first()
     if not pub:
         raise Http404
@@ -276,6 +371,8 @@ def startlist_xlsx(request, pk, program_id):
 def results_xlsx(request, pk, class_id):
     c = get_object_or_404(TournamentClass.objects.select_related("program__tournament"), pk=class_id, program__tournament_id=pk,
                           program__tournament__publication__in=["published", "finished", "cancelled"])
+    if not request.user.is_authenticated or not can_judge_or_manage(request.user, c.program.tournament):
+        raise Http404
     pub = c.result_publications.first()
     if not pub:
         raise Http404
@@ -293,6 +390,12 @@ def results_xlsx(request, pk, class_id):
                      h["name"], h.get("birth_year") or "", h.get("sex") or "", h.get("color") or "", h.get("breed") or ""]
                     + ["" if v is None else v for v in cells] + [r["status"]])
     return _xlsx_response(xlsx.build("Результаты", rows), f"results-{pk}-{c.pk}-v{pub.version}.xlsx")
+
+
+def can_judge_or_manage(user, t):
+    from apps.tournaments.services import roles_of
+
+    return bool(roles_of(user, t) & {"organizer", "judge"})
 
 
 def _mark(row):

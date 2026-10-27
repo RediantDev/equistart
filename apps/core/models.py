@@ -8,6 +8,7 @@ ACTION_LABELS = {
     "tournament.submit": "Отправлен на проверку",
     "tournament.approve": "Опубликован модератором",
     "tournament.return": "Возвращён с замечаниями",
+    "tournament.reject": "Отклонён модератором",
     "tournament.cancel": "Соревнование отменено",
     "tournament.delete": "Черновик удалён",
     "program.save": "Сохранена программа",
@@ -19,6 +20,13 @@ ACTION_LABELS = {
     "team.decline": "Приглашение отклонено",
     "team.revoke": "Доступ отозван",
     "venue.confirm": "Место проведения подтверждено",
+    "support.create": "Обращение создано",
+    "support.user_reply": "Ответ пользователя",
+    "support.staff_reply": "Ответ поддержки",
+    "support.status": "Изменён статус обращения",
+    "support.transfer": "Передано команде турнира",
+    "service.backup": "Резервная копия сделана",
+    "service.error": "Ошибка сервера",
 }
 
 

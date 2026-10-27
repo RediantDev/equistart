@@ -1,6 +1,7 @@
 import datetime
 import threading
 
+from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.test import TransactionTestCase, override_settings
 from django.urls import reverse
@@ -126,7 +127,7 @@ class ViewTests(StableBase):
         self.assertContains(r, "ПРОВЕРЬТЕ БРОНЬ")
         self.assertFalse(Booking.objects.exists())
         r = self.client.post(reverse("stables:book", args=[self.t.pk]), {**data, "confirm": "1"})
-        self.assertRedirects(r, reverse("stables:my"))
+        self.assertRedirects(r, reverse("stables:book", args=[self.t.pk]) + "#mine", fetch_redirect_response=False)
         self.client.post(reverse("stables:book", args=[self.t.pk]), {**data, "confirm": "1"})
         self.assertEqual(Booking.objects.count(), 1)
 
@@ -216,3 +217,221 @@ class StaffScreenTests(StableBase):
         S.decide(self.groom, b.pk, True)
         page = self.client.get(reverse("stables:manage", args=[self.t.pk]) + "?tab=bookings").content.decode()
         self.assertIn("Назначить денник", page)  # без ожидающих — сразу брони без номера
+
+
+class MultiHorseBookingTests(StableBase):
+    """Бронь на несколько лошадей одной отправкой: всё или ничего, повтор — без дублей."""
+
+    def setUp(self):
+        super().setUp()
+        self.cat.capacity = 2
+        self.cat.save()
+        self.h4 = Horse.objects.create(name="Вихрь", birth_year=2015, color="bay", sex="mare", breed="x", manager=self.coach)
+        self.url = reverse("stables:book", args=[self.t.pk])
+        self.data = {"category": self.cat.pk, "arrive": self.d0.isoformat(), "depart": self.d1.isoformat(), "key": "multi1", "confirm": "1"}
+
+    def test_service_success_and_repeat(self):
+        made = services.book_many(self.coach, self.cat.pk, [self.h1, self.h3], self.d0, self.d1, "m1")
+        self.assertEqual({b.horse_id for b in made}, {self.h1.pk, self.h3.pk})
+        again = services.book_many(self.coach, self.cat.pk, [self.h3, self.h1], self.d0, self.d1, "m1")
+        self.assertEqual({b.pk for b in again}, {b.pk for b in made})
+        self.assertEqual(Booking.objects.count(), 2)
+        with self.assertRaises(services.Conflict):  # тот же ключ, другой состав
+            services.book_many(self.coach, self.cat.pk, [self.h4], self.d0, self.d1, "m1")
+
+    def test_capacity_overflow_all_or_nothing(self):
+        with self.assertRaises(services.Conflict) as cm:
+            services.book_many(self.coach, self.cat.pk, [self.h1, self.h3, self.h4], self.d0, self.d1, "m2")
+        self.assertIn("Ни одна бронь не создана", str(cm.exception))
+        self.assertEqual(Booking.objects.count(), 0)
+        self.book(self.h1, "single")
+        with self.assertRaises(services.Conflict):
+            services.book_many(self.coach, self.cat.pk, [self.h3, self.h4], self.d0, self.d1, "m3")
+        self.assertEqual(Booking.objects.count(), 1)
+
+    def test_foreign_horse_in_batch(self):
+        from django.core.exceptions import PermissionDenied
+        with self.assertRaises(PermissionDenied):
+            services.book_many(self.coach, self.cat.pk, [self.h1, self.h2], self.d0, self.d1, "m4")
+        self.assertEqual(Booking.objects.count(), 0)
+
+    def test_view_multi_horse_and_repeat_submit(self):
+        self.client.force_login(self.coach)
+        r = self.client.post(self.url, {**self.data, "horse": [self.h1.pk, self.h3.pk]})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(Booking.objects.count(), 2)
+        self.client.post(self.url, {**self.data, "horse": [self.h1.pk, self.h3.pk]})  # двойное нажатие
+        self.assertEqual(Booking.objects.count(), 2)
+        page = self.client.get(self.url).content.decode()
+        self.assertIn('id="mine"', page)
+        self.assertIn("Ожидает подтверждения", page)
+
+    def test_view_overflow_shows_error_and_creates_nothing(self):
+        self.client.force_login(self.coach)
+        r = self.client.post(self.url, {**self.data, "horse": [self.h1.pk, self.h3.pk, self.h4.pk]})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "выбрано лошадей: 3")
+        self.assertContains(r, "field--error")
+        self.assertEqual(Booking.objects.count(), 0)
+
+    def test_view_bad_dates_marked_on_field(self):
+        self.client.force_login(self.coach)
+        r = self.client.post(self.url, {**self.data, "horse": [self.h1.pk], "arrive": self.d1.isoformat(), "depart": self.d0.isoformat()})
+        self.assertContains(r, "Выезд должен быть позже заезда")
+        self.assertEqual(Booking.objects.count(), 0)
+
+    def test_view_foreign_horse_forbidden(self):
+        self.client.force_login(self.coach)
+        r = self.client.post(self.url, {**self.data, "horse": [self.h1.pk, self.h2.pk]})
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(Booking.objects.count(), 0)
+
+    def test_guest_redirected(self):
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+        self.assertEqual(self.client.post(self.url, {**self.data, "horse": [self.h1.pk]}).status_code, 302)
+        self.assertEqual(Booking.objects.count(), 0)
+
+    def test_staff_books_several_including_new_horse_once(self):
+        self.cat.capacity = 3
+        self.cat.save()
+        self.client.force_login(self.groom)
+        self.assertContains(self.client.get(self.url), 'name="add_new"')
+        self.assertEqual(self.client.post(self.url, {**self.data, "horse": [self.h1.pk]}).status_code, 403)  # лошадь не из заявок турнира
+        data = {**self.data, "add_new": "on", "new_horse": "Новичок"}
+        self.client.post(self.url, data)
+        self.client.post(self.url, data)  # повтор не создаёт вторую лошадь и бронь
+        self.assertEqual(Booking.objects.count(), 1)
+        self.assertEqual(Horse.objects.filter(name="Новичок").count(), 1)
+
+    def test_empty_category_option_label(self):
+        self.client.force_login(self.coach)
+        self.assertContains(self.client.get(self.url), '<select id="b-cat" name="category" required><option value="">— выберите —</option>')
+
+
+class EditBookingTests(StableBase):
+    def setUp(self):
+        super().setUp()
+        self.cat2 = StableCategory.objects.create(tournament=self.t, name="Конюшня", available_from=self.d0, available_to=self.d1 + datetime.timedelta(days=1), capacity=1)
+        self.b = self.book(self.h1, "e1")
+        self.url = reverse("stables:my_edit", args=[self.b.pk])
+
+    def test_owner_edits_pending(self):
+        self.client.force_login(self.coach)
+        d2 = self.d1 + datetime.timedelta(days=1)
+        r = self.client.post(self.url, {"category": self.cat2.pk, "arrive": self.d0.isoformat(), "depart": d2.isoformat(), "revision": self.b.revision})
+        self.assertEqual(r.status_code, 302)
+        self.b.refresh_from_db()
+        self.assertEqual((self.b.category_id, self.b.depart, self.b.state), (self.cat2.pk, d2, "pending"))
+        self.book(self.h3, "e2")  # место в старой категории освободилось
+
+    def test_edit_respects_capacity_and_period(self):
+        services.book(self.coach, self.cat2.pk, self.h3, self.d0, self.d1, "e3")
+        with self.assertRaises(services.Conflict):
+            services.update_booking(self.coach, self.b.pk, self.cat2.pk, self.d0, self.d1)
+        with self.assertRaises(ValueError):
+            services.update_booking(self.coach, self.b.pk, self.cat.pk, self.d0, self.d1 + datetime.timedelta(days=1))
+        self.b.refresh_from_db()
+        self.assertEqual(self.b.category_id, self.cat.pk)
+
+    def test_confirmed_cannot_be_edited(self):
+        services.decide(self.groom, self.b.pk, True)
+        with self.assertRaises(services.Conflict):
+            services.update_booking(self.coach, self.b.pk, self.cat2.pk, self.d0, self.d1)
+
+    def test_permissions(self):
+        data = {"category": self.cat2.pk, "arrive": self.d0.isoformat(), "depart": self.d1.isoformat()}
+        self.assertEqual(self.client.post(self.url, data).status_code, 302)  # гость → вход
+        for who in (self.other, self.groom):  # чужой пользователь и даже конюшня не меняют бронь представителя
+            self.client.force_login(who)
+            self.assertEqual(self.client.post(self.url, data).status_code, 403)
+        self.b.refresh_from_db()
+        self.assertEqual(self.b.category_id, self.cat.pk)
+        self.client.force_login(self.coach)
+        self.assertEqual(self.client.get(self.url).status_code, 405)
+        self.assertEqual(self.client.post(reverse("stables:my_edit", args=[999999]), data).status_code, 404)
+
+    def test_contact_shown_only_to_owner(self):
+        url = reverse("stables:book", args=[self.t.pk])
+        self.client.force_login(self.coach)
+        self.assertContains(self.client.get(url), f"tel:{self.groom.phone}")
+        self.client.force_login(self.other)
+        page = self.client.get(url).content.decode()
+        self.assertNotIn(self.groom.phone, page)
+        self.assertNotIn("Барон", page)  # чужие брони не видны
+
+
+class MultiServiceOrderTests(StableBase):
+    def setUp(self):
+        super().setUp()
+        self.sawdust = Service.objects.create(tournament=self.t, name="Опилки", unit="мешок", limit=5)
+        self.hay = Service.objects.create(tournament=self.t, name="Сено", unit="тюк")
+        self.power = Service.objects.create(tournament=self.t, name="Электричество", unit="сутки", recipient="trailer")
+        self.url = reverse("stables:order", args=[self.t.pk])
+
+    def post(self, **kw):
+        return self.client.post(self.url, {"key": "cart1", **kw})
+
+    def test_cart_creates_all_lines_and_returns_to_screen(self):
+        self.client.force_login(self.coach)
+        r = self.post(**{f"q-{self.sawdust.pk}-{self.h1.pk}": "2", f"q-{self.sawdust.pk}-{self.h3.pk}": "1",
+                         f"q-{self.hay.pk}-{self.h1.pk}": "3", f"q-{self.power.pk}": "2", f"trailer-{self.power.pk}": "А123ВС"})
+        self.assertRedirects(r, reverse("stables:book", args=[self.t.pk]) + "#mine", fetch_redirect_response=False)
+        self.assertEqual(ServiceOrder.objects.count(), 4)
+        self.assertEqual(sorted(ServiceOrder.objects.values_list("recipient_label", flat=True)), ["Барон", "Барон", "Гранит", "Коневоз А123ВС"])
+        self.post(**{f"q-{self.sawdust.pk}-{self.h1.pk}": "2"})  # повтор той же формы
+        self.assertEqual(ServiceOrder.objects.count(), 4)
+        page = self.client.get(reverse("stables:book", args=[self.t.pk])).content.decode()
+        self.assertIn("Коневоз А123ВС", page)
+
+    def test_cart_all_or_nothing_on_limit(self):
+        self.client.force_login(self.coach)
+        r = self.post(**{f"q-{self.sawdust.pk}-{self.h1.pk}": "3", f"q-{self.sawdust.pk}-{self.h3.pk}": "3", f"q-{self.hay.pk}-{self.h1.pk}": "1"})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "осталось только 5")
+        self.assertContains(r, 'value="3"')  # введённое не теряется
+        self.assertEqual(ServiceOrder.objects.count(), 0)
+
+    def test_trailer_without_number(self):
+        self.client.force_login(self.coach)
+        r = self.post(**{f"q-{self.power.pk}": "1"})
+        self.assertContains(r, "Укажите номер коневоза")
+        self.assertEqual(ServiceOrder.objects.count(), 0)
+
+    def test_empty_cart(self):
+        self.client.force_login(self.coach)
+        self.assertContains(self.post(), "Укажите количество")
+
+    def test_permissions(self):
+        self.assertEqual(self.post(**{f"q-{self.hay.pk}-{self.h1.pk}": "1"}).status_code, 302)  # гость → вход
+        self.assertEqual(ServiceOrder.objects.count(), 0)
+        # чужая лошадь в форму не попадает: поле игнорируется, заказ не создаётся
+        self.client.force_login(self.other)
+        self.post(**{f"q-{self.hay.pk}-{self.h1.pk}": "1"})
+        self.assertFalse(ServiceOrder.objects.filter(horse=self.h1).exists())
+        with self.assertRaises(PermissionDenied):
+            services.order_many(self.other, self.t.pk, [{"service": self.hay.pk, "quantity": 1, "horse": self.h1}], "x1")
+        # чужой заказ не отменить
+        o = services.order(self.coach, self.hay.pk, 1, "own", horse=self.h1)
+        self.assertEqual(self.client.post(reverse("stables:my_cancel", args=["order", o.pk])).status_code, 403)
+
+    def test_book_page_has_single_order_button_and_no_label_wrapped_select(self):
+        self.client.force_login(self.coach)
+        page = self.client.get(reverse("stables:book", args=[self.t.pk])).content.decode()
+        self.assertEqual(page.count("data-order-submit>"), 1)
+        self.assertNotIn('<label class="field" style', page)  # select в <label> открывал второй (системный) список
+
+
+class MyPageTests(StableBase):
+    def test_grouped_by_tournament_with_link(self):
+        self.book(self.h1, "g1")
+        other_t = self.make_tournament()
+        self.client.force_login(self.coach)
+        page = self.client.get(reverse("stables:my")).content.decode()
+        self.assertIn(reverse("stables:book", args=[self.t.pk]), page)
+        self.assertNotIn(reverse("stables:book", args=[other_t.pk]), page)
+        self.assertIn("Ожидает подтверждения", page)
+        self.assertNotIn("касса", page)
+        self.client.force_login(self.other)
+        self.assertNotIn("Барон", self.client.get(reverse("stables:my")).content.decode())
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("stables:my")).status_code, 302)

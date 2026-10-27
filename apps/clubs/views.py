@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -31,11 +32,51 @@ def club_list(request):
     q = request.GET.get("q", "").strip()
     region = request.GET.get("region", "")
     qs = Club.objects.filter(confirmed_at__isnull=False, merged_into__isnull=True)
+    venues = []
     if q:
-        qs = qs.filter(Q(pub_name__icontains=q) | Q(pub_settlement__icontains=q))
+        # тест 5, п. 9.4–9.5: «белая роща» = «КСК «Белая роща»», регистр, кавычки и «ё» не мешают
+        from apps.core import search
+
+        def _region(w):
+            codes = [code for code, label in REGION_CHOICES if w in search.normalize(label)]
+            return Q(pub_region__in=codes) if codes else None
+
+        qs = search.apply(qs, q, ["pub_name", "pub_settlement", "pub_address"], extra=_region)
     if region:
         qs = qs.filter(pub_region=region)
-    return render(request, "clubs/list.html", {"clubs": qs.order_by("pub_name"), "q": q, "region": region, "regions": REGION_CHOICES})
+    with_t = request.GET.get("with_t") == "1"
+    today = timezone.localdate()
+    clubs = list(qs.order_by("pub_name").prefetch_related("photos"))
+    # Тест 5, п. 25.3: карточка каталога — обложка (первое фото) и число ближайших турниров
+    upcoming = {}
+    venue_ids = [c.venue_id for c in clubs if c.venue_id]
+    if venue_ids:
+        from django.db.models import Count
+
+        for row in (Tournament.objects.filter(venue_id__in=venue_ids, publication=Tournament.Publication.PUBLISHED, pub_ends_on__gte=today)
+                    .values("venue_id").annotate(n=Count("id"))):
+            upcoming[row["venue_id"]] = row["n"]
+    for c in clubs:
+        c.upcoming_count = upcoming.get(c.venue_id, 0)
+        photos = list(c.photos.all())
+        c.cover = photos[0] if photos else None
+    if with_t:
+        clubs = [c for c in clubs if c.upcoming_count]
+    if q and not clubs:
+        # Клуба в каталоге нет, но турниры на такой площадке есть — показываем площадку
+        from apps.core import search
+        from apps.tournaments.models import Venue
+
+        def _vregion(w):
+            codes = [code for code, label in REGION_CHOICES if w in search.normalize(label)]
+            return Q(region__in=codes) if codes else None
+
+        vqs = Venue.objects.filter(tournaments__publication__in=PUBLIC_T).distinct()
+        venues = list(search.apply(vqs, q, ["name", "settlement"], extra=_vregion)[:10])
+    my_club = services.club_of(request.user) if request.user.is_authenticated else None
+    return render(request, "clubs/list.html", {"clubs": clubs, "venues": venues, "q": q, "region": region, "regions": REGION_CHOICES,
+                                              "my_club": my_club, "with_t": with_t,
+                                              "region_name": dict(REGION_CHOICES).get(region, "")})
 
 
 def detail(request, pk):
@@ -49,7 +90,17 @@ def detail(request, pk):
     upcoming = list(ts.filter(pub_ends_on__gte=today).order_by("pub_starts_on"))
     past = list(ts.filter(pub_ends_on__lt=today).order_by("-pub_starts_on")[:20])
     news = club.news.filter(hidden=False).prefetch_related("photos").select_related("tournament")[:20]
-    return render(request, "clubs/detail.html", {"club": club, "upcoming": upcoming, "past": past, "news": news,
+    tab = request.GET.get("tab", "tournaments")
+    if tab not in ("tournaments", "news", "photos", "about"):
+        tab = "tournaments"
+    photos = list(club.photos.all())
+    from urllib.parse import quote
+
+    where = ", ".join(p for p in (club.public_region_name, club.public_settlement, club.public_address) if p)
+    return render(request, "clubs/detail.html", {"club": club, "upcoming": upcoming, "past": past, "news": news, "preview": not club.is_public,
+                                                 "tab": tab, "photos": photos, "cover": photos[0] if photos else None,
+                                                 "map_url": "https://yandex.ru/maps/?text=" + quote(where),
+                                                 "tel": "".join(ch for ch in club.phone if ch.isdigit() or ch == "+"),
                                                  "manage": services.can_manage(request.user, club)})
 
 
@@ -114,7 +165,25 @@ def mine(request):
         return redirect("clubs:mine")
     news = club.news.prefetch_related("photos").select_related("tournament") if club else []
     invites = ClubMember.objects.filter(phone=request.user.phone, state=ClubMember.State.PENDING).select_related("club") if not club else []
-    return render(request, "clubs/mine.html", {"club": club, "form": form, "news": news, "missing": services.missing(club) if club else [],
+    from apps.core import once
+
+    # Тест 5, п. 25.3: нет клуба, «Изменить сведения» или ошибка в форме — мастер из 3 шагов; иначе — кабинет клуба
+    wizard = not club or request.GET.get("edit") == "1" or request.method == "POST"
+    template = "clubs/club_form.html" if wizard else "clubs/mine.html"
+    photos = list(club.photos.all()) if club else []
+    checklist = []
+    if club:
+        checklist = [
+            ("Название, адрес и контакты", not services.missing(club), "?edit=1"),
+            ("Логотип", bool(club.logo), "?edit=1#step-3"),
+            ("Рассказ о клубе", bool(club.description.strip()), "?edit=1#step-2"),
+            ("Обложка — первое фото", bool(photos), "#photos"),
+            ("Первая новость", club.news.exists(), reverse("clubs:news_new")),
+        ]
+    venue_t = Tournament.objects.filter(venue_id=club.venue_id, publication__in=PUBLIC_T).count() if club and club.venue_id else 0
+    return render(request, template, {"club": club, "form": form, "news": news, "missing": services.missing(club) if club else [], "once": once.new_token(),
+                                      "photos": photos, "checklist": checklist, "done": sum(1 for c in checklist if c[1]),
+                                      "venue_t": venue_t, "members_count": club.members.count() + 1 if club else 0,
                                                "invites": invites, "is_owner": club and services.is_owner(request.user, club),
                                                "similar": services.similar(club) if club and not club.is_public and club.settlement else []})
 
@@ -125,18 +194,44 @@ def photo_add(request):
     club = _my_club(request.user)
     if not club:
         raise Http404
-    f = request.FILES.get("file")
+    from apps.core import once
+
+    files = request.FILES.getlist("file")
+    if once.already_used(request):
+        return redirect(reverse("clubs:mine") + "#photos")  # повторное нажатие — без дублей (тест 5, п. 24.5)
     try:
-        if not f:
-            raise ValidationError("Выберите файл.")
-        services.check_image(f)
+        if not files:
+            raise ValidationError("Выберите фото.")
+        if len(files) > 10:
+            raise ValidationError("За раз — не больше 10 фото.")
+        for f in files:
+            services.check_image(f)
     except ValidationError as e:
         messages.error(request, " ".join(e.messages))
-        return redirect("clubs:mine")
-    p = ClubPhoto.objects.create(club=club, file=f, caption=request.POST.get("caption", "")[:200], position=club.photos.count())
-    audit(request.user, "club.photo.add", club, photo=p.pk)
-    messages.success(request, "Фото добавлено.")
-    return redirect("clubs:mine")
+        return redirect(reverse("clubs:mine") + "#photos")
+    with transaction.atomic():
+        start = club.photos.count()
+        for i, f in enumerate(files):
+            p = ClubPhoto.objects.create(club=club, file=f, caption=request.POST.get("caption", "")[:200], position=start + i)
+            audit(request.user, "club.photo.add", club, photo=p.pk)
+    messages.success(request, "Фото добавлены." if len(files) > 1 else "Фото добавлено.")
+    return redirect(reverse("clubs:mine") + "#photos")
+
+
+@login_required
+@require_POST
+def photo_cover(request, pk):
+    """Сделать фото обложкой: оно становится первым (тест 5, п. 25.3)."""
+    p = get_object_or_404(ClubPhoto.objects.select_related("club"), pk=pk)
+    services.require_manage(request.user, p.club)
+    with transaction.atomic():
+        ids = list(ClubPhoto.objects.select_for_update().filter(club=p.club).order_by("position", "id").values_list("id", flat=True))
+        ids.remove(p.pk)
+        for i, pid in enumerate([p.pk] + ids):
+            ClubPhoto.objects.filter(pk=pid).update(position=i)
+    audit(request.user, "club.photo.cover", p.club, photo=p.pk)
+    messages.success(request, "Обложка обновлена.")
+    return redirect(reverse("clubs:mine") + "#photos")
 
 
 @login_required
@@ -147,7 +242,7 @@ def photo_delete(request, pk):
     p.delete()
     audit(request.user, "club.photo.delete", p.club, photo=pk)
     messages.success(request, "Фото удалено.")
-    return redirect("clubs:mine")
+    return redirect(reverse("clubs:mine") + "#photos")
 
 
 @login_required
@@ -156,8 +251,16 @@ def news_edit(request, pk=None):
     club = _my_club(request.user)
     if not club:
         raise Http404
-    item = get_object_or_404(ClubNews, pk=pk, club=club) if pk else None
+    item = ClubNews.objects.filter(pk=pk, club=club).first() if pk else None
+    if pk and not item:
+        # «Назад» после удаления новости: без технической страницы 404
+        messages.info(request, "Этой новости уже нет — возможно, она удалена.")
+        return redirect("clubs:mine")
     form = NewsForm(club, request.POST or None, request.FILES or None, instance=item)
+    from apps.core import once
+
+    if request.method == "POST" and not pk and once.already_used(request):
+        return redirect("clubs:mine")  # повторное «Опубликовать» не создаёт дубль (тест 5, п. 25.2)
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
             n = form.save(commit=False)
@@ -168,8 +271,8 @@ def news_edit(request, pk=None):
                 NewsPhoto.objects.create(news=n, file=photo, position=n.photos.count())
             audit(request.user, "club.news.save", club, news=n.pk)
         messages.success(request, "Новость опубликована." if not pk else "Новость сохранена.")
-        return redirect("clubs:mine")
-    return render(request, "clubs/news_form.html", {"club": club, "form": form, "item": item})
+        return redirect(reverse("clubs:mine") + "#news")
+    return render(request, "clubs/news_form.html", {"club": club, "form": form, "item": item, "once": once.new_token()})
 
 
 @login_required

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Обращение №{{ t.pk }} — Пульт — СтартЛист{% endblock %}
+{% block content %}
+<a class="back" href="{% url 'moderation:support' %}">← Все обращения</a>
+<div class="page-head">
+  <div>
+    <h1 class="h1">Обращение №{{ t.pk }}</h1>
+    <div class="chips">{% include "support/_status.html" %}{% if overdue %}<span class="chip chip--danger">Ждёт ответа дольше суток</span>{% endif %}<span class="table__sub">{{ t.get_topic_display }} · {{ t.created_at|date:"j E Y, H:i" }}</span></div>
+  </div>
+</div>
+<div class="grid-2" style="align-items: start;">
+  <section class="card break">
+    <h2 class="h3">Переписка</h2>
+    <ol class="thread">
+      <li class="thread__msg">
+        <div class="thread__who">{{ t.contact_name|default:"Пользователь" }} · {{ t.created_at|date:"j E, H:i" }}</div>
+        <div class="thread__text">{{ t.text|linebreaksbr }}</div>
+        {% if files %}<div class="photo-grid">{% for f in files %}<a href="{% url 'support:file' f.pk %}" target="_blank" rel="noopener"><img src="{% url 'support:file' f.pk %}" alt="Вложение {{ forloop.counter }}" loading="lazy"></a>{% endfor %}</div>{% endif %}
+      </li>
+      {% for m in msgs %}
+        <li class="thread__msg{% if m.is_staff %} thread__msg--staff{% endif %}">
+          <div class="thread__who">{% if m.is_staff %}Поддержка{% if m.author %} ({{ m.author.short_name }}){% endif %}{% else %}{{ t.contact_name|default:"Пользователь" }}{% endif %} · {{ m.created_at|date:"j E, H:i" }}</div>
+          <div class="thread__text">{{ m.text|linebreaksbr }}</div>
+        </li>
+      {% endfor %}
+    </ol>
+    <form method="post" class="form" style="margin-top: var(--space-4);">
+      {% csrf_token %}
+      <div class="field"><label class="field__label" for="reply">Ответ пользователю</label>
+        <textarea id="reply" name="text" rows="5" maxlength="5000" placeholder="Придёт уведомлением на сайте{% if t.reply_email %} и письмом на {{ t.reply_email }}{% endif %}"></textarea></div>
+      <div class="field"><label class="field__label" for="st">Статус после ответа</label>
+        <select id="st" name="status">{% for v, l in statuses %}<option value="{{ v }}"{% if v == "waiting" and t.status == "new" or v == t.status and t.status != "new" %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+      <div class="form__actions"><button class="btn btn--primary">Сохранить</button></div>
+    </form>
+  </section>
+
+  <section class="stack">
+    <div class="card">
+      <h2 class="h3">Кто написал</h2>
+      <dl class="facts">
+        <dt>Имя</dt><dd>{{ t.contact_name|default:"—" }}{% if not t.author_id %} (без аккаунта){% endif %}</dd>
+        <dt>Телефон</dt><dd>{{ t.contact_phone|default:"—" }}</dd>
+        <dt>Email</dt><dd>{{ t.reply_email|default:"не указан — ответ только на сайте" }}</dd>
+        <dt>Страница</dt><dd>{% if t.page %}<a href="{{ t.page }}" target="_blank" rel="noopener">{{ t.page }}</a>{% else %}—{% endif %}</dd>
+        <dt>Устройство</dt><dd class="table__sub">{{ t.user_agent|default:"—" }}</dd>
+      </dl>
+      {% if t.topic == "login" %}<p class="table__sub">Сброс пароля — только администратор, после сверки телефона с аккаунтом (команда <code>set_password</code>).</p>{% endif %}
+    </div>
+    {% if t.tournament or t.athlete or t.horse or t.club %}
+    <div class="card">
+      <h2 class="h3">О чём обращение</h2>
+      <ul class="list">
+        {% if t.tournament %}<li class="list__row"><span style="flex:1">Турнир: <a href="{% url 'moderation:detail' t.tournament_id %}">{{ t.tournament.pub_title|default:t.tournament.title }}</a></span></li>{% endif %}
+        {% if t.athlete %}<li class="list__row">Спортсмен: {{ t.athlete.full_name }} (№{{ t.athlete_id }})</li>{% endif %}
+        {% if t.horse %}<li class="list__row">Лошадь: {{ t.horse.name }} (№{{ t.horse_id }})</li>{% endif %}
+        {% if t.club %}<li class="list__row"><span style="flex:1">Клуб: <a href="{% url 'moderation:club' t.club_id %}">{{ t.club.name }}</a></span></li>{% endif %}
+      </ul>
+      {% if t.tournament %}
+        <form method="post" style="margin-top: var(--space-3);">{% csrf_token %}<input type="hidden" name="action" value="transfer">
+          <button class="btn btn--ghost btn--sm" data-confirm="Отправить текст обращения судьям и организатору турнира?" data-confirm-ok="Передать">{% if t.transferred_at %}Передать судьям ещё раз{% else %}Передать судьям турнира{% endif %}</button>
+          <p class="table__sub">{% if t.transferred_at %}Передано {{ t.transferred_at|date:"j E, H:i" }}. {% endif %}Исправляет судья турнира — новой версией с причиной; модератор результаты не меняет.</p>
+        </form>
+      {% endif %}
+    </div>
+    {% endif %}
+    <div class="card">
+      <h2 class="h3">История</h2>
+      <ul class="list">{% for h in history %}<li class="list__row"><span style="flex:1">{{ h.label }}</span><span class="table__sub">{{ h.actor.short_name|default:"гость" }} · {{ h.created_at|date:"j E, H:i" }}</span></li>{% endfor %}</ul>
+    </div>
+  </section>
+</div>
+{% endblock %}

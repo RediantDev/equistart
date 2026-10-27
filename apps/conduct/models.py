@@ -31,6 +31,11 @@ class StartSlot(models.Model):
     def locked(self):
         return self.status in self.LOCKED
 
+    @property
+    def is_off(self):
+        """«Не стартует» (снят или не явился)."""
+        return self.status in (self.Status.WITHDRAWN, self.Status.NO_SHOW)
+
 
 class StartListPublication(models.Model):
     """Опубликованная версия стартового протокола программы. Прежние версии сохраняются."""
@@ -113,7 +118,7 @@ class JumpRound(models.Model):
 
 
 class JudgePosition(models.Model):
-    """Судейская бригада езды (DRS-02): 3 или 5 судей на буквах и судья-подсчёт."""
+    """Судейская бригада езды (DRS-02): 3 или 5 судей на буквах и судья по итогам."""
 
     class Letter(models.TextChoices):
         C = "C", "C"
@@ -121,7 +126,7 @@ class JudgePosition(models.Model):
         B = "B", "B"
         H = "H", "H"
         M = "M", "M"
-        SCORER = "SCORER", "Судья-подсчёт"
+        SCORER = "SCORER", "Судья по итогам"
 
     class Role(models.TextChoices):
         ALL = "all", "Весь лист"
@@ -152,7 +157,7 @@ class JudgePosition(models.Model):
 
 
 class DressageSheet(models.Model):
-    """Лист судьи на букве по одной паре (DRS-03/04). После подписи закрыт; правка — только после возврата судьёй-подсчётом."""
+    """Лист судьи на букве по одной паре (DRS-03/04). После подписи закрыт; правка — только после возврата судьёй по итогам."""
 
     entry = models.ForeignKey("entries.Entry", on_delete=models.CASCADE, related_name="dressage_sheets")
     position = models.ForeignKey(JudgePosition, on_delete=models.PROTECT, related_name="sheets")
@@ -174,10 +179,12 @@ class DressageSheet(models.Model):
 
 
 class DressageFlags(models.Model):
-    """Отметки судьи на C по паре (DRS-05): ошибки в схеме, технические нарушения, исключение; утверждение судьёй-подсчётом."""
+    """Отметки судьи на C по паре (DRS-05): ошибки в схеме, технические нарушения, исключение; утверждение судьёй по итогам."""
 
     entry = models.OneToOneField("entries.Entry", on_delete=models.CASCADE, related_name="dressage_flags")
     errors = models.PositiveSmallIntegerField("ошибки в схеме", default=0)
+    error_items = models.JSONField("элементы со сбоем", default=list, blank=True,
+                                   help_text="Тест 4: судья на C отмечает «Сбой» у элемента; число ошибок = число отметок.")
     technical = models.PositiveSmallIntegerField("технические нарушения", default=0)
     eliminated = models.BooleanField("исключение", default=False)
     reason = models.CharField("причина исключения", max_length=200, blank=True)

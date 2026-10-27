@@ -68,9 +68,7 @@ class RegistrationUxTests(Base):
         self.assertNotIn('type="text" name="phone"', page)
         data = {"phone": "+79995550001", "password1": "Konkur-2026!", "password2": "Konkur-2026!", "last_name": "Белова", "first_name": "Ира",
                 "categories": ["athlete"], "pd_consent": "on"}
-        resp = self.client.post(reverse("accounts:register"), data)
-        self.assertContains(resp, "согласие на публикацию")
-        resp = self.client.post(reverse("accounts:register"), {**data, "publication_consent": "on"})
+        self.client.post(reverse("accounts:register"), data)  # тест 4: отдельного согласия на публикацию нет
         u = User.objects.get(phone="+79995550001")
         a = Athlete.objects.get(linked_user=u)
         self.assertEqual((a.last_name, a.manager_id), ("Белова", u.pk))

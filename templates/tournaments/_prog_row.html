@@ -1,0 +1,12 @@
+{% load tournaments %}{# Маршрут или езда одной строкой, зачёты — внутри неё (тест 4.2, п. 38) #}
+<article class="prog-row2">
+  <div class="prog-row2__time">{{ p.start_time|default:"—" }}</div>
+  <div class="prog-row2__main">
+    <div class="prog-row2__name">{{ p.name }}</div>
+    <div class="table__sub">{% if p.discipline_name %}{{ p.discipline_name }} · {% endif %}{{ p.program_type_name }}{% if p|heights_extra %} · {{ p|heights_extra }}{% endif %}{% if p.article_label %} · {{ p.article_label }}{% elif p.article %} · {{ p.article }}{% endif %}</div>
+  </div>
+  <ul class="prog-row2__classes">
+    {% for c in p.classes %}<li><span class="prog-row2__class">{{ c.label }}</span><span class="table__sub">{{ c.conditions|default:"без ограничений" }}{% if c.note %} · {{ c.note }}{% endif %}</span></li>
+    {% empty %}<li><span class="chip chip--danger">Нет зачётов</span></li>{% endfor %}
+  </ul>
+</article>

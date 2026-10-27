@@ -1,4 +1,5 @@
 {% extends "tournaments/_wizard.html" %}
+{% load tournaments %}
 {% block step %}
 <div class="wizard-grid">
   <div class="wizard-main">
@@ -15,14 +16,20 @@
     {% endif %}
 
     {% for d in by_day %}
-      <h2 class="h2" style="margin-top: var(--space-4);">{{ d.day|date:"l, j E" }}</h2>
+      <details class="day-block"{% if d.programs %} open{% endif %}>
+      <summary class="day-block__head">
+        <span class="h2 day-block__title">{{ d.day|date:"l, j E" }}</span>
+        <span class="table__sub">{% if d.programs %}{{ d.programs|length }} в программе{% else %}программы нет{% endif %}</span>
+        {% if not t.is_locked %}<button type="button" class="btn btn--ghost btn--sm day-block__add" data-add-day="{{ d.day|date:'Y-m-d' }}">+ Добавить программу</button>{% endif %}
+        {% if d.programs %}<span class="day-block__chev" aria-hidden="true"></span>{% endif %}
+      </summary>
       {% for p in d.programs %}
         <section class="card prog-card" id="program-{{ p.pk }}">
           <div class="section-head">
             <div style="min-width: 0;">
               <h3 class="h3" style="margin: 0;">{% if p.start_time %}<span class="prog-row__time">{{ p.start_time|time:"H:i" }}</span> {% endif %}{{ p.name }}</h3>
               <span class="table__sub">
-                {% if p.is_jumping %}{{ p.program_type_name }}{% if p.variant %} ({{ p.variant }}){% endif %}{% if p.heights %} · {{ p.heights_label }}{% endif %}{% if p.article_label %} · {{ p.article_label }}{% endif %}
+                {% if p.is_jumping %}{{ p.program_type_name }}{% if p.variant %} ({{ p.variant }}){% endif %}{% if p|heights_extra %} · {{ p|heights_extra }}{% endif %}{% if p.article_label %} · {{ p.article_label }}{% endif %}
                 {% else %}{{ p.program_type_name }}{% if p.test_snapshot.level %} · {{ p.test_snapshot.level }}{% endif %}{% if p.arena %} · манеж {{ p.get_arena_display|default:p.arena }}{% endif %}{% endif %}
               </span>
             </div>
@@ -39,7 +46,7 @@
                   {% if not t.is_locked %}
                     <span class="class-row__actions">
                       <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:class_edit' t.pk p.pk c.pk %}#class-form-{{ p.pk }}">Изменить</a>
-                      <form method="post" action="{% url 'tournaments:class_delete' t.pk p.pk c.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}"><button type="submit" class="btn btn--danger btn--sm" aria-label="Удалить зачёт {{ c.name }}">Удалить</button></form>
+                      <form method="post" action="{% url 'tournaments:class_delete' t.pk p.pk c.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}"><button type="submit" class="btn btn--danger btn--sm" aria-label="Удалить зачёт {{ c.name }}" data-confirm="Удалить зачёт «{{ c.label }}»?">Удалить</button></form>
                     </span>
                   {% endif %}
                 </li>
@@ -51,20 +58,23 @@
 
           {% if not t.is_locked %}
             <details class="inline-form" id="class-form-{{ p.pk }}"{% if p.form_open %} open{% endif %}>
-              <summary class="btn btn--dark btn--sm">{% if p.editing_class %}Изменить зачёт «{{ p.editing_class.name }}»{% else %}+ Зачёт{% endif %}</summary>
+              <summary class="btn btn--dark btn--sm">{% if p.editing_class %}Изменить зачёт «{{ p.editing_class.name }}»{% else %}+ Добавить зачёт{% endif %}</summary>
               {% if not p.editing_class %}
                 <div class="tpl-picker">
-                  <p class="caption muted" style="margin: var(--space-3) 0 var(--space-2);">ВЫБЕРИТЕ ГОТОВЫЙ ЗАЧЁТ — ГОДЫ РОЖДЕНИЯ ПОДСТАВЯТСЯ ОТ {{ t.starts_on|date:"Y" }} ГОДА</p>
-                  <form method="post" action="{% url 'tournaments:class_from_template' t.pk p.pk %}" class="chips" style="flex-wrap: wrap;">
+                  <p class="field__help" style="margin: var(--space-3) 0 var(--space-2);">Отметьте готовые зачёты — можно несколько. Годы рождения подставятся от {{ t.starts_on|date:"Y" }} года.</p>
+                  <form method="post" action="{% url 'tournaments:class_from_template' t.pk p.pk %}" class="form" style="margin-top: 0;">
                     {% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}">
                     {% if p.heights|length > 1 %}
-                      <label class="field" style="flex: 0 0 auto;"><span class="field__label">Высота</span><select name="height"><option value="">для всех высот</option>{% for h in p.heights %}<option value="{{ h }}">{{ h }} см</option>{% endfor %}</select></label>
+                      <div class="field" style="max-width: 280px;"><label class="field__label" for="h-{{ p.pk }}">Высота</label><select name="height" id="h-{{ p.pk }}"><option value="">для всех высот</option>{% for h in p.heights %}<option value="{{ h }}">{{ h }} см</option>{% endfor %}</select></div>
                     {% endif %}
+                    <div class="tpl-grid">
                     {% for tpl in templates %}{% if p.discipline in tpl.disciplines %}
-                      <button type="submit" name="template" value="{{ tpl.pk }}" class="btn btn--ghost btn--sm" title="{{ tpl.note }}">{{ tpl.name }}</button>
+                      <label class="choice choice--sm"><input type="checkbox" name="template" value="{{ tpl.pk }}"><span>{{ tpl.name }}</span></label>
                     {% endif %}{% endfor %}
+                    </div>
+                    <div class="form-actions" style="justify-content: flex-start;"><button type="submit" class="btn btn--dark btn--sm">Добавить отмеченные</button></div>
                   </form>
-                  {% if not p.form %}<p style="margin-top: var(--space-3);"><a class="btn btn--ghost btn--sm" href="?custom={{ p.pk }}#class-form-{{ p.pk }}">Свой зачёт — задать условия вручную</a></p>{% else %}<p class="caption muted" style="margin: var(--space-3) 0 var(--space-2);">ИЛИ СВОЙ ЗАЧЁТ</p>{% endif %}
+                  {% if not p.form %}<p style="margin-top: var(--space-3);"><a class="btn btn--ghost btn--sm" href="?custom={{ p.pk }}#class-form-{{ p.pk }}">Свой зачёт — условия вручную</a></p>{% else %}<p class="caption muted" style="margin: var(--space-3) 0 var(--space-2);">ИЛИ СВОЙ ЗАЧЁТ</p>{% endif %}
                 </div>
               {% endif %}
               {% if p.form %}
@@ -108,56 +118,93 @@
             </details>
             <div class="prog-card__actions">
               <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:program_edit' t.pk p.pk %}#program-form">Изменить {% if p.is_dressage %}езду{% else %}маршрут{% endif %}</a>
-              <form method="post" action="{% url 'tournaments:program_delete' t.pk p.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}"><button type="submit" class="btn btn--danger btn--sm" aria-label="Удалить {{ p.name }}">Удалить</button></form>
+              <form method="post" action="{% url 'tournaments:program_delete' t.pk p.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}"><button type="submit" class="btn btn--danger btn--sm" aria-label="Удалить {{ p.name }}" data-confirm="Удалить «{{ p.name }}» вместе с зачётами?">Удалить {% if p.is_dressage %}езду{% else %}маршрут{% endif %}</button></form>
             </div>
           {% endif %}
           </details>
         </section>
-      {% empty %}
-        <p class="muted">В этот день программы пока нет.</p>
       {% endfor %}
+      </details>
     {% endfor %}
 
     {% if not t.is_locked %}
-    <section class="card" id="program-form" style="margin-top: var(--space-5);">
-      <h2 class="h3">{% if editing %}Изменить «{{ editing.name }}»{% else %}Добавить маршрут или езду{% endif %}</h2>
+    <details class="card add-program" id="program-form"{% if editing or form.errors or not by_day.0.programs %} open{% endif %}>
+      <summary class="add-program__summary">{% if editing %}<span class="h3">Изменить «{{ editing.name }}»</span>{% else %}<span class="btn btn--dark">+ Добавить маршрут или езду</span>{% endif %}</summary>
       <form method="post" novalidate class="form" action="{% if editing %}{% url 'tournaments:program_save' t.pk editing.pk %}{% else %}{% url 'tournaments:program_add' t.pk %}{% endif %}" data-program-form>
         {% csrf_token %}
         <input type="hidden" name="revision" value="{{ t.revision }}">
         {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
-        <fieldset class="choices segmented-choices">
-          <legend class="field__label">Дисциплина</legend>
-          {% for option in form.discipline %}<label class="choice">{{ option.tag }}<span>{{ option.choice_label }}</span></label>{% endfor %}
-        </fieldset>
-        <div class="grid-2">
-          {% if form.day.is_hidden %}{{ form.day }}{% else %}{% include "partials/field.html" with field=form.day %}{% endif %}
-          {% include "partials/field.html" with field=form.start_time %}
+
+        <div class="pf-step"><span class="pf-step__n">1</span>
+          <div class="pf-step__body"><fieldset class="choices segmented-choices">
+            <legend class="field__label">Дисциплина</legend>
+            {% for option in form.discipline %}<label class="choice">{{ option.tag }}<span>{{ option.choice_label }}</span></label>{% endfor %}
+          </fieldset></div>
         </div>
-        <div data-for="jumping">
-          <div class="grid-2">
+
+        <div class="pf-step"><span class="pf-step__n">2</span>
+          <div class="pf-step__body grid-2">
+            {% include "partials/field.html" with field=form.start_time %}
+            {% if form.day.is_hidden %}{{ form.day }}{% else %}{% include "partials/field.html" with field=form.day %}{% endif %}
+          </div>
+        </div>
+
+        <div class="pf-step" data-show-when="discipline=jumping"><span class="pf-step__n">3</span>
+          <div class="pf-step__body">
+            <div class="label lg">Маршрут</div>
             {% include "partials/field.html" with field=form.program_type %}
-            {% include "partials/field.html" with field=form.heights_text %}
+            {% for r in route_types %}{% if r.variants %}
+              <div data-show-when="program_type={{ r.key }}" class="field{% if form.variant.errors %} field--error{% endif %}">
+                <label class="field__label" for="variant-{{ r.key }}">Вариант формулы</label>
+                <select name="variant" id="variant-{{ r.key }}">{% for v, label in r.variants %}<option value="{{ v }}"{% if form.variant.value == v %} selected{% endif %}>{{ label }} (п. {{ v }})</option>{% endfor %}</select>
+                {% for error in form.variant.errors %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ error }}</p>{% endfor %}
+              </div>
+            {% endif %}{% endfor %}
+            <div class="grid-2">
+              {% include "partials/field.html" with field=form.heights_text %}
+              {% include "partials/field.html" with field=form.table %}
+            </div>
+            <details class="route-help">
+              <summary class="label" style="cursor: pointer;">Чем отличаются маршруты</summary>
+              <ul class="list">{% for r in route_types %}<li class="list__row"><span><strong>{{ r.name }}</strong>{% if r.article %} <span class="table__sub">гл. X, п. {{ r.article }}{% if r.fei %} (ст. {{ r.fei }} FEI){% endif %}</span>{% endif %}<span class="table__sub">{{ r.note }}</span></span></li>{% endfor %}</ul>
+            </details>
           </div>
-          <div class="grid-2">
-            {% include "partials/field.html" with field=form.table %}
-            {% include "partials/field.html" with field=form.variant %}
+        </div>
+
+        <div class="pf-step" data-show-when="discipline=dressage"><span class="pf-step__n">3</span>
+          <div class="pf-step__body">
+            <div class="label lg">Езда</div>
+            {% include "partials/field.html" with field=form.dressage_test %}
+            <p class="field__help">Нет нужной езды? <a href="{% url 'sport:test_new' %}?t={{ t.pk }}">Создайте свою</a> — она будет доступна только в ваших турнирах.</p>
           </div>
-          <details class="route-help">
-            <summary class="label" style="cursor: pointer;">Чем отличаются маршруты</summary>
-            <ul class="list">{% for r in route_types %}<li class="list__row"><span><strong>{{ r.name }}</strong>{% if r.article %} <span class="table__sub">гл. X, п. {{ r.article }}{% if r.fei %} (ст. {{ r.fei }} FEI){% endif %}</span>{% endif %}<span class="table__sub">{{ r.note }}</span></span></li>{% endfor %}</ul>
-          </details>
         </div>
-        <div data-for="dressage">
-          {% include "partials/field.html" with field=form.dressage_test %}
-          <p class="field__help">Нет нужной езды? <a href="{% url 'sport:test_new' %}?t={{ t.pk }}">Создайте свою</a> — она будет доступна только в ваших турнирах.</p>
+
+        <div class="pf-step"><span class="pf-step__n">4</span>
+          <div class="pf-step__body">
+            <details class="tpl-box"{% if form.templates.value %} open{% endif %}>
+              <summary class="btn btn--ghost">+ Добавить зачёт</summary>
+              <p class="field__help" style="margin: var(--space-3) 0 var(--space-2);">Отметьте один или несколько. Годы рождения подставятся от {{ t.starts_on|date:"Y" }} года, условия можно поправить в карточке маршрута.</p>
+              <div class="tpl-grid">
+                {% for tpl in templates %}
+                  <label class="choice choice--sm" data-disciplines="{{ tpl.disciplines }}"><input type="checkbox" name="templates" value="{{ tpl.pk }}"{% if tpl.pk|stringformat:"s" in form.templates.value %} checked{% endif %}><span>{{ tpl.name }}{% if tpl.note %}<span class="table__sub">{{ tpl.note|truncatechars:70 }}</span>{% endif %}</span></label>
+                {% endfor %}
+              </div>
+              <p class="field__help">Нужен зачёт со своими условиями? Сохраните маршрут и нажмите «Свой зачёт» в его карточке.</p>
+            </details>
+          </div>
         </div>
-        {% include "partials/field.html" with field=form.name %}
+
+        <details class="pf-name"{% if form.name.value or form.name.errors %} open{% endif %}>
+          <summary class="label" style="cursor: pointer;">Своё название (необязательно)</summary>
+          <div style="margin-top: var(--space-2);">{% include "partials/field.html" with field=form.name %}</div>
+        </details>
+
         <div class="form-actions">
           {% if editing %}<a class="btn btn--ghost" href="{% url 'tournaments:step' t.pk 2 %}">Отмена</a>{% endif %}
-          <button type="submit" class="btn btn--dark">{% if editing %}Сохранить{% else %}+ Добавить в программу{% endif %}</button>
+          <button type="submit" class="btn btn--primary">{% if editing %}Сохранить{% else %}Добавить в программу{% endif %}</button>
         </div>
       </form>
-    </section>
+    </details>
     {% endif %}
 
     <div class="form-actions">
@@ -171,17 +218,31 @@
   </aside>
 </div>
 <script>
-  (function () {
-    var form = document.querySelector("[data-program-form]");
-    if (!form) return;
-    function sync() {
-      var checked = form.querySelector("input[name=discipline]:checked");
-      var d = checked ? checked.value : "jumping";
-      form.querySelectorAll("[data-for]").forEach(function (el) { el.hidden = el.getAttribute("data-for") !== d; });
-    }
-    form.addEventListener("change", sync);
-    sync();
-  })();
+(function () { // «+ Добавить программу» у дня: открыть форму с этим днём
+  document.querySelectorAll("[data-add-day]").forEach(function (b) {
+    b.addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var box = document.getElementById("program-form"); if (!box) return;
+      box.open = true;
+      var day = box.querySelector("[name=day]");
+      if (day) { day.value = b.dataset.addDay; day.dispatchEvent(new Event("change", { bubbles: true })); }
+      box.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+})();
+</script>
+<script>
+(function () { // в списке зачётов — только подходящие выбранной дисциплине
+  var form = document.querySelector("[data-program-form]"); if (!form) return;
+  function sync() {
+    var c = form.querySelector("input[name=discipline]:checked"), d = c ? c.value : "jumping";
+    form.querySelectorAll("[data-disciplines]").forEach(function (el) {
+      var ok = el.getAttribute("data-disciplines").split(",").indexOf(d) >= 0;
+      el.hidden = !ok; if (!ok) el.querySelector("input").checked = false;
+    });
+  }
+  form.addEventListener("change", sync); sync();
+})();
 </script>
 <script>
 (function () { // открыть карточку, к которой ведёт ссылка (#program-N), после сохранения

@@ -157,9 +157,9 @@ class CabinetTests(TestCase):
 
     def test_home_shows_sections_for_all_roles(self):
         resp = self.client.get(reverse("accounts:cabinet"))
-        self.assertContains(resp, "Главная")
+        self.assertContains(resp, "Кабинет")
         self.assertContains(resp, "Кого вы ведёте")  # тренер
-        self.assertContains(resp, "Куда вас заявил")  # спортсмен
+        self.assertContains(resp, "куда вас заявил тренер")  # спортсмен
         self.assertNotContains(resp, "Создать соревнование")
         self.assertNotContains(resp, "/cabinet/mode/")
 
@@ -174,7 +174,7 @@ class CabinetTests(TestCase):
 
     def test_add_role_keeps_profile(self):
         resp = self.client.post(reverse("accounts:add_role"), {"category": "organizer"})
-        self.assertRedirects(resp, reverse("accounts:cabinet"))
+        self.assertRedirects(resp, reverse("accounts:profile"))
         self.user.refresh_from_db()
         self.assertTrue(self.user.is_organizer and self.user.is_athlete and self.user.is_coach)
         self.assertEqual(User.objects.count(), 1)

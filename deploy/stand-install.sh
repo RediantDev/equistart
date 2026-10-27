@@ -86,7 +86,7 @@ cat > /etc/nginx/sites-available/equistart <<'NGINX'
 server {
     listen 80 default_server;
     server_name _;
-    client_max_body_size 12m;
+    client_max_body_size 22m;
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}{% if horse %}{{ horse.name }}{% else %}Новая лошадь{% endif %} — EquiStart{% endblock %}
+{% block title %}{% if horse %}{{ horse.name }}{% else %}Новая лошадь{% endif %} — СтартЛист{% endblock %}
 {% block content %}
 <section class="auth">
   <div class="card auth__card auth__card--wide">
-    <a class="back" href="{% if horse %}{% url 'profiles:horse' horse.pk %}{% else %}{% url 'profiles:horses' %}{% endif %}">← Назад</a>
+    <a class="back" href="{% if next %}{{ next }}{% elif horse %}{% url 'profiles:horse' horse.pk %}{% else %}{% url 'profiles:horses' %}{% endif %}">{% if next %}← Вернуться к заявке{% else %}← Назад{% endif %}</a>
     <h1 class="h1">{% if horse %}Изменить лошадь{% else %}Новая лошадь{% endif %}</h1>
     {% if similar %}
       <div class="alert alert--warning" role="alert">
@@ -25,10 +25,9 @@
       </div>
       {% include "partials/field.html" with field=form.fksr_number %}
       {% include "partials/field.html" with field=form.fei_id %}
-      <div class="grid-2">
-        {% include "partials/field.html" with field=form.is_pony %}
-        {% include "partials/field.html" with field=form.height_cm %}
-      </div>
+      {# Тест 5, п. 15.2: «Рост в холке» — только для пони #}
+      {% include "partials/field.html" with field=form.is_pony %}
+      <div data-show-when="is_pony:checked">{% include "partials/field.html" with field=form.height_cm %}</div>
       <details{% if form.sire.value or form.birthplace.value or form.owner_name.value %} open{% endif %}>
         <summary class="label" style="cursor: pointer;">Дополнительно: отец, место рождения, владелец</summary>
         <div class="form" style="margin-top: var(--space-3);">

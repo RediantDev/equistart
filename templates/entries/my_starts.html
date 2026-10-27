@@ -1,7 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Мои выступления — EquiStart{% endblock %}
+{% block title %}Мои выступления — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head"><div><a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a><h1 class="h1">Мои выступления</h1><p class="muted">Выступления, в которые вас заявил тренер или менеджер. Видны только ваши позиции.</p></div></div>
+<div class="page-head"><div><a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a><h1 class="h1">Мои выступления</h1><p class="muted">Выступления, в которые вас заявил тренер или менеджер. Видны только ваши позиции.</p></div>
+  <a class="btn btn--primary" href="{% url 'core:calendar' %}">Найти соревнования</a></div>
 {% if entries %}
   <div class="list-cards">{% for e in entries %}
     <article class="row-card">
@@ -10,5 +11,5 @@
       {% include "entries/_entry_chips.html" %}
     </article>
   {% endfor %}</div>
-{% else %}<div class="card empty"><h2 class="h3">Выступлений пока нет</h2></div>{% endif %}
+{% else %}<div class="card empty"><h2 class="h3">Выступлений пока нет</h2><p class="muted">Выберите турнир в календаре — заявку может подать ваш тренер или вы сами.</p><a class="btn btn--primary" href="{% url 'core:calendar' %}">Найти соревнования</a></div>{% endif %}
 {% endblock %}

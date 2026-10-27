@@ -1,0 +1,2 @@
+{# Всадник в таблице: имя и одна строка сведений — строка не растягивается (тест 4.2, п. 11) #}
+<span class="cell-main">{{ a.name }}</span><span class="cell-sub" title="{{ a.birth_year|default:'' }}{% if a.rank %} · {{ a.rank }}{% endif %}{% if a.club %} · {{ a.club }}{% endif %}{% if a.coach %} · тренер {{ a.coach }}{% endif %}">{{ a.birth_year|default:"" }}{% if a.rank %} · {{ a.rank }}{% endif %}{% if a.club %} · {{ a.club }}{% endif %}{% if a.coach %} · тр. {{ a.coach }}{% endif %}</span>

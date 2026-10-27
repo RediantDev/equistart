@@ -14,4 +14,5 @@ def site(request):
         "LEGAL_DOCS_VERSION": settings.LEGAL_DOCS_VERSION,
         "UNREAD_NOTIFICATIONS": unread,
         "STAND_BANNER": settings.STAND_BANNER,
+        "SUPPORT_TELEGRAM": getattr(settings, "SUPPORT_TELEGRAM", ""),
     }

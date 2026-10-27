@@ -1,23 +1,23 @@
 {% extends "base.html" %}
-{% block title %}Бригада · {{ p.name }} — EquiStart{% endblock %}
+{% block title %}Бригада · {{ p.name }} — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
     <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← {{ p.name }}</a>
     <h1 class="h1">Судейская бригада</h1>
-    <p class="muted">3 или 5 судей на буквах (на клубных стартах можно 1–2) и судья-подсчёт. Буквы выбираются вручную. «Кто вводит» — аккаунт, с которого вносятся оценки: сам судья или секретарь, переносящий бумажный лист.</p>
+    <p class="muted">3 или 5 судей на буквах (на клубных стартах можно 1–2) и судья по итогам. Буквы выбираются вручную. «Кто вводит» — аккаунт, с которого вносятся оценки: сам судья или секретарь, переносящий бумажный лист.</p>
   </div>
 </div>
-<form method="post" class="card form" novalidate>
+<form method="post" class="card form" novalidate data-dirty-guard id="panel-form">
   {% csrf_token %}
   {% for r in rows %}
-    <fieldset class="panel-row">
-      <legend class="label">Судья {{ forloop.counter }}</legend>
+    <fieldset class="panel-row" data-panel-row{% if not r.letter and not r.judge_name and not r.user %}{% if not forloop.first or rows.0.letter %} hidden{% endif %}{% endif %}>
+      <legend class="label panel-row__head">Судья {{ forloop.counter }} <button type="button" class="btn btn--ghost btn--sm" data-panel-remove>Убрать</button></legend>
       <div class="grid-3">
         <label class="field"><span class="field__label">Позиция</span>
           <select name="letter_{{ forloop.counter0 }}"><option value="">—</option>{% for v, l in letters %}<option value="{{ v }}"{% if r.letter == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
         <label class="field"><span class="field__label">Кто вводит оценки</span>
-          <select name="user_{{ forloop.counter0 }}"><option value="">—</option>{% for u in candidates %}<option value="{{ u.pk }}"{% if r.user == u.pk|stringformat:"s" %} selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></label>
+          <select name="user_{{ forloop.counter0 }}"><option value="">—</option>{% for u in candidates %}<option value="{{ u.pk }}"{% if r.user == u.pk|stringformat:"s" %} selected{% endif %}>{{ u.full_name }} · …{{ u.phone|slice:"-4:" }}{% if u.pk == request.user.pk %} (вы){% endif %}</option>{% endfor %}</select></label>
         {% if children %}<label class="field"><span class="field__label">Оценивает</span>
           <select name="role_{{ forloop.counter0 }}">{% for v, l in roles %}<option value="{{ v }}"{% if r.role == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>{% endif %}
       </div>
@@ -28,7 +28,27 @@
       </div>
     </fieldset>
   {% endfor %}
+  <div><button type="button" class="btn btn--ghost" id="panel-add">+ Добавить судью</button></div>
   <p class="field__help">Нет нужного человека в списке «Кто вводит»? Пригласите его в команду турнира судьёй.</p>
-  <div class="form-actions"><button class="btn btn--primary">Сохранить бригаду</button></div>
+  <div class="form-actions"><button type="submit" class="btn btn--primary">Сохранить</button></div>
 </form>
+<script>
+(function () {
+  var form = document.getElementById("panel-form"), add = document.getElementById("panel-add");
+  function rows() { return Array.prototype.slice.call(form.querySelectorAll("[data-panel-row]")); }
+  function sync() { add.hidden = !rows().some(function (r) { return r.hidden; }); }
+  add.addEventListener("click", function () {
+    var r = rows().find(function (x) { return x.hidden; }); if (!r) return;
+    r.hidden = false; var b = r.querySelector(".sel__btn, select"); if (b) b.focus(); sync();
+  });
+  form.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-panel-remove]"); if (!b) return;
+    var r = b.closest("[data-panel-row]");
+    r.querySelectorAll("input").forEach(function (i) { i.value = ""; });
+    r.querySelectorAll("select").forEach(function (s) { s.selectedIndex = 0; s.dispatchEvent(new Event("change", { bubbles: true })); });
+    r.hidden = true; sync();
+  });
+  sync();
+})();
+</script>
 {% endblock %}

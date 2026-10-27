@@ -1,21 +1,19 @@
 {% extends "base.html" %}
-{% block title %}{% if t %}{{ t.title }}{% else %}Новое соревнование{% endif %} — EquiStart{% endblock %}
+{% block title %}{% if t %}{{ t.title }}{% else %}Новое соревнование{% endif %} — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <a class="back" href="{% url 'tournaments:mine' %}">← Мои соревнования</a>
+    {% if t %}{% include "partials/crumbs.html" with here="Сведения и программа" %}{% else %}<nav class="crumbs" aria-label="Вы здесь"><a href="{% url 'accounts:cabinet' %}">Кабинет</a><span aria-hidden="true">›</span><a href="{% url 'tournaments:mine' %}">Мои соревнования</a><span aria-hidden="true">›</span><span class="crumbs__here">Новое соревнование</span></nav>{% endif %}
     <h1 class="h1">{% if t %}{{ t.title }}{% else %}Новое соревнование{% endif %}</h1>
     {% if t %}
       <div class="chips">
         {% if t.status == "review" %}<span class="chip chip--warning">На проверке у модератора</span>
         {% elif t.status == "returned" %}<span class="chip chip--danger">Нужны исправления</span>
+        {% elif t.status == "rejected" %}<span class="chip chip--danger">Отклонён модератором</span>
         {% elif t.status == "approved" %}<span class="chip chip--success">Опубликован</span>
         {% elif t.is_published %}<span class="chip chip--warning">Есть неопубликованные изменения</span>
         {% else %}<span class="chip">Черновик</span>{% endif %}
         {% if t.publication == "cancelled" %}<span class="chip chip--danger">Отменён</span>{% endif %}
-        {% if t.is_published %}<a class="tag tag--lemon" href="{% url 'tournaments:public' t.pk %}">Страница в календаре</a>{% endif %}
-        <a class="tag" href="{% url 'tournaments:team' t.pk %}">Команда турнира</a>
-        {% if t.is_published %}<a class="tag tag--sky" href="{% url 'entries:manage' t.pk %}">Заявки</a><a class="tag tag--mint" href="{% url 'conduct:overview' t.pk %}">Проведение</a><a class="tag tag--lemon" href="{% url 'stables:manage' t.pk %}">Денники и услуги</a>{% endif %}
       </div>
     {% endif %}
   </div>
@@ -24,7 +22,9 @@
 {% if t.status == "returned" and t.moderation_comment %}
   <div class="alert alert--error" role="alert" style="margin-bottom: var(--space-4);"><strong>Замечания модератора:</strong> {{ t.moderation_comment|linebreaksbr }}</div>
 {% endif %}
-{% if t.is_locked %}
+{% if t.status == "rejected" %}
+  <div class="alert alert--error" role="alert" style="margin-bottom: var(--space-4);"><strong>Соревнование отклонено модератором:</strong> {{ t.moderation_comment|linebreaksbr }}<br>Повторно отправить его нельзя. Черновик можно удалить на шаге 4.</div>
+{% elif t.is_locked %}
   <div class="alert alert--warning" style="margin-bottom: var(--space-4);">Турнир на проверке у модератора. Редактирование откроется после решения.</div>
 {% elif t.is_published and t.status != "approved" %}
   <div class="alert alert--warning" style="margin-bottom: var(--space-4);">Участники видят прежнюю опубликованную версию. Изменения появятся в календаре после проверки модератором.</div>

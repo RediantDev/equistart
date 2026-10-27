@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Проверка: {{ t.title }} — EquiStart{% endblock %}
+{% block title %}Проверка: {{ t.title }} — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
@@ -47,10 +47,15 @@
           {% endif %}
           <button type="submit" name="decision" value="approve" class="btn btn--primary btn--block"{% if problems %} disabled{% endif %}>Опубликовать</button>
           <div class="field" style="margin-top: var(--space-3);">
-            <label class="field__label" for="comment">Замечания для организатора</label>
-            <textarea id="comment" name="comment" rows="4" placeholder="Что нужно исправить"></textarea>
+            <label class="field__label" for="comment">Замечания или причина отклонения</label>
+            <textarea id="comment" name="comment" rows="4" placeholder="Обязательно для «Вернуть» и «Отклонить»"></textarea>
           </div>
-          <button type="submit" name="decision" value="return" class="btn btn--danger btn--block">Вернуть с замечаниями</button>
+          <button type="submit" name="decision" value="return" class="btn btn--ghost btn--block">Вернуть с замечаниями</button>
+          <p class="field__help">Организатор исправит и отправит снова.</p>
+          {% if t.publication == "none" %}
+          <button type="submit" name="decision" value="reject" class="btn btn--danger btn--block" data-confirm="Отклонить соревнование «{{ t.title }}»? Организатор не сможет отправить его повторно." data-confirm-ok="Отклонить">Отклонить соревнование</button>
+          <p class="field__help">Окончательно: например, турнир не настоящий или дублирует другой.</p>
+          {% endif %}
         </form>
       </section>
     {% else %}

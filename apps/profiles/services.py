@@ -13,7 +13,7 @@ def athletes_for_entry(user):
     if not user.is_authenticated:
         return Athlete.objects.none()
     return (
-        Athlete.objects.filter(Q(manager=user) | Q(delegates__user=user) | Q(linked_user=user), archived=False)
+        Athlete.objects.filter(Q(manager=user, added_by_judge=False) | Q(delegates__user=user) | Q(linked_user=user), archived=False)
         .distinct()
         .order_by("last_name", "first_name")
     )
@@ -64,11 +64,16 @@ def search_horses(query: str, mode: str):
     if not q:
         return Horse.objects.none()
     qs = Horse.objects.filter(archived=False)
+    if mode not in ("code", "name"):
+        # Тест 5, п. 14.1: кличка или номер — определяем сами. Номер — цифры (ФКСР) или код из латиницы и цифр.
+        import re
+
+        mode = "code" if re.fullmatch(r"[\d\s-]+|(?i:eq)[-\s]?[A-Za-z0-9]{6}", q) else "name"
     if mode == "code":
         from .models import normalize_fksr
 
         norm = normalize_fksr(q)
-        return qs.filter(Q(fksr_number=norm) | Q(fei_id=norm) | Q(code=q.upper()))[:20]
+        return qs.filter(Q(fksr_number=norm) | Q(fei_id=norm) | Q(code=q.upper()) | Q(code="EQ-" + q.upper().replace("EQ", "").strip(" -")))[:20]
     return qs.filter(name__icontains=q).order_by("name", "birth_year")[:30]
 
 

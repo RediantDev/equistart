@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Обращения — Пульт — СтартЛист{% endblock %}
+{% block content %}
+<a class="back" href="{% url 'moderation:panel' %}">← Пульт</a>
+<div class="page-head">
+  <div>
+    <h1 class="h1">Обращения в поддержку</h1>
+    <p class="muted">Срочные «Идёт турнир» — первыми. Срок ответа — 1 рабочий день{% if overdue %}; <strong>просрочено: {{ overdue }}</strong>{% endif %}.</p>
+  </div>
+</div>
+<form method="get" class="card filters__body" style="margin: 0 0 var(--space-4);">
+  <div class="field"><label class="field__label" for="f-status">Статус</label>
+    <select id="f-status" name="status"><option value="open"{% if f.status == "open" %} selected{% endif %}>Все нерешённые</option>{% for v, l in statuses %}<option value="{{ v }}"{% if f.status == v %} selected{% endif %}>{{ l }}</option>{% endfor %}<option value="all"{% if f.status == "all" %} selected{% endif %}>Все</option></select></div>
+  <div class="field"><label class="field__label" for="f-topic">Тема</label>
+    <select id="f-topic" name="topic"><option value="">Все темы</option>{% for v, l in topics %}<option value="{{ v }}"{% if f.topic == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="field"><label class="field__label" for="f-q">Номер или текст</label><input id="f-q" name="q" value="{{ f.q }}" placeholder="№ или слово"></div>
+  <label class="check"><input type="checkbox" name="urgent" value="1"{% if f.urgent == "1" %} checked{% endif %}><span>Только срочные</span></label>
+  <div class="filters__actions"><button class="btn btn--dark">Показать</button></div>
+</form>
+{% if tickets %}
+  <div class="list-cards">
+    {% for t in tickets %}
+      <a class="row-card row-card--link{% if t.urgent %} row-card--urgent{% endif %}" href="{% url 'moderation:support_detail' t.pk %}">
+        <div style="flex: 1 1 220px; min-width: 0;" class="break">
+          <strong>№{{ t.pk }} · {{ t.get_topic_display }}</strong>
+          <div class="table__sub">{{ t.contact_name|default:"Без имени" }}{% if not t.author_id %} · гость{% endif %}{% if t.tournament %} · {{ t.tournament.pub_title|default:t.tournament.title }}{% endif %}</div>
+          <div class="table__sub">{{ t.text|truncatechars:120 }}</div>
+        </div>
+        <div class="chips">
+          {% include "support/_status.html" %}
+          {% if t.overdue %}<span class="chip chip--danger">Ждёт дольше суток</span>{% endif %}
+          {% if t.transferred_at %}<span class="chip chip--info">У судей</span>{% endif %}
+          <span class="table__sub">{{ t.created_at|date:"j E, H:i" }}</span>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card empty"><h2 class="h3">Обращений нет</h2><p class="muted">По выбранным условиям ничего не найдено.</p></div>
+{% endif %}
+{% endblock %}

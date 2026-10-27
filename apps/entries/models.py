@@ -9,7 +9,7 @@ class Application(models.Model):
 
     tournament = models.ForeignKey("tournaments.Tournament", on_delete=models.PROTECT, related_name="applications")
     submitted_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="applications", verbose_name="подал")
-    contact_phone = models.CharField("телефон для связи", max_length=13, blank=True)
+    contact_phone = models.CharField("телефон для связи", max_length=16, blank=True)
     contact_name = models.CharField("контактное лицо", max_length=200, blank=True)
     comment = models.TextField("комментарий", blank=True)
     late = models.BooleanField("внесена судьёй (поздняя / на месте)", default=False)

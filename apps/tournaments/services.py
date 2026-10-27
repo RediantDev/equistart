@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.models import audit
@@ -147,6 +148,7 @@ def build_snapshot(t: Tournament) -> dict:
         "level_name": t.get_level_display(),
         "classification": t.classification,
         "entry_deadline": t.entry_deadline.isoformat() if t.entry_deadline else None,
+        "entry_deadline_time": t.entry_deadline_time.strftime("%H:%M") if t.entry_deadline_time else "",
         "cancel_terms": t.cancel_terms,
         "has_regulation": bool(t.regulation),
         "disciplines": list(dict.fromkeys(p["discipline"] for p in programs)),
@@ -193,6 +195,7 @@ def approve(moderator, tournament_id: int, revision, confirm_venue: bool = False
     t.pub_region = t.venue.region if t.venue else ""
     t.pub_disciplines = snap["disciplines"]
     t.pub_deadline = t.entry_deadline
+    t.pub_deadline_time = t.entry_deadline_time
     t.pub_timezone = t.timezone
     if t.publication == Tournament.Publication.NONE:
         t.publication = Tournament.Publication.PUBLISHED
@@ -228,6 +231,33 @@ def return_for_fixes(moderator, tournament_id: int, revision, comment: str) -> T
     t.revision += 1
     t.save()
     audit(moderator, "tournament.return", t, comment=comment)
+    return t
+
+
+@transaction.atomic
+def reject(moderator, tournament_id: int, revision, comment: str) -> Tournament:
+    """Тест 4.2: модератор отклоняет соревнование — окончательно, без повторной отправки. Только для неопубликованных."""
+    if not moderator.is_moderator:
+        raise PermissionDenied
+    comment = (comment or "").strip()
+    if not comment:
+        raise ValueError("Напишите причину отклонения — её увидит организатор.")
+    t = Tournament.objects.select_for_update().get(pk=tournament_id)
+    check_revision(t, revision)
+    if t.status != Tournament.Status.REVIEW:
+        raise Conflict
+    if t.publication != Tournament.Publication.NONE:
+        raise ValueError("Турнир уже опубликован — отклонить можно только новый. Верните изменения с замечаниями.")
+    t.status = Tournament.Status.REJECTED
+    t.moderation_comment = comment
+    t.reviewed_by = moderator
+    t.reviewed_at = timezone.now()
+    t.revision += 1
+    t.save()
+    audit(moderator, "tournament.reject", t, comment=comment)
+    from apps.core.models import notify
+
+    notify([t.owner], f"Соревнование «{t.title}» отклонено модератором: {comment}", reverse("tournaments:step", args=[t.pk, 4]), "moderation")
     return t
 
 

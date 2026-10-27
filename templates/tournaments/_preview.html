@@ -2,25 +2,18 @@
 {# Предпросмотр сведений турнира в том виде, в каком их увидят участники. preview — словарь снимка. #}
 <div class="summary">
   <div class="summary__grid">
-    <div><div class="caption muted">ДАТЫ</div><div class="label">{% daterange preview.starts_on preview.ends_on %}</div><div class="table__sub">{{ tz_label }}</div></div>
+    <div><div class="caption muted">ДАТЫ</div><div class="label">{% daterange preview.starts_on preview.ends_on %}</div></div>
     <div><div class="caption muted">МЕСТО</div><div class="label">{{ preview.venue.name|default:"—" }}</div><div class="table__sub">{{ preview.venue.region_name }}{% if preview.venue.settlement %}, {{ preview.venue.settlement }}{% endif %}{% if preview.venue.address %}, {{ preview.venue.address }}{% endif %}</div></div>
-    <div><div class="caption muted">ЗАЯВКИ ДО</div><div class="label">{{ preview.entry_deadline|isodate|default:"—" }}</div><div class="table__sub">{{ preview.level_name }}{% if preview.classification %} · классификационные{% endif %}{% if preview.contact %} · {{ preview.contact_name }} {{ preview.contact }}{% endif %}</div></div>
+    <div><div class="caption muted">ЗАЯВКИ ДО</div><div class="label">{{ preview.entry_deadline|isodate|default:"—" }}{% if preview.entry_deadline_time %}, {{ preview.entry_deadline_time }}{% endif %}</div><div class="table__sub">{{ preview.level_name }}{% if preview.classification %} · классификационные{% endif %}{% if preview.contact %} · {{ preview.contact_name }} {{ preview.contact|phone }}{% endif %}</div></div>
   </div>
   {% if preview.programs %}
-    <div class="table-wrap">
-      <table class="table table--stack">
-        <thead><tr><th>День</th><th class="num">Начало</th><th>Маршрут / езда</th><th>Зачёт</th><th>Условия</th></tr></thead>
-        <tbody>
-          {% for p in preview.programs %}
-            {% for c in p.classes %}
-              <tr><td{% if forloop.first %} data-label="День"{% endif %}>{% if forloop.first %}{{ p.day|isodate:False }}{% endif %}</td><td class="num"{% if forloop.first and p.start_time %} data-label="Начало"{% endif %}>{% if forloop.first %}{{ p.start_time }}{% endif %}</td><td class="stack-full">{% if forloop.first %}{{ p.name }}<span class="table__sub">{{ p.discipline_name }} · {{ p.program_type_name }}{% if p.article %} · {{ p.article }}{% endif %}</span>{% endif %}</td><td data-label="Зачёт">{{ c.label }}</td><td data-label="Условия">{{ c.conditions|default:"—" }}{% if c.note %}<span class="table__sub">{{ c.note }}</span>{% endif %}</td></tr>
-            {% empty %}
-              <tr><td data-label="День">{{ p.day|isodate:False }}</td><td class="num" data-label="Начало">{{ p.start_time }}</td><td class="stack-full">{{ p.name }}</td><td colspan="3" class="stack-full"><span class="chip chip--danger">Нет зачётов</span></td></tr>
-            {% endfor %}
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    {% regroup preview.programs by day as by_day %}
+    {% for d in by_day %}
+      <div class="prog-day">{{ d.grouper|isodate:False }}</div>
+      <div class="prog-list">
+        {% for p in d.list %}{% include "tournaments/_prog_row.html" %}{% endfor %}
+      </div>
+    {% endfor %}
   {% endif %}
   {% if preview.cancel_terms %}<div class="alert"><strong>Условия отмены:</strong> {{ preview.cancel_terms|linebreaksbr }}</div>{% endif %}
 </div>

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Проведение — {{ t.title }} — EquiStart{% endblock %}
+{% block title %}Проведение — {{ t.title }} — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <a class="back" href="{% if manage %}{% url 'tournaments:step' t.pk 4 %}{% else %}{% url 'tournaments:public' t.pk %}{% endif %}">← {{ t.title }}</a>
+    {% include "partials/crumbs.html" with here="Проведение" %}
     <h1 class="h1">Проведение</h1>
-    <div class="chips"><a class="tag tag--sky" href="{% url 'entries:manage' t.pk %}">Заявки</a><a class="tag" href="{% url 'tournaments:public' t.pk %}">Публичная страница</a>{% if t.publication == "finished" %}<span class="chip">Турнир завершён</span>{% endif %}</div>
+    <p class="muted">{{ t.pub_title|default:t.title }}</p>
   </div>
 </div>
 <div class="wizard-grid">
@@ -20,7 +20,7 @@
             <div class="table__sub">{{ r.p.day|date:"j E" }} · принято {{ r.accepted }} · готовы к старту {{ r.ready }} · в порядке {{ r.slots }}</div>
           </div>
           <div class="chips">{% if r.published %}<span class="chip chip--info">Протокол v{{ r.published.version }}</span>{% else %}<span class="chip">Протокол не опубликован</span>{% endif %}</div>
-          <a class="btn btn--ghost btn--sm" href="{% url 'conduct:live' t.pk r.p.pk %}">Экран судьи</a>
+          <div class="row-actions"><a class="btn btn--ghost btn--sm" href="{% url 'conduct:live' t.pk r.p.pk %}">Экран судьи</a><a class="btn btn--dark btn--sm" href="{% url 'conduct:program' t.pk r.p.pk %}">Открыть</a></div>
         </article>
       {% empty %}<div class="card empty"><h2 class="h3">В турнире нет программ</h2></div>{% endfor %}
     </div>
@@ -35,8 +35,8 @@
     </section>
     {% if manage and t.publication == "published" %}
       <details class="card danger-zone"><summary class="h3">Завершить турнир</summary>
-        {% if warnings %}<div class="alert alert--warning" style="margin-top: var(--space-3);"><strong>Не закрыто:</strong><ul style="margin: 6px 0 0; padding-left: 1.2em;">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul></div>{% else %}<p class="muted">Всё закрыто.</p>{% endif %}
-        <form method="post" action="{% url 'conduct:finish' t.pk %}" class="form">{% csrf_token %}<input type="hidden" name="confirm" value="1"><p class="muted">Опубликованные протоколы и результаты останутся в архиве. Долги и возвраты можно закрывать и после завершения.</p><button class="btn btn--danger">Завершить турнир</button></form>
+        {% if warnings %}<div class="alert alert--warning" style="margin-top: var(--space-3);"><strong>Перед завершением проверьте:</strong><ul class="warn-list">{% for text, hint, url, link in warnings %}<li><strong>{{ text }}</strong>{% if hint %}<span>{{ hint }}</span>{% endif %}{% if url %} <a href="{{ url }}">{{ link }} →</a>{% endif %}</li>{% endfor %}</ul><p style="margin: 8px 0 0; font-weight: 500;">Завершить турнир можно и с этими пунктами — это только напоминание.</p></div>{% else %}<p class="muted">Всё закрыто.</p>{% endif %}
+        <form method="post" action="{% url 'conduct:finish' t.pk %}" class="form">{% csrf_token %}<input type="hidden" name="confirm" value="1"><p class="muted">Опубликованные протоколы и результаты останутся в архиве.</p><button class="btn btn--danger">Завершить турнир</button></form>
       </details>
     {% endif %}
   </aside>

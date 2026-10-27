@@ -1,25 +1,20 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Мои брони и заказы — EquiStart{% endblock %}
+{% block title %}Денники и услуги — мои брони — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head"><div><a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a><h1 class="h1">Брони денников и заказы услуг</h1></div></div>
-<h2 class="h2">Денники</h2>
-{% if bookings %}<div class="list-cards">{% for b in bookings %}
-  <article class="row-card" style="align-items: flex-start;">
-    <div style="flex: 1 1 260px; min-width: 0;"><strong>{{ b.horse_name }}</strong> · {{ b.category.name }}
-      <span class="table__sub"><a href="{% url 'tournaments:public' b.tournament_id %}">{{ b.tournament.pub_title }}</a> · {{ b.arrive|date:"j E" }} — {{ b.depart|date:"j E" }}, суток: {{ b.nights }}</span>
-      {% if b.required %}<span class="table__sub">Без денника выступления невозможны{% if b.state != "confirmed" and b.state != "cancelled" %} — выступления лошади ждут подтверждения брони{% endif %}</span>{% endif %}
-      {% if b.reason and b.state != "pending" %}<span class="table__sub">Причина: {{ b.reason }}</span>{% endif %}</div>
-    <div class="chips"><span class="chip{% if b.state == 'confirmed' %} chip--success{% elif b.state == 'pending' %} chip--warning{% elif b.state == 'rejected' %} chip--danger{% endif %}">{{ b.get_state_display }}</span>{% if b.box_number %}<span class="chip chip--info">Денник {{ b.box_number }}</span>{% endif %}</div>
-    {% if b.is_holding %}<details class="inline-details"><summary class="btn btn--ghost btn--sm">Отменить</summary><form method="post" action="{% url 'stables:my_cancel' 'booking' b.pk %}" class="inline-row">{% csrf_token %}<input type="text" name="reason" placeholder="Причина (необязательно)" aria-label="Причина"><button class="btn btn--danger btn--sm">Отменить бронь</button></form>{% if b.state == "confirmed" %}<p class="table__sub">Возврат оплаты — по условиям турнира, решает касса.</p>{% endif %}</details>{% endif %}
-  </article>{% endfor %}</div>
-{% else %}<div class="card empty"><h3 class="h3">Броней нет</h3><p class="muted">Забронировать денник можно на странице турнира.</p></div>{% endif %}
-
-<h2 class="h2" style="margin-top: var(--space-5);">Услуги</h2>
-{% if orders %}<div class="list-cards">{% for o in orders %}
-  <article class="row-card"><div style="flex: 1 1 260px; min-width: 0;"><strong>{{ o.service.name }}</strong> × {{ o.quantity }} {{ o.service.unit }} · {{ o.recipient_label }}<span class="table__sub">{{ o.tournament.pub_title }}{% if o.for_date %} · на {{ o.for_date|date:"j E" }}{% endif %}</span></div>
-    <span class="chip{% if o.delivered == o.quantity %} chip--success{% elif o.state == 'cancelled' %} chip--danger{% endif %}">{{ o.delivery_state }}</span>
-    {% if o.state == "ordered" and not o.delivered %}<form method="post" action="{% url 'stables:my_cancel' 'order' o.pk %}">{% csrf_token %}<button class="btn btn--ghost btn--sm">Отменить</button></form>{% endif %}
-  </article>{% endfor %}</div>
-{% else %}<p class="muted">Заказов нет.</p>{% endif %}
+<div class="page-head"><div><a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a><h1 class="h1">Денники и услуги</h1><p class="muted">Брони и заказы по турнирам. Изменить, отменить или заказать ещё — на экране турнира.</p></div></div>
+{% for g in groups %}
+  <section class="card stb-group">
+    <div class="section-head"><div><h2 class="h3">{{ g.t.pub_title|default:g.t.title }}</h2>{% if g.t.pub_starts_on %}<span class="table__sub">{{ g.t.pub_starts_on|date:"j E" }}{% if g.t.pub_ends_on and g.t.pub_ends_on != g.t.pub_starts_on %} — {{ g.t.pub_ends_on|date:"j E" }}{% endif %}</span>{% endif %}</div>
+      <a class="btn btn--dark btn--sm" href="{% url 'stables:book' g.t.pk %}#mine">Денники и услуги</a></div>
+    {% if g.bookings %}<ul class="stb-group__list">{% for b in g.bookings %}
+      <li><span><strong>{{ b.horse_name }}</strong> · {{ b.category.name }}<span class="table__sub">{{ b.arrive|date:"j E" }} — {{ b.depart|date:"j E" }}, суток: {{ b.nights }}{% if b.reason and b.state != "pending" %} · {{ b.reason }}{% endif %}</span></span>
+        <span class="chips"><span class="chip{% if b.state == 'confirmed' %} chip--success{% elif b.state == 'pending' %} chip--warning{% elif b.state == 'rejected' %} chip--danger{% endif %}">{{ b.get_state_display }}</span>{% if b.box_number %}<span class="chip chip--info">Денник {{ b.box_number }}</span>{% endif %}</span></li>{% endfor %}</ul>{% endif %}
+    {% if g.orders %}<ul class="stb-group__list">{% for o in g.orders %}
+      <li><span><strong>{{ o.service.name }}</strong> × {{ o.quantity }} {{ o.service.unit }} · {{ o.recipient_label }}{% if o.for_date %}<span class="table__sub">на {{ o.for_date|date:"j E" }}</span>{% endif %}</span>
+        <span class="chip{% if o.delivered == o.quantity %} chip--success{% elif o.delivered %} chip--warning{% elif o.state == 'cancelled' %} chip--danger{% endif %}">{{ o.delivery_state }}</span></li>{% endfor %}</ul>{% endif %}
+  </section>
+{% empty %}
+  <div class="card empty"><h2 class="h3">Броней и заказов нет</h2><p class="muted">Забронировать денник и заказать услуги можно на странице турнира.</p></div>
+{% endfor %}
 {% endblock %}

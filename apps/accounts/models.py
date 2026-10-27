@@ -69,9 +69,9 @@ class UserManager(BaseUserManager):
 class User(AbstractBaseUser, PermissionsMixin):
     phone = models.CharField(
         "телефон",
-        max_length=13,
+        max_length=16,
         unique=True,
-        help_text="Логин. Мобильный номер России, Казахстана или Беларуси в формате +7… / +375….",
+        help_text="Логин. Мобильный номер в международном формате: +7…, +375…, +998… и т. п.",
     )
     phone_verified_at = models.DateTimeField("телефон подтверждён", null=True, blank=True)
 

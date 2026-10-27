@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Модераторы — СтартЛист{% endblock %}
+{% block content %}
+<div class="page-head"><div>
+  <a class="back" href="{% url 'moderation:panel' %}">← Пульт</a>
+  <h1 class="h1">Модераторы</h1>
+  <p class="muted">Модератор проверяет турниры и клубы и отвечает в поддержке. Их может быть несколько. Назначает и снимает модераторов только главный модератор. Человек сначала регистрируется сам, потом вы добавляете его по номеру телефона.</p>
+</div></div>
+<section class="card stack">
+  <form method="post" class="inline-row">
+    {% csrf_token %}<input type="hidden" name="action" value="add">
+    <label class="visually-hidden" for="mphone">Телефон</label>
+    <input id="mphone" name="phone" type="tel" placeholder="Телефон зарегистрированного пользователя" required>
+    <button class="btn btn--dark" data-confirm="Сделать владельца номера {value} модератором? Он увидит пульт, турниры и клубы на проверке, обращения в поддержку." data-confirm-field="phone" data-confirm-ok="Назначить">Назначить</button>
+  </form>
+  <ul class="list">
+    {% for m in mods %}
+      <li class="list__row"><span style="flex: 1;"><strong>{{ m.full_name }}</strong><span class="table__sub">{{ m.phone_display }}{% if m.pk == user.pk %} · это вы{% endif %}</span></span>
+        {% if m.pk != user.pk %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="user" value="{{ m.pk }}"><button class="btn btn--danger btn--sm" data-confirm="Снять роль модератора с {{ m.full_name }}?" data-confirm-ok="Снять">Снять</button></form>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

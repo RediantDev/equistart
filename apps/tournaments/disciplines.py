@@ -18,6 +18,8 @@ DISCIPLINES = [
     ("other", "Другая дисциплина", ""),
 ]
 DISCIPLINE_CHOICES = [(k, n) for k, n, _ in DISCIPLINES]
+# С чем сервис работает сейчас (тест 5, п. 1.4): остальные скрыты из фильтров календаря
+ACTIVE_DISCIPLINES = ("jumping", "dressage")
 DISCIPLINE_NAMES = dict(DISCIPLINE_CHOICES)
 DISCIPLINE_COLORS = {k: c for k, _, c in DISCIPLINES}
 

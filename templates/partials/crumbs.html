@@ -1,0 +1,7 @@
+{# Хлебные крошки: где я и как вернуться. Передаётся t (турнир) и here (текущий раздел), опционально mid/mid_url. #}
+<nav class="crumbs" aria-label="Вы здесь">
+  <a href="{% url 'accounts:cabinet' %}">Кабинет</a><span aria-hidden="true">›</span>
+  {% if t %}<a href="{% url 'tournaments:hub' t.pk %}">{{ t.pub_title|default:t.title|default:"Турнир"|truncatechars:40 }}</a><span aria-hidden="true">›</span>{% endif %}
+  {% if mid %}<a href="{{ mid_url }}">{{ mid }}</a><span aria-hidden="true">›</span>{% endif %}
+  <span class="crumbs__here">{{ here }}</span>
+</nav>

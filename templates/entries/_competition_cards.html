@@ -1,0 +1,47 @@
+{% load tournaments %}
+{% if cards %}
+  <div class="stack">
+  {% for c in cards %}
+    <article class="card mc-card">
+      <div class="mc-card__head">
+        <div style="min-width: 0;">
+          <a class="h3 row-card__title" href="{% url 'tournaments:public' c.t.pk %}">{{ c.t.pub_title|default:c.t.title }}</a>
+          <div class="table__sub">{% daterange c.t.pub_starts_on c.t.pub_ends_on %}{% if c.t.venue %} · {{ c.t.venue.name }}{% endif %}</div>
+        </div>
+        {% if c.summary %}<div class="chips">{% for label, n, color in c.summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>{% endif %}
+      </div>
+      {% if c.entries %}
+        <ul class="mc-list">
+          {% for e in c.entries %}
+            <li class="mc-row">
+              <div style="min-width: 0; flex: 1;">
+                <strong>{{ e.athlete_snapshot.name }}</strong> на {{ e.horse_snapshot.name }}
+                <div class="table__sub">{{ e.day|date:"j E" }} · {{ e.program_name }} · {{ e.class_name }}{% if e.by_coach %} · заявил тренер{% endif %}</div>
+              </div>
+              {% include "entries/_entry_chips.html" %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      {% if c.bookings or c.orders %}
+        <div class="mc-stable">
+          <span aria-hidden="true">🐴</span>
+          <span>{% for b in c.bookings %}{{ b.horse.name }} — {{ b.get_state_display|lower }}{% if not forloop.last %}; {% endif %}{% endfor %}{% if c.bookings and c.orders %}; {% endif %}{% if c.orders %}услуг заказано: {{ c.orders }}{% endif %}</span>
+        </div>
+      {% endif %}
+      <div class="mc-card__actions">
+        {% for a in c.apps %}<a class="btn btn--ghost btn--sm" href="{% url 'entries:application' a %}">Заявка №{{ a }}</a>{% endfor %}
+        {% if c.bookings or c.orders %}<a class="btn btn--ghost btn--sm" href="{% url 'stables:book' c.t.pk %}">Денники и услуги</a>{% endif %}
+        <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:public' c.t.pk %}?tab=starts">Стартовые</a>
+      </div>
+    </article>
+  {% endfor %}
+  </div>
+{% else %}
+  <div class="card empty-friendly">
+    <div class="empty-friendly__ico" aria-hidden="true">🏇</div>
+    {% if tab == "past" %}<h2 class="h3">Прошедших стартов пока нет</h2><p class="muted">Здесь будут турниры, в которых вы выступали, и ссылки на результаты.</p>
+    {% else %}<h2 class="h3">Впереди пока ничего</h2><p class="muted">Найдите турнир в календаре и подайте заявку — или попросите тренера заявить вас.</p>
+    <div class="empty-friendly__actions"><a class="btn btn--primary btn--sm" href="{% url 'core:calendar' %}">Найти соревнования</a></div>{% endif %}
+  </div>
+{% endif %}

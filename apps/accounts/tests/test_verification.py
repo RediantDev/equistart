@@ -60,7 +60,7 @@ class PasswordAndCommandsTests(TestCase):
         self.assertEqual(self.client.get(reverse("accounts:password")).status_code, 302)
         self.client.force_login(u)
         r = self.client.post(reverse("accounts:password"), {"old_password": "Konkur-2026!", "new_password1": "Novyi-Parol-77", "new_password2": "Novyi-Parol-77"})
-        self.assertRedirects(r, reverse("accounts:cabinet"))
+        self.assertRedirects(r, reverse("accounts:profile"))
         u.refresh_from_db()
         self.assertTrue(u.check_password("Novyi-Parol-77"))
         out = StringIO()

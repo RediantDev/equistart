@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Мои обращения — СтартЛист{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="h1">Поддержка</h1>
+    <p class="muted">Ответ — в течение {{ within }}.</p>
+  </div>
+  <a class="btn btn--primary" href="{% url 'support:new' %}">Написать в поддержку</a>
+</div>
+{# Тест 5, п. 1.2: частые вопросы — в разделе «Поддержка», первым пунктом #}
+<a class="row-card row-card--link faq-tile" href="{% url 'support:faq' %}">
+  <span class="faq-tile__ico" aria-hidden="true">?</span>
+  <div style="flex: 1; min-width: 0;"><strong>Частые вопросы</strong><div class="table__sub">Как подать заявку, отменить выступление, восстановить пароль — ответ за минуту</div></div>
+  <span aria-hidden="true">›</span>
+</a>
+{% if tickets %}
+  <h2 class="h3">Мои обращения</h2>
+  <div class="list-cards">
+    {% for t in tickets %}
+      <a class="row-card row-card--link" href="{% url 'support:detail' t.pk %}">
+        <div style="flex: 1 1 200px; min-width: 0;" class="break">
+          <strong>№{{ t.pk }} · {{ t.get_topic_display }}</strong>
+          <div class="table__sub">{{ t.text|truncatechars:110 }}</div>
+        </div>
+        <div class="chips">
+          {% include "support/_status.html" %}
+          <span class="table__sub">{{ t.updated_at|date:"j E, H:i" }}</span>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card empty"><h2 class="h3">Обращений пока нет</h2><p class="muted">Если что-то не получается — напишите, поможем.</p></div>
+{% endif %}
+{% endblock %}

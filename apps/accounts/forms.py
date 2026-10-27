@@ -24,7 +24,7 @@ class PhoneField(forms.CharField):
 
 
 class RegistrationForm(forms.Form):
-    phone = PhoneField()
+    phone = PhoneField(help_text="Россия и Казахстан — +7. Другие страны — с «+» и кодом страны: +375…, +998…")
     password1 = forms.CharField(
         label="Пароль",
         strip=False,
@@ -47,20 +47,15 @@ class RegistrationForm(forms.Form):
         widget=forms.EmailInput(attrs={"autocomplete": "email"}),
     )
     categories = forms.MultipleChoiceField(
-        label="Кем вы будете в EquiStart",
+        label="Кем вы будете в СтартЛисте",
         choices=Category.choices,
         widget=forms.CheckboxSelectMultiple,
-        help_text="Можно выбрать несколько и добавить другие позже.",
+        help_text="Можно выбрать несколько. Роли можно добавить или убрать позже в профиле.",
         error_messages={"required": "Выберите хотя бы одну роль."},
     )
     pd_consent = forms.BooleanField(
         label="Даю согласие на обработку персональных данных",
         error_messages={"required": "Без согласия регистрация невозможна."},
-    )
-    publication_consent = forms.BooleanField(
-        label="Спортсмен: согласен на публикацию фамилии, имени и года рождения в стартовых протоколах и результатах",
-        required=False,
-        help_text="Нужно, чтобы подавать заявки за себя. Для несовершеннолетнего согласие даёт законный представитель.",
     )
 
     def clean_phone(self):
@@ -74,9 +69,6 @@ class RegistrationForm(forms.Form):
         p1, p2 = cleaned.get("password1"), cleaned.get("password2")
         if p1 and p2 and p1 != p2:
             self.add_error("password2", "Пароли не совпадают.")
-        if "athlete" in (cleaned.get("categories") or []) and not cleaned.get("publication_consent"):
-            self.add_error("publication_consent", "Отметьте согласие на публикацию — без него вас нельзя включить в протоколы. "
-                                                  "Если не хотите — снимите роль «Спортсмен», её можно добавить позже.")
         if p1 and not self.has_error("password2"):
             probe = User(
                 phone=cleaned.get("phone", ""),
@@ -162,7 +154,9 @@ class LoginForm(forms.Form):
 
 
 class AddRoleForm(forms.Form):
-    category = forms.ChoiceField(label="Роль", choices=Category.choices, widget=forms.RadioSelect)
+    # Тест 5, п. 22.1: можно выбрать сразу несколько ролей
+    category = forms.MultipleChoiceField(label="Роли", choices=Category.choices, widget=forms.CheckboxSelectMultiple,
+                                         error_messages={"required": "Выберите хотя бы одну роль."})
 
     def __init__(self, user: User, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -170,7 +164,86 @@ class AddRoleForm(forms.Form):
         self.fields["category"].choices = [(c.value, c.label) for c in user.missing_categories()]
 
     def save(self):
-        cat = self.cleaned_data["category"]
-        self.user.add_category(cat)
+        cats = self.cleaned_data["category"]
+        for cat in cats:
+            self.user.add_category(cat)
         self.user.save(update_fields=list(CATEGORY_FIELDS.values()))
-        return cat
+        return cats
+
+
+class ProfileForm(forms.Form):
+    """Сведения о себе в профиле."""
+
+    last_name = forms.CharField(label="Фамилия", max_length=100)
+    first_name = forms.CharField(label="Имя", max_length=100)
+    middle_name = forms.CharField(label="Отчество", max_length=100, required=False)
+    email = forms.EmailField(label="Email для связи", required=False)
+
+
+class PhoneChangeForm(forms.Form):
+    phone = PhoneField(label="Новый телефон")
+    password = forms.CharField(label="Текущий пароль", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
+                               help_text="Для защиты аккаунта: телефон — это логин.")
+
+    def __init__(self, user, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+
+    def clean_phone(self):
+        phone = self.cleaned_data["phone"]
+        if phone == self.user.phone:
+            raise ValidationError("Это ваш текущий номер.")
+        if User.objects.filter(phone=phone).exclude(pk=self.user.pk).exists():
+            raise ValidationError("Этот номер уже зарегистрирован в другом аккаунте.")
+        return phone
+
+    def clean_password(self):
+        pw = self.cleaned_data["password"]
+        if not self.user.check_password(pw):
+            raise ValidationError("Неверный пароль.")
+        return pw
+
+
+class PasswordResetRequestForm(forms.Form):
+    """Восстановление пароля, шаг 1: номер телефона (тест 5, п. 6.3)."""
+
+    phone = forms.CharField(label="Телефон", max_length=32)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["phone"].widget.input_type = "tel"
+        self.fields["phone"].widget.attrs.update({"inputmode": "tel", "autocomplete": "username", "placeholder": "+7 900 000-00-00"})
+
+    def clean_phone(self):
+        try:
+            return normalize_phone(self.cleaned_data["phone"])
+        except ValidationError:
+            raise ValidationError("Проверьте номер: например, +7 900 000-00-00.")
+
+
+class PasswordResetConfirmForm(forms.Form):
+    """Шаг 2: код из СМС и новый пароль."""
+
+    code = forms.CharField(label="Код из СМС", max_length=8)
+    password1 = forms.CharField(label="Новый пароль", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+                                help_text="Не короче 8 символов, не только цифры.")
+    password2 = forms.CharField(label="Повторите пароль", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}))
+
+    def __init__(self, user=None, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+        self.fields["code"].widget.attrs.update({"inputmode": "numeric", "autocomplete": "one-time-code", "maxlength": "6", "class": "input-lg"})
+
+    def clean(self):
+        from django.contrib.auth.password_validation import validate_password
+
+        cleaned = super().clean()
+        p1, p2 = cleaned.get("password1"), cleaned.get("password2")
+        if p1 and p2 and p1 != p2:
+            self.add_error("password2", "Пароли не совпадают.")
+        elif p1:
+            try:
+                validate_password(p1, self.user)
+            except ValidationError as e:
+                self.add_error("password1", e)
+        return cleaned

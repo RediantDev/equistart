@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Обращение №{{ t.pk }} — СтартЛист{% endblock %}
+{% block content %}
+<section class="auth">
+  <div class="card auth__card auth__card--wide">
+    {% if not token %}<a class="back" href="{% url 'support:my' %}">← Мои обращения</a>{% endif %}
+    <h1 class="h1">Обращение №{{ t.pk }}</h1>
+    <div class="chips">{% include "support/_status.html" %}<span class="table__sub">{{ t.get_topic_display }} · {{ t.created_at|date:"j E Y, H:i" }}</span></div>
+    {% if t.status != "resolved" and not t.last_staff_at %}<p class="table__sub">Ответим в течение {{ within }}.</p>{% endif %}
+    {% if t.tournament %}<p class="table__sub">Турнир: <a href="{% url 'tournaments:public' t.tournament_id %}">{{ t.tournament.pub_title|default:t.tournament.title }}</a></p>{% endif %}
+    {% if token %}<p class="table__sub">Сохраните ссылку на эту страницу — по ней вы увидите ответ и сможете продолжить переписку.</p>{% endif %}
+
+    <ol class="thread">
+      <li class="thread__msg">
+        <div class="thread__who">Вы · {{ t.created_at|date:"j E, H:i" }}</div>
+        <div class="thread__text">{{ t.text|linebreaksbr }}</div>
+        {% if files %}<div class="photo-grid">{% for f in files %}<a href="{% url 'support:file' f.pk %}{% if token %}?k={{ token }}{% endif %}" target="_blank" rel="noopener"><img src="{% url 'support:file' f.pk %}{% if token %}?k={{ token }}{% endif %}" alt="Вложение {{ forloop.counter }}" loading="lazy"></a>{% endfor %}</div>{% endif %}
+      </li>
+      {% for m in msgs %}
+        <li class="thread__msg{% if m.is_staff %} thread__msg--staff{% endif %}">
+          <div class="thread__who">{% if m.is_staff %}Поддержка{% else %}Вы{% endif %} · {{ m.created_at|date:"j E, H:i" }}</div>
+          <div class="thread__text">{{ m.text|linebreaksbr }}</div>
+        </li>
+      {% endfor %}
+    </ol>
+
+    <form method="post" class="form" style="margin-top: var(--space-4);">
+      {% csrf_token %}
+      <div class="field">
+        <label class="field__label" for="reply">{% if t.status == "resolved" %}Вопрос не решён? Напишите — обращение откроется снова{% else %}Ваш ответ{% endif %}</label>
+        <textarea id="reply" name="text" rows="4" maxlength="5000" required placeholder="Обязательно"></textarea>
+      </div>
+      <div class="form__actions"><button type="submit" class="btn btn--primary">Отправить</button></div>
+    </form>
+  </div>
+</section>
+{% endblock %}

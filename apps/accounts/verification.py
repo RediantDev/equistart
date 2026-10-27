@@ -31,8 +31,9 @@ def seconds_until_resend(user) -> int:
     return max(0, left)
 
 
-def send_code(user) -> None:
-    if user.phone_verified:
+def send_code(user, purpose: str = "verify") -> None:
+    """purpose: verify — подтверждение телефона; reset — восстановление пароля (тест 5, п. 6.3)."""
+    if purpose == "verify" and user.phone_verified:
         return
     if seconds_until_resend(user):
         raise ValueError(f"Новый код можно запросить через {seconds_until_resend(user)} с.")
@@ -43,10 +44,12 @@ def send_code(user) -> None:
     PhoneCode.objects.filter(user=user, used_at__isnull=True).update(used_at=timezone.now())
     PhoneCode.objects.create(user=user, code_hash=_hash(code))
     try:
-        sms.send(user.phone, f"EquiStart: код {code}. Никому его не сообщайте.")
+        text = (f"СтартЛист: код для нового пароля {code}. Никому его не сообщайте." if purpose == "reset"
+                else f"СтартЛист: код {code}. Никому его не сообщайте.")
+        sms.send(user.phone, text)
     except sms.SmsError:
         raise ValueError("Не удалось отправить СМС. Попробуйте позже.")
-    audit(user, "phone.code_sent", user)
+    audit(user, "password.reset_code_sent" if purpose == "reset" else "phone.code_sent", user)
 
 
 def check_code(user, code: str) -> bool:

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Пульт — СтартЛист{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="h1">Пульт</h1>
+    <p class="muted">Что ждёт решения, как работает сервис и что происходит за неделю.</p>
+  </div>
+  <div class="chips">
+    <a class="btn btn--sm" href="{% url 'moderation:queue' %}">Турниры</a>
+    <a class="btn btn--sm" href="{% url 'moderation:clubs' %}">Клубы</a>
+    <a class="btn btn--sm" href="{% url 'moderation:support' %}">Поддержка</a>
+    {% if user.is_superuser %}<a class="btn btn--sm" href="{% url 'moderation:moderators' %}">Модераторы</a>{% endif %}
+    {% if user.is_staff %}<a class="btn btn--sm" href="{% url 'admin:index' %}">Все данные</a>{% endif %}
+  </div>
+</div>
+
+<section class="stack">
+  <h2 class="h2">Ждут решения <span class="tag tag--lemon">{{ waiting_total }}</span>
+    {% if overdue_total %}<span class="chip chip--danger">дольше суток: {{ overdue_total }}</span>{% endif %}</h2>
+
+  {% if tournaments or clubs or tickets %}
+    <div class="list-cards">
+      {% for t in tickets %}
+        <article class="row-card{% if t.urgent %} row-card--urgent{% endif %}">
+          <div style="flex: 1 1 180px; min-width: 0;" class="break">
+            <a class="h3 row-card__title" href="{% url 'moderation:support_detail' t.pk %}">Обращение №{{ t.pk }} · {{ t.get_topic_display }}</a>
+            <div class="table__sub">{{ t.contact_name|default:"Гость" }}{% if t.tournament %} · {{ t.tournament.pub_title|default:t.tournament.title }}{% endif %} · {{ t.get_status_display|lower }}</div>
+          </div>
+          <div class="chips">
+            {% if t.urgent %}<span class="chip chip--danger">Идёт турнир</span>{% endif %}
+            {% if t.overdue %}<span class="chip chip--danger">Ждёт дольше суток</span>{% endif %}
+            <span class="table__sub">{{ t.created_at|date:"j E, H:i" }}</span>
+          </div>
+          <a class="btn btn--primary btn--sm" href="{% url 'moderation:support_detail' t.pk %}">Ответить</a>
+        </article>
+      {% endfor %}
+      {% for t in tournaments %}
+        <article class="row-card">
+          <div style="flex: 1 1 180px; min-width: 0;">
+            <a class="h3 row-card__title" href="{% url 'moderation:detail' t.pk %}">{{ t.title }}</a>
+            <div class="table__sub">Турнир · {{ t.starts_on|isodate }}{% if t.venue %} · {{ t.venue.name }}{% endif %} · {{ t.owner.full_name }}</div>
+          </div>
+          <div class="chips">
+            {% if t.overdue %}<span class="chip chip--danger">Ждёт дольше суток</span>{% endif %}
+            <span class="table__sub">отправлен {{ t.submitted_at|date:"j E, H:i" }}</span>
+          </div>
+          <a class="btn btn--primary btn--sm" href="{% url 'moderation:detail' t.pk %}">Проверить</a>
+        </article>
+      {% endfor %}
+      {% for c in clubs %}
+        <article class="row-card">
+          <div style="flex: 1 1 180px; min-width: 0;">
+            <a class="h3 row-card__title" href="{% url 'moderation:club' c.pk %}">{{ c.name }}</a>
+            <div class="table__sub">Клуб · {{ c.settlement }} · {{ c.manager.full_name }}</div>
+          </div>
+          <div class="chips">
+            {% if c.overdue %}<span class="chip chip--danger">Ждёт дольше суток</span>{% endif %}
+            <span class="table__sub">отправлен {{ c.submitted_at|date:"j E, H:i" }}</span>
+          </div>
+          <a class="btn btn--primary btn--sm" href="{% url 'moderation:club' c.pk %}">Проверить</a>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card empty"><h2 class="h3">Всё проверено</h2><p class="muted">Новые турниры, клубы и обращения в поддержку появятся здесь.</p></div>
+  {% endif %}
+
+  <h2 class="h2" style="margin-top: var(--space-6);">Состояние сервиса</h2>
+  <div class="stat-grid">
+    <div class="stat">
+      <div class="table__sub">База данных</div>
+      <div class="stat__value">{% if db_ok %}Работает{% else %}Нет связи{% endif %}</div>
+    </div>
+    <div class="stat{% if not backup_ok %} stat--accent{% endif %}">
+      <div class="table__sub">Последняя копия</div>
+      <div class="stat__value">{% if last_backup %}{{ last_backup.created_at|date:"j E, H:i" }}{% else %}Не было{% endif %}</div>
+      {% if not backup_ok %}<span class="chip chip--danger">{% if last_backup %}Старше суток{% else %}Копии не настроены{% endif %}</span>{% endif %}
+    </div>
+    <div class="stat{% if errors_day %} stat--accent{% endif %}">
+      <div class="table__sub">Ошибок сервера за сутки</div>
+      <div class="stat__value">{{ errors_day }}</div>
+    </div>
+  </div>
+
+  <h2 class="h2" style="margin-top: var(--space-6);">Цифры</h2>
+  <div class="stat-grid">
+    <div class="stat"><div class="table__sub">Пользователи</div><div class="stat__value">{{ stats.users }}</div><div class="table__sub">+{{ stats.users_week }} за неделю</div></div>
+    <div class="stat"><div class="table__sub">Подтверждённые клубы</div><div class="stat__value">{{ stats.clubs }}</div></div>
+    <div class="stat"><div class="table__sub">Турниры в календаре</div><div class="stat__value">{{ stats.tournaments_live }}</div><div class="table__sub">+{{ stats.tournaments_week }} создано за неделю</div></div>
+    <div class="stat"><div class="table__sub">Заявки за неделю</div><div class="stat__value">{{ stats.applications_week }}</div><div class="table__sub">выступлений: {{ stats.entries_week }}</div></div>
+  </div>
+</section>
+{% endblock %}

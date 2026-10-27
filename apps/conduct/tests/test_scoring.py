@@ -215,3 +215,22 @@ class DressageTests(ConductBase):
         self.assertEqual(self.client.get(url).status_code, 404)
         self.client.force_login(self.coach)
         self.assertEqual(self.client.get(url).status_code, 404)  # результаты ещё не опубликованы
+
+    # тест судьи и клуба (25.10.2026): судья на букве просит вернуть подписанный лист
+    def test_ask_return(self):
+        from apps.core.models import Notification
+
+        scoring.save_panel(self.judge, self.p1, self.rows)
+        url = reverse("conduct:judge_ask_return", args=[self.t.pk, self.p1.pk, "C"])
+        # гость
+        self.assertEqual(self.client.post(url, {"entry": self.e2.pk, "reason": "x"}).status_code, 302)
+        self.assertFalse(Notification.objects.filter(kind="dressage.ask_return").exists())
+        # чужая буква
+        self.client.force_login(self.judge2)
+        self.assertEqual(self.client.post(url, {"entry": self.e2.pk, "reason": "x"}).status_code, 403)
+        # свой лист — уведомление судье по итогам
+        self.client.force_login(self.judge)
+        self.client.post(url, {"entry": self.e2.pk, "reason": "элемент 3"})
+        n = Notification.objects.get(kind="dressage.ask_return")
+        self.assertEqual(n.user, self.org)
+        self.assertIn("элемент 3", n.text)

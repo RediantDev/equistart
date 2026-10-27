@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Данные пары — {{ p.name }} — СтартЛист{% endblock %}
+{% block content %}
+<section class="auth"><div class="card auth__card auth__card--wide">
+  <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← {{ p.name }}</a>
+  <h1 class="h1">Данные пары</h1>
+  <p class="muted">Исправления действуют для протоколов этого турнира. Профили спортсмена и лошади не меняются.</p>
+  <form method="post" class="form" novalidate data-dirty-guard>{% csrf_token %}
+    <div class="form__group">
+      <h2 class="h3">Всадник</h2>
+      <div class="field"><label class="field__label" for="name">Фамилия и имя</label><input id="name" name="name" value="{{ a.name|default:'' }}" required></div>
+      <div class="grid-3">
+        <div class="field"><label class="field__label" for="by">Год рождения</label><input id="by" name="birth_year" inputmode="numeric" value="{{ a.birth_year|default:'' }}"></div>
+        <div class="field"><label class="field__label" for="rank">Разряд</label><select id="rank" name="rank"><option value="">—</option>{% for r in ranks %}<option{% if a.rank == r %} selected{% endif %}>{{ r }}</option>{% endfor %}</select></div>
+        <div class="field"><label class="field__label" for="club">Клуб</label><input id="club" name="club" value="{{ a.club|default:'' }}"></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label class="field__label" for="region">Регион</label><input id="region" name="region" value="{{ a.region|default:'' }}"></div>
+        <div class="field"><label class="field__label" for="coach">Тренер</label><input id="coach" name="coach" value="{{ a.coach|default:'' }}"></div>
+      </div>
+    </div>
+    <div class="form__group">
+      <h2 class="h3">Лошадь</h2>
+      <div class="grid-2">
+        <div class="field"><label class="field__label" for="hn">Кличка</label><input id="hn" name="h_name" value="{{ h.name|default:'' }}" required></div>
+        <div class="field"><label class="field__label" for="hy">Год рождения</label><input id="hy" name="h_birth_year" inputmode="numeric" value="{{ h.birth_year|default:'' }}"></div>
+      </div>
+      <div class="grid-3">
+        <div class="field"><label class="field__label" for="hs">Пол</label><select id="hs" name="h_sex"><option value="">—</option>{% for x in sexes %}<option{% if h.sex == x %} selected{% endif %}>{{ x }}</option>{% endfor %}</select></div>
+        <div class="field"><label class="field__label" for="hc">Масть</label><select id="hc" name="h_color"><option value="">—</option>{% for x in colors %}<option{% if h.color == x %} selected{% endif %}>{{ x }}</option>{% endfor %}</select></div>
+        <div class="field"><label class="field__label" for="hb">Порода</label><input id="hb" name="h_breed" value="{{ h.breed|default:'' }}"></div>
+      </div>
+    </div>
+    <div class="form__group" style="border-bottom: 0;">
+      <h2 class="h3">Зачёт</h2>
+      <div class="field"><label class="field__label" for="tc">Зачёт в «{{ p.name }}»</label><select id="tc" name="tclass">{% for c in classes %}<option value="{{ c.pk }}"{% if c.pk == e.tclass_id %} selected{% endif %}>{{ c.label }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="form-actions"><a class="btn btn--ghost" href="{% url 'conduct:program' t.pk p.pk %}">Отмена</a><button class="btn btn--primary">Сохранить</button></div>
+  </form>
+</div></section>
+{% endblock %}

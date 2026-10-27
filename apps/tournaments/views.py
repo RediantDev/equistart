@@ -1,4 +1,5 @@
 import datetime
+import uuid
 import zoneinfo
 
 from django.contrib import messages
@@ -9,6 +10,7 @@ from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from django.db.models import Q
 from django.http import FileResponse, Http404
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -17,7 +19,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from apps.core.models import AuditLog, audit
 
 from . import services
-from .disciplines import DISCIPLINE_CHOICES, DISCIPLINE_COLORS
+from .disciplines import ACTIVE_DISCIPLINES, DISCIPLINE_CHOICES, DISCIPLINE_COLORS
 from .forms import BasicsForm, ClassForm, InviteForm, ProgramForm, TermsForm
 from .models import ProgramItem, TeamMember, Tournament, TournamentClass, Venue
 from .regions import REGION_CHOICES, REGION_NAMES, tz_label
@@ -70,6 +72,39 @@ def _wizard_ctx(t, step, **extra):
     return ctx
 
 
+# ---------------- панель турнира (тест 4.2) ----------------
+
+@login_required
+def hub(request, pk):
+    """Единая точка входа для команды турнира: отсюда — во все рабочие разделы, и «Назад» из разделов ведёт сюда."""
+    from django.db.models import Count
+
+    t = get_object_or_404(Tournament.objects.select_related("venue"), pk=pk)
+    roles = services.roles_of(request.user, t)
+    if not roles:
+        raise PermissionDenied
+    manage = "organizer" in roles
+    judge = bool(roles & {"organizer", "judge"})
+    stable = bool(roles & {"organizer", "stable"})
+    ctx = {"t": t, "roles": roles, "manage": manage, "judge": judge, "stable": stable, "programs": [], "counts": {},
+           "edit_step": (services.first_invalid_step(t) or 1) if manage else 1}
+    if t.is_published:
+        from apps.conduct.models import StartListPublication
+        from apps.entries.models import Entry
+        from apps.stables.models import Booking
+
+        counts = dict(Entry.objects.filter(tournament=t).order_by().values("decision").annotate(n=Count("id")).values_list("decision", "n"))
+        ctx["counts"] = counts
+        ctx["bookings_pending"] = Booking.objects.filter(tournament=t, state=Booking.State.PENDING).count()
+        acc = dict(Entry.objects.filter(tournament=t, decision="accepted").order_by().values("program_id").annotate(n=Count("id")).values_list("program_id", "n"))
+        pubs = set(StartListPublication.objects.filter(program__tournament=t).values_list("program_id", flat=True))
+        for p in t.programs.all().order_by("day", "start_time", "position"):
+            p.accepted = acc.get(p.pk, 0)
+            p.has_protocol = p.pk in pubs
+            ctx["programs"].append(p)
+    return render(request, "tournaments/hub.html", ctx)
+
+
 # ---------------- мои соревнования ----------------
 
 @login_required
@@ -93,17 +128,33 @@ def create(request):
         messages.info(request, "Чтобы создавать соревнования, добавьте роль «Организатор», «Судья» или «Клуб».")
         return redirect("accounts:add_role")
     last = Tournament.objects.filter(owner=request.user).select_related("venue").order_by("-created_at").first()
-    initial = {"contact_name": last.contact_name, "contact": last.contact, "venue": last.venue_id, "level": last.level} if last else {}
+    initial = ({"contact_name": last.contact_name, "contact": last.contact, "venue": last.venue_id, "level": last.level} if last
+               else {"contact_name": request.user.full_name})  # телефон-логин не подставляем: он станет публичным
+    created = request.session.get("tournament_create_keys", {})
+    key = request.POST.get("create_key", "")
+    if request.method == "POST" and key and key in created:
+        # повторная отправка той же формы («Назад» в браузере, двойное нажатие) — не создаём второй черновик
+        prev = Tournament.objects.filter(pk=created[key], owner=request.user).first()
+        if prev:
+            messages.info(request, "Этот черновик уже создан — продолжаем его.")
+            return redirect("tournaments:step", pk=prev.pk, step=1)
     form = BasicsForm(request.user, request.POST or None, initial=initial)
+    form.is_new = True
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
             t = Tournament(owner=request.user)
             _apply_basics(request, t, form)
             t.save()
             audit(request.user, "tournament.create", t)
+        if key:
+            created[key] = t.pk
+            request.session["tournament_create_keys"] = dict(list(created.items())[-20:])
+        if "save" in request.POST:
+            messages.success(request, "Черновик сохранён. Его можно продолжить в «Мои соревнования».")
+            return redirect("tournaments:step", pk=t.pk, step=1)
         messages.success(request, "Черновик создан. Теперь добавьте программу.")
         return redirect("tournaments:step", pk=t.pk, step=2)
-    return render(request, "tournaments/step1.html", {"form": form, "t": None, "step": 1, "steps": [
+    return render(request, "tournaments/step1.html", {"form": form, "t": None, "step": 1, "create_key": key or uuid.uuid4().hex, "steps": [
         {"n": n, "name": name, "done": False, "current": n == 1, "reachable": n == 1} for n, name in STEPS
     ]})
 
@@ -233,14 +284,34 @@ def program_save(request, pk, item_id=None):
             if not instance:
                 obj.position = locked.programs.count()
             obj.save()
+            added = _add_template_classes(locked, obj, form.cleaned_data.get("templates") or [])
             locked.mark_changed()
             locked.save()
             audit(request.user, "program.save", locked, program=obj.pk, name=obj.name)
     except Conflict:
         messages.error(request, CONFLICT_MSG)
         return redirect("tournaments:step", pk=pk, step=2)
-    messages.success(request, f"«{obj.name}» сохранено.")
+    tail = f" Зачёты: {', '.join(c.label for c in added)}." if added else (" Добавьте зачёты — без них нельзя подать заявку." if not obj.classes.exists() else "")
+    messages.success(request, f"«{obj.name}» сохранено.{tail}")
     return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + f"#program-{obj.pk}")
+
+
+def _add_template_classes(t, program, template_ids, height=None):
+    """Создать зачёты из выбранных шаблонов (годы рождения — от года турнира). Повторно тот же шаблон не добавляется."""
+    from apps.sport.models import ClassTemplate
+
+    ids = [int(i) for i in template_ids if str(i).isdigit()]
+    if not ids:
+        return []
+    have = set(program.classes.filter(height=height).values_list("template_id", flat=True))
+    year = (t.starts_on or timezone.localdate()).year
+    out = []
+    for tpl in ClassTemplate.objects.filter(pk__in=ids, is_active=True):
+        if tpl.pk in have or program.discipline not in tpl.disciplines:
+            continue
+        out.append(TournamentClass.objects.create(program=program, template=tpl, height=height,
+                                                  position=program.classes.count(), **tpl.for_year(year)))
+    return out
 
 
 @login_required
@@ -333,7 +404,10 @@ def class_from_template(request, pk, program_id):
     if (r := _editable_or_redirect(request, t)):
         return r
     program = get_object_or_404(ProgramItem, pk=program_id, tournament=t)
-    tpl = get_object_or_404(ClassTemplate, pk=request.POST.get("template"), is_active=True)
+    ids = [i for i in request.POST.getlist("template") if i.isdigit()]
+    if not ids:
+        messages.error(request, "Отметьте хотя бы один зачёт.")
+        return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + f"#program-{program.pk}")
     height = request.POST.get("height") or None
     if height is not None:
         try:
@@ -346,16 +420,19 @@ def class_from_template(request, pk, program_id):
         with transaction.atomic():
             locked = _managed(request, pk, lock=True)
             services.check_revision(locked, request.POST.get("revision"))
-            data = tpl.for_year((locked.starts_on or timezone.localdate()).year)
-            obj = TournamentClass.objects.create(program=program, template=tpl, height=height, position=program.classes.count(), **data)
+            added = _add_template_classes(locked, program, ids, height)
             locked.mark_changed()
             locked.save()
-            audit(request.user, "class.save", locked, tclass=obj.pk, name=obj.name, template=tpl.pk)
+            for obj in added:
+                audit(request.user, "class.save", locked, tclass=obj.pk, name=obj.name, template=obj.template_id)
     except Conflict:
         messages.error(request, CONFLICT_MSG)
         return redirect("tournaments:step", pk=pk, step=2)
-    hint = " В выездке дети — 10–14 лет: проверьте годы рождения." if tpl.name == "Дети" and program.is_dressage else ""
-    messages.success(request, f"Зачёт «{obj.label}» добавлен: {obj.conditions or 'без ограничений'}. Условия можно поправить.{hint}")
+    if not added:
+        messages.info(request, "Эти зачёты уже есть в программе.")
+    else:
+        hint = " В выездке дети — 10–14 лет: проверьте годы рождения." if program.is_dressage and any(c.name == "Дети" for c in added) else ""
+        messages.success(request, "Добавлено: " + "; ".join(f"«{c.label}» ({c.conditions or 'без ограничений'})" for c in added) + f". Условия можно поправить.{hint}")
     return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + f"#program-{program.pk}")
 
 
@@ -395,6 +472,7 @@ def _step3(request, t):
                     locked = _managed(request, t.pk, lock=True)
                     services.check_revision(locked, request.POST.get("revision"))
                     locked.entry_deadline = form.cleaned_data["entry_deadline"]
+                    locked.entry_deadline_time = form.cleaned_data["entry_deadline_time"]
                     locked.cancel_terms = form.cleaned_data["cancel_terms"]
                     new_file = request.FILES.get("regulation")
                     if new_file:
@@ -408,11 +486,17 @@ def _step3(request, t):
             except Conflict:
                 messages.error(request, CONFLICT_MSG)
                 return redirect("tournaments:step", pk=t.pk, step=3)
+            left = [p.text for p in services.problems(locked) if p.step == 3]
+            if "next" in request.POST and left:
+                # тест первых пользователей: о незаполненном сообщаем сразу и рядом с кнопкой, а не на шаге 4
+                messages.success(request, "Сохранено.")
+                return redirect(reverse("tournaments:step", kwargs={"pk": t.pk, "step": 3}) + "?check=1")
             messages.success(request, "Сохранено.")
             return redirect("tournaments:step", pk=t.pk, step=4 if "next" in request.POST else 3)
     else:
         form = TermsForm(instance=t)
-    return render(request, "tournaments/step3.html", _wizard_ctx(t, 3, form=form))
+    left3 = [p.text for p in services.problems(t) if p.step == 3] if request.GET.get("check") else []
+    return render(request, "tournaments/step3.html", _wizard_ctx(t, 3, form=form, left3=left3))
 
 
 def _step4(request, t):
@@ -427,8 +511,40 @@ def _step4(request, t):
             messages.success(request, "Турнир отправлен на проверку. Мы сообщим о решении модератора в кабинете.")
         return redirect("tournaments:step", pk=t.pk, step=LAST)
     preview = services.build_snapshot(t) if t.starts_on else None
-    history = AuditLog.objects.filter(target_type="tournament", target_id=t.pk).select_related("actor")[:20]
+    history = _compact_history(AuditLog.objects.filter(target_type="tournament", target_id=t.pk).select_related("actor")[:200])
     return render(request, "tournaments/step4.html", _wizard_ctx(t, LAST, preview=preview, history=history, tz_label=tz_label(t.timezone) if t.timezone else ""))
+
+
+KEY_ACTIONS = {"tournament.create", "tournament.submit", "tournament.approve", "tournament.return", "tournament.reject", "tournament.cancel", "venue.confirm"}
+EDIT_KINDS = {"tournament.edit": "сведения", "program.save": "программа", "program.delete": "программа",
+              "class.save": "зачёты", "class.delete": "зачёты"}
+
+
+def _compact_history(items):
+    """Тест 4: в истории — только существенные события; правки между ними сворачиваются в одну строку
+    «Правки: сведения, программа, зачёты (N)» с датой последней правки."""
+    out, bucket = [], []
+
+    def flush():
+        if not bucket:
+            return
+        kinds = []
+        for h in bucket:
+            k = EDIT_KINDS.get(h.action, "команда")
+            if k not in kinds:
+                kinds.append(k)
+        out.append({"created_at": bucket[0].created_at, "label": "Правки: " + ", ".join(kinds), "count": len(bucket),
+                    "actor": bucket[0].actor, "minor": True})
+        bucket.clear()
+
+    for h in items:  # от новых к старым
+        if h.action in KEY_ACTIONS:
+            flush()
+            out.append({"created_at": h.created_at, "label": h.label, "comment": (h.data or {}).get("comment", ""), "actor": h.actor})
+        else:
+            bucket.append(h)
+    flush()
+    return out[:15]
 
 
 @login_required
@@ -510,6 +626,24 @@ def team(request, pk):
 
 @login_required
 @require_POST
+def team_stable_contact(request, pk, member_id):
+    """Назначить одного ответственного за денники: его контакт видит участник с бронью (решение 27.10.2026)."""
+    t = get_object_or_404(Tournament, pk=pk)
+    services.require_manage(request.user, t)
+    with transaction.atomic():
+        m = get_object_or_404(TeamMember.objects.select_for_update(), pk=member_id, tournament=t,
+                              role=TeamMember.Role.STABLE, state=TeamMember.State.ACCEPTED)
+        TeamMember.objects.filter(tournament=t).exclude(pk=m.pk).update(stable_contact=False)
+        if not m.stable_contact:
+            m.stable_contact = True
+            m.save(update_fields=["stable_contact"])
+            audit(request.user, "team.stable_contact", t, member=m.pk)
+    messages.success(request, f"{m.user.full_name if m.user else m.phone} — ответственный за денники. Его телефон видят участники со своей бронью.")
+    return redirect("tournaments:team", pk=t.pk)
+
+
+@login_required
+@require_POST
 def team_revoke(request, pk, member_id):
     t = get_object_or_404(Tournament, pk=pk)
     services.require_manage(request.user, t)
@@ -536,6 +670,14 @@ def invitations(request):
 @login_required
 @require_POST
 def invitation_respond(request, member_id):
+    done = TeamMember.objects.filter(pk=member_id, phone=request.user.phone).exclude(state=TeamMember.State.PENDING).first()
+    if done:
+        # «Назад» и повторное нажатие: без технической страницы 404
+        if done.state == TeamMember.State.ACCEPTED:
+            messages.info(request, "Это приглашение уже принято.")
+            return redirect("tournaments:hub", pk=done.tournament_id)
+        messages.info(request, "На это приглашение вы уже ответили.")
+        return redirect("tournaments:invitations")
     with transaction.atomic():
         m = get_object_or_404(TeamMember.objects.select_for_update(), pk=member_id, state=TeamMember.State.PENDING)
         if m.phone != request.user.phone:
@@ -546,7 +688,11 @@ def invitation_respond(request, member_id):
         m.responded_at = timezone.now()
         m.save()
         audit(request.user, "team.accept" if accept else "team.decline", m.tournament, member=m.pk, role=m.role)
-    messages.success(request, "Приглашение принято." if accept else "Приглашение отклонено.")
+    if accept:
+        # тест судьи и клуба: сразу в турнир, а не на пустую страницу приглашений
+        messages.success(request, f"Вы в команде турнира «{m.tournament.pub_title or m.tournament.title}». Здесь — разделы для вашей роли.")
+        return redirect("tournaments:hub", pk=m.tournament_id)
+    messages.success(request, "Приглашение отклонено.")
     return redirect("tournaments:invitations")
 
 
@@ -570,7 +716,14 @@ def calendar(request):
     else:
         qs = qs.filter(pub_ends_on__gte=today - datetime.timedelta(days=1)).order_by("pub_starts_on")
     if q:
-        qs = qs.filter(pub_title__icontains=q)
+        # Тест 5, п. 9.5: «белая роща», «кск Белая роща», «Берёзки» — по названию, площадке, месту и региону
+        from apps.core import search
+
+        def _region(w):
+            codes = [k for k, n in REGION_CHOICES if w in search.normalize(n)]
+            return Q(pub_region__in=codes) if codes else None
+
+        qs = search.apply(qs, q, ["pub_title", "venue__name", "venue__settlement"], extra=_region)
     if discipline:
         qs = qs.filter(pub_disciplines__contains=[discipline])
     if region:
@@ -620,8 +773,9 @@ def calendar(request):
         {
             "cards": cards, "q": q, "discipline": discipline, "region": region, "month": month,
             "only_open": only_open, "past": past, "active": active, "months": months,
-            "disciplines": DISCIPLINE_CHOICES, "regions": REGION_CHOICES,
-            "filters_open": bool(discipline or region or month or only_open or past), "club": club,
+            # Тест 5, п. 1.4: в фильтре — только дисциплины, с которыми работаем
+            "disciplines": [d for d in DISCIPLINE_CHOICES if d[0] in ACTIVE_DISCIPLINES], "regions": REGION_CHOICES,
+            "filters_count": sum(bool(x) for x in (discipline, region, month, only_open, past)), "club": club,
         },
     )
 
@@ -650,12 +804,13 @@ def _card(t):
         days = f"{start.day}"
         wd = WEEKDAYS[start.weekday()]
     else:
-        days = f"{start.day}–{end.day}" if start.month == end.month else f"{start.day}.{start.month:02d}–{end.day}.{end.month:02d}"
+        days = f"{start.day}–{end.day}"  # месяцы — в подписи над числами («ОКТ–НОЯ»), чтобы дата не ломалась в 3 строки
         wd = f"{WEEKDAYS[start.weekday()]}–{WEEKDAYS[end.weekday()]}"
     disc = s.get("disciplines", [])
     return {
         "t": t,
-        "month": MONTHS_SHORT[start.month - 1],
+        "month": MONTHS_SHORT[start.month - 1] if (start.month, start.year) == (end.month, end.year)
+                 else f"{MONTHS_SHORT[start.month - 1]}–{MONTHS_SHORT[end.month - 1]}",
         "days": days,
         "weekdays": wd,
         "venue": s.get("venue") or {},
@@ -697,6 +852,7 @@ def public_detail(request, pk):
             "open": t.public_entries_open(), "card": _card(t),
             "can_manage": request.user.is_authenticated and services.can_manage(request.user, t),
             "can_judge": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "judge"}),
+            "staff": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "judge"}),
             "can_stable": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "stable"}),
             "has_stables": t.stable_categories.filter(is_active=True).exists() or t.services.filter(is_active=True).exists(),
             **_public_tabs(request, t),
@@ -758,12 +914,12 @@ def _public_tabs(request, t):
         pubs = {}
         for pub in StartListPublication.objects.filter(program__tournament=t).order_by("program_id", "-version"):
             pubs.setdefault(pub.program_id, pub)
-        have = [p for p in programs if p.pk in pubs]
+        have = programs  # тест 4.2: показываем все маршруты дня; где протокола нет — так и пишем
     else:
         pubs = {}
         for pub in ResultPublication.objects.filter(tclass__program__tournament=t).order_by("tclass_id", "-version"):
             pubs.setdefault(pub.tclass_id, pub)
-        have = [p for p in programs if any(c.pk in pubs for c in p.classes.all())]
+        have = programs
     days = sorted({p.day for p in have})
     out["days_nav"] = days
     day = request.GET.get("day", "")
@@ -782,10 +938,13 @@ def _public_tabs(request, t):
             have = [p for p in have if p.day == d]
     out["day"] = day
     if tab == "starts":
-        ids = [r["entry"] for p in have for r in pubs[p.pk].rows]
+        ids = [r["entry"] for p in have if p.pk in pubs for r in pubs[p.pk].rows]
         inactive = {e.pk for e in Entry.objects.filter(pk__in=ids) if not e.is_active}
         for p in have:
-            pub = pubs[p.pk]
+            pub = pubs.get(p.pk)
+            if not pub:
+                out["starts"].append({"p": p, "pub": None, "rows": [], "timed": False})
+                continue
             rows = [dict(r, mark={"withdrawn": "Снят", "no_show": "Не явился"}.get(r.get("status")) or ("Снят" if r["entry"] in inactive else ""))
                     for r in pub.rows]
             out["starts"].append({"p": p, "pub": pub, "rows": rows, "timed": any(r.get("time") for r in rows)})
@@ -815,6 +974,15 @@ def _public_tabs(request, t):
     return out
 
 
+@xframe_options_sameorigin
 def public_regulation(request, pk):
     t = get_object_or_404(Tournament, pk=pk, publication__in=PUBLIC_STATES)
     return _file_response(t.published_regulation, f"polozhenie-{t.pk}.pdf")
+
+
+def public_regulation_page(request, pk):
+    """Положение внутри сайта: с кнопкой «← К турниру» и «Скачать» (тест 5, п. 2.1)."""
+    t = get_object_or_404(Tournament, pk=pk, publication__in=PUBLIC_STATES)
+    if not (t.snapshot or {}).get("has_regulation") and not t.published_regulation:
+        raise Http404
+    return render(request, "tournaments/regulation.html", {"t": t, "title": t.pub_title})

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ title }} — EquiStart{% endblock %}
+{% block title %}{{ title }} — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head"><div><a class="back" href="{% url 'stables:manage' t.pk %}?tab=setup">← Денники и услуги</a><h1 class="h1">{{ title }}</h1></div></div>
 <form method="post" class="card form" style="max-width: 720px;" novalidate>{% csrf_token %}

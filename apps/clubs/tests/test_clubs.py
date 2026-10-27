@@ -133,11 +133,11 @@ class ClubContentTests(ClubBase):
         self.assertEqual(self.client.get(reverse("clubs:news_edit", args=[n.pk])).status_code, 404)
         self.assertEqual(self.client.post(reverse("clubs:news_delete", args=[n.pk])).status_code, 403)
         self.client.logout()
-        self.assertContains(self.client.get(reverse("clubs:detail", args=[self.club.pk])), "Кубок клуба")
+        self.assertContains(self.client.get(reverse("clubs:detail", args=[self.club.pk]) + "?tab=news"), "Кубок клуба")
         with self.assertRaises(ValueError):
             services.hide_news(self.mod, n.pk, "")
         services.hide_news(self.mod, n.pk, "Реклама")
-        self.assertNotContains(self.client.get(reverse("clubs:detail", args=[self.club.pk])), "Кубок клуба")
+        self.assertNotContains(self.client.get(reverse("clubs:detail", args=[self.club.pk]) + "?tab=news"), "Кубок клуба")
         self.assertEqual(self.client.get(reverse("clubs:file", args=["news", n.photos.get().pk])).status_code, 404)
 
     def test_club_venue_selectable_and_calendar_filter(self):
