@@ -8,6 +8,7 @@ urlpatterns = [
     path("t/<int:pk>/stables/", views.book, name="book"),
     path("t/<int:pk>/stables/order/", views.order, name="order"),
     path("my/stables/", views.my, name="my"),
+    path("my/stables/booking/<int:booking_id>/edit/", views.my_edit, name="my_edit"),
     path("my/stables/<str:kind>/<int:obj_id>/cancel/", views.my_cancel, name="my_cancel"),
     path("organizer/t/<int:pk>/stables/", views.manage, name="manage"),
     path("organizer/t/<int:pk>/stables/do/<str:action>/", views.manage_action, name="action"),

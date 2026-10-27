@@ -2,69 +2,106 @@
 {% load tournaments %}
 {% block title %}{{ club.public_name }} — СтартЛист{% endblock %}
 {% block content %}
-<a class="back" href="{% url 'clubs:list' %}">← Все клубы</a>
-{% if not club.is_public %}<div class="alert alert--warning" role="status">Профиль ещё не опубликован — его видите только вы{% if user.is_moderator %} и модераторы{% endif %}.</div>
+{# Тест 5, п. 25.3: новая страница клуба — обложка, логотип, быстрые действия, вкладки (макет утверждён 27.10.2026) #}
+{% if not club.is_public %}<div class="alert alert--warning" role="status">Профиль ещё не опубликован — так страница будет выглядеть после проверки. Сейчас её видите только вы{% if user.is_moderator %} и модераторы{% endif %}.</div>
 {% elif manage and club.status == "review" %}<div class="alert alert--info" role="status">Новое название или адрес на проверке. Пока все видят прежние: «{{ club.pub_name }}», {{ club.pub_settlement }}.</div>{% endif %}
-<section class="hero-card">
-  <div class="hero-card__main">
-    <div class="club-head">
-      {% if club.logo %}<img class="club-logo club-logo--lg" src="{% url 'clubs:file' 'logo' club.pk %}" alt="Логотип {{ club.public_name }}">{% endif %}
-      <div style="min-width: 0;">
-        <h1 class="h1" style="margin: 0;">{{ club.public_name }}</h1>
-        <div class="table__sub">{{ club.public_region_name }}, {{ club.public_settlement }}{% if club.public_address %}, {{ club.public_address }}{% endif %}</div>
-      </div>
+
+<section class="club-hero">
+  <div class="club-hero__cover">
+    {% if cover %}<img src="{% url 'clubs:file' 'photo' cover.pk %}" alt="{{ cover.caption|default:club.public_name }}">{% endif %}
+    <a class="club-hero__back" href="{% url 'clubs:list' %}" aria-label="Все клубы"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></a>
+    {% if manage %}<a class="btn btn--ghost btn--sm club-hero__edit" href="{% url 'clubs:mine' %}">Управлять</a>{% endif %}
+  </div>
+  <div class="club-hero__body">
+    <div class="club-hero__row">
+      {% if club.logo %}<img class="club-hero__logo" src="{% url 'clubs:file' 'logo' club.pk %}" alt="Логотип {{ club.public_name }}">
+      {% else %}<span class="club-hero__logo club-hero__logo--empty" aria-hidden="true">{{ club.public_name|slice:":1" }}</span>{% endif %}
+      {% if club.is_public %}<span class="chip chip--success">Проверен модератором</span>{% endif %}
     </div>
-    {% if club.description %}<p class="break" style="white-space: pre-line; margin-top: var(--space-4);">{{ club.description }}</p>{% endif %}
-  </div>
-  <div class="hero-card__side">
-    <div class="caption muted">КОНТАКТЫ</div>
-    <ul class="list">
-      {% if club.phone %}<li><a href="tel:{{ club.phone|cut:' '|cut:'-'|cut:'('|cut:')' }}">{{ club.phone }}</a></li>{% endif %}
-      {% if club.email %}<li><a href="mailto:{{ club.email }}">{{ club.email }}</a></li>{% endif %}
-      {% if club.site %}<li><a href="{{ club.site }}" rel="noopener nofollow" target="_blank" class="break">{{ club.site }}</a></li>{% endif %}
-      {% for s in club.social_links %}<li><a href="{{ s }}" rel="noopener nofollow" target="_blank" class="break">{{ s }}</a></li>{% endfor %}
-    </ul>
-    {% if manage %}<a class="btn btn--ghost btn--sm" href="{% url 'clubs:mine' %}">Редактировать</a>{% endif %}
+    <h1 class="h1 club-hero__title">{{ club.public_name }}</h1>
+    <p class="table__sub" style="margin: 0;">{{ club.public_region_name }}, {{ club.public_settlement }}{% if club.public_address %}, {{ club.public_address }}{% endif %}</p>
+    <div class="club-actions">
+      {% if tel %}<a class="club-action club-action--main" href="tel:{{ tel }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>Позвонить</a>
+      {% elif club.email %}<a class="club-action club-action--main" href="mailto:{{ club.email }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>Написать</a>{% endif %}
+      <a class="club-action" href="{{ map_url }}" target="_blank" rel="noopener"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Маршрут</a>
+      <button type="button" class="club-action" data-share="{{ request.scheme }}://{{ request.get_host }}{% url 'clubs:detail' club.pk %}" data-share-title="{{ club.public_name }}">{% include "partials/share_icon.html" %}Поделиться</button>
+    </div>
   </div>
 </section>
 
-{% if club.photos.all %}
-<section class="stack" style="margin-top: var(--space-5);">
-  <h2 class="h2">Фото</h2>
-  <div class="photo-grid">{% for p in club.photos.all %}<figure><img src="{% url 'clubs:file' 'photo' p.pk %}" alt="{{ p.caption|default:club.public_name }}" loading="lazy">{% if p.caption %}<figcaption class="table__sub">{{ p.caption }}</figcaption>{% endif %}</figure>{% endfor %}</div>
-</section>
-{% endif %}
+<div id="club-view" style="view-transition-name: swap-area;">
+<nav class="tabs tabs--sticky club-tabs" aria-label="Разделы клуба" data-swap="#club-view">
+  <a class="tabs__item{% if tab == 'tournaments' %} is-active{% endif %}" href="?tab=tournaments">Турниры</a>
+  <a class="tabs__item{% if tab == 'news' %} is-active{% endif %}" href="?tab=news">Новости{% if news %} · {{ news|length }}{% endif %}</a>
+  <a class="tabs__item{% if tab == 'photos' %} is-active{% endif %}" href="?tab=photos">Фото{% if photos %} · {{ photos|length }}{% endif %}</a>
+  <a class="tabs__item{% if tab == 'about' %} is-active{% endif %}" href="?tab=about">О клубе</a>
+</nav>
 
-<section class="stack" style="margin-top: var(--space-5);">
-  <h2 class="h2">Турниры в клубе</h2>
-  {% if upcoming %}
-    <div class="list-cards">{% for t in upcoming %}
-      <article class="row-card"><div style="flex: 1 1 180px; min-width: 0;"><a class="h3 row-card__title" href="{% url 'tournaments:public' t.pk %}">{{ t.pub_title }}</a>
-        <div class="table__sub">{% daterange t.pub_starts_on t.pub_ends_on %}{% if t.publication == "cancelled" %} · <span class="chip chip--danger">Отменён</span>{% endif %}</div></div>
-        <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:public' t.pk %}">Подробнее</a></article>
+{% if tab == "news" %}
+  {% if news %}
+    <div class="stack">{% for n in news %}
+      <article class="card news-card">
+        {% with ph=n.photos.all %}{% if ph %}
+          <div class="news-card__photos{% if ph|length > 1 %} news-card__photos--2{% endif %}">{% for p in ph|slice:":2" %}<img src="{% url 'clubs:file' 'news' p.pk %}" alt="Фото к новости «{{ n.title }}»" loading="lazy">{% endfor %}</div>
+        {% endif %}{% endwith %}
+        <div class="news-card__body">
+          <span class="table__sub">{{ n.published_at|date:"j E Y" }}</span>
+          <h2 class="h3" style="margin: 0;">{{ n.title }}</h2>
+          {% if n.text|length > 240 %}
+            <details class="news-card__more"><summary><span class="break" style="white-space: pre-line;">{{ n.text|truncatechars:220 }}</span> <span class="news-card__toggle">Читать дальше</span></summary><p class="break" style="white-space: pre-line; margin: 0;">{{ n.text }}</p></details>
+          {% else %}<p class="break" style="white-space: pre-line; margin: 0;">{{ n.text }}</p>{% endif %}
+          {% if n.tournament %}<a class="news-card__t" href="{% url 'tournaments:public' n.tournament.pk %}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>{{ n.tournament.pub_title|default:n.tournament.title }}</a>{% endif %}
+        </div>
+      </article>
     {% endfor %}</div>
-    <a class="table__sub" href="{% url 'core:calendar' %}?club={{ club.pk }}">Все турниры клуба в календаре →</a>
-  {% else %}
-    <p class="muted">Ближайших турниров нет.</p>
-  {% endif %}
+  {% else %}<div class="card empty-friendly"><div class="empty-friendly__ico" aria-hidden="true">📰</div><h2 class="h3">Новостей пока нет</h2><p class="muted">Здесь клуб рассказывает о турнирах, сборах и жизни конюшни.</p></div>{% endif %}
+
+{% elif tab == "photos" %}
+  {% if photos %}
+    <div class="club-gallery">{% for p in photos %}<figure><a href="{% url 'clubs:file' 'photo' p.pk %}" target="_blank" rel="noopener"><img src="{% url 'clubs:file' 'photo' p.pk %}" alt="{{ p.caption|default:club.public_name }}" loading="lazy"></a>{% if p.caption %}<figcaption class="table__sub">{{ p.caption }}</figcaption>{% endif %}</figure>{% endfor %}</div>
+  {% else %}<div class="card empty-friendly"><div class="empty-friendly__ico" aria-hidden="true">📷</div><h2 class="h3">Фото пока нет</h2></div>{% endif %}
+
+{% elif tab == "about" %}
+  <div class="stack">
+    {% if club.description %}<section class="card"><p class="break" style="white-space: pre-line; margin: 0;">{{ club.description }}</p></section>{% endif %}
+    <section class="card">
+      <h2 class="h3" style="margin-top: 0;">Контакты</h2>
+      <ul class="club-contacts">
+        <li><span class="caption muted">АДРЕС</span><a href="{{ map_url }}" target="_blank" rel="noopener">{{ club.public_region_name }}, {{ club.public_settlement }}{% if club.public_address %}, {{ club.public_address }}{% endif %}</a></li>
+        {% if club.phone %}<li><span class="caption muted">ТЕЛЕФОН</span><a href="tel:{{ tel }}">{{ club.phone }}</a></li>{% endif %}
+        {% if club.email %}<li><span class="caption muted">EMAIL</span><a href="mailto:{{ club.email }}">{{ club.email }}</a></li>{% endif %}
+        {% if club.site %}<li><span class="caption muted">САЙТ</span><a href="{{ club.site }}" rel="noopener nofollow" target="_blank" class="break">{{ club.site }}</a></li>{% endif %}
+        {% for s in club.social_links %}<li><span class="caption muted">СОЦСЕТИ</span><a href="{{ s }}" rel="noopener nofollow" target="_blank" class="break">{{ s }}</a></li>{% endfor %}
+      </ul>
+    </section>
+  </div>
+
+{% else %}
+  <h2 class="h3">Ближайшие турниры</h2>
+  {% if upcoming %}
+    <div class="stack">{% for t in upcoming %}{% with c=t|card %}
+      <article class="club-t">
+        <div class="event-card__date event-card__date--{{ c.color|default:'lemon' }} club-t__date"><span class="caption">{{ c.month }}</span><span class="event-card__days">{{ c.days }}</span></div>
+        <div style="min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+          <a class="h3 row-card__title" href="{% url 'tournaments:public' t.pk %}">{{ t.pub_title }}</a>
+          <div class="chips">
+            {% if t.publication == "cancelled" %}<span class="chip chip--danger">Отменён</span>{% elif c.open %}<span class="chip chip--info">Приём заявок открыт</span>{% else %}<span class="chip">Приём заявок закрыт</span>{% endif %}
+            {% for d in c.disciplines %}<span class="tag tag--{{ d.2 }}">{{ d.1 }}</span>{% endfor %}
+          </div>
+          {% if c.open %}<span class="table__sub">Заявки до {{ t.pub_deadline|date:"j E" }}</span>{% endif %}
+        </div>
+      </article>
+    {% endwith %}{% endfor %}</div>
+  {% else %}<div class="card empty-friendly"><div class="empty-friendly__ico" aria-hidden="true">🏇</div><h2 class="h3">Ближайших турниров нет</h2><p class="muted">Когда клуб опубликует турнир, он появится здесь и в календаре.</p></div>{% endif %}
   {% if past %}
-    <details><summary class="label" style="cursor: pointer;">Прошедшие: {{ past|length }}</summary>
+    <details class="card" style="margin-top: var(--space-4);"><summary class="label" style="cursor: pointer;">Прошедшие турниры и результаты · {{ past|length }}</summary>
       <ul class="list" style="margin-top: var(--space-2);">{% for t in past %}<li class="list__row"><a href="{% url 'tournaments:public' t.pk %}?tab=results">{{ t.pub_title }}</a><span class="table__sub">{% daterange t.pub_starts_on t.pub_ends_on %}</span></li>{% endfor %}</ul>
     </details>
   {% endif %}
-</section>
-
-{% if news %}
-<section class="stack" style="margin-top: var(--space-5);">
-  <h2 class="h2">Новости</h2>
-  {% for n in news %}
-    <article class="card news">
-      <h3 class="h3">{{ n.title }}</h3>
-      <div class="table__sub">{{ n.published_at|date:"j E Y" }}{% if n.tournament %} · <a href="{% url 'tournaments:public' n.tournament.pk %}">{{ n.tournament.pub_title|default:n.tournament.title }}</a>{% endif %}</div>
-      <p class="break" style="white-space: pre-line;">{{ n.text }}</p>
-      {% if n.photos.all %}<div class="photo-grid">{% for p in n.photos.all %}<img src="{% url 'clubs:file' 'news' p.pk %}" alt="Фото к новости «{{ n.title }}»" loading="lazy">{% endfor %}</div>{% endif %}
-    </article>
-  {% endfor %}
-</section>
+  {% if photos %}
+    <div class="section-head" style="margin: var(--space-5) 0 var(--space-2);"><h2 class="h3" style="margin: 0;">Фото</h2><a href="?tab=photos" class="table__sub">Все фото →</a></div>
+    <div class="club-strip">{% for p in photos|slice:":3" %}<img src="{% url 'clubs:file' 'photo' p.pk %}" alt="{{ p.caption|default:club.public_name }}" loading="lazy">{% endfor %}{% if photos|length > 3 %}<a href="?tab=photos" class="club-strip__more">+{{ photos|length|add:"-3" }}</a>{% endif %}</div>
+  {% endif %}
 {% endif %}
+</div>
 {% endblock %}

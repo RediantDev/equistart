@@ -16,20 +16,22 @@ class AthleteForm(forms.ModelForm):
 
     class Meta:
         model = Athlete
-        fields = ["last_name", "first_name", "middle_name", "birth_date", "rank_jumping", "rank_dressage", "fksr_number", "fei_id", "club", "region", "coach_name"]
+        fields = ["last_name", "first_name", "middle_name", "birth_date", "rank", "fksr_number", "fei_id", "club", "region", "coach_name"]
         widgets = {"birth_date": DATE}
         help_texts = {
             "birth_date": "Нужна для зачётов с возрастными условиями. Публично показывается только год.",
-            "rank_jumping": "Нужен для зачётов конкура с требованием разряда.",
-            "rank_dressage": "Нужен для зачётов выездки с требованием разряда.",
+            "rank": "Один для конкура и выездки. По нему проверяются зачёты с условием о разряде.",
             "fksr_number": "Необязательно. Один номер — один спортсмен в сервисе.",
             "fei_id": "Необязательно. Для спортсменов с регистрацией FEI.",
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for f in ("rank_jumping", "rank_dressage"):
-            self.fields[f].choices = [("", "— не указан —")] + list(self.fields[f].choices)[1:]
+        if "region" in self.fields:
+            from .catalogs import regions_json
+
+            self.fields["region"].widget.attrs.update({"data-suggest": regions_json(), "placeholder": "Начните вводить: «Моск…»"})
+        self.fields["rank"].choices = [("", "— не указан —")] + list(self.fields["rank"].choices)[1:]
 
     def clean_birth_date(self):
         d = self.cleaned_data.get("birth_date")
@@ -63,6 +65,9 @@ class HorseForm(forms.ModelForm):
         self.duplicate = None
         self.fields["color"].choices = [("", "— выберите —")] + list(self.fields["color"].choices)[1:]
         self.fields["sex"].choices = [("", "— выберите —")] + list(self.fields["sex"].choices)[1:]
+        from .catalogs import breeds_json
+
+        self.fields["breed"].widget.attrs.update({"data-suggest": breeds_json(), "placeholder": "Начните вводить или выберите"})
 
     def clean_birth_year(self):
         y = self.cleaned_data["birth_year"]
@@ -100,19 +105,26 @@ class DocumentForm(forms.ModelForm):
         model = HorseDocument
         fields = ["kind", "title", "file", "valid_until"]
         widgets = {"valid_until": DATE}
-        help_texts = {"file": "PDF, JPEG или PNG до 20 МБ."}
+        help_texts = {"file": "PDF, фото (JPEG, PNG, WEBP, HEIC) до 20 МБ."}
 
     def clean_file(self):
         f = self.cleaned_data["file"]
         if f.size > DOC_MAX:
             raise ValidationError("Файл больше 20 МБ.")
-        head = f.read(5)
+        head = f.read(16)
         f.seek(0)
         for sig, ct in DOC_SIGNATURES.items():
             if head.startswith(sig):
                 self.content_type = ct
                 return f
-        raise ValidationError("Нужен файл PDF, JPEG или PNG.")
+        # Тест 5, п. 16.1: фото с телефона — WEBP и HEIC (iPhone) тоже подходят
+        if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+            self.content_type = "image/webp"
+            return f
+        if head[4:8] == b"ftyp" and head[8:12] in (b"heic", b"heix", b"mif1", b"msf1", b"heif", b"hevc"):
+            self.content_type = "image/heic"
+            return f
+        raise ValidationError("Подходят PDF, JPEG, PNG, WEBP или HEIC (фото с iPhone).")
 
 
 class PhoneForm(forms.Form):

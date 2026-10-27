@@ -227,8 +227,13 @@ def horse_action(request, pk, action):
             audit(request.user, "horse.document", h, document=d.pk, kind=d.kind)
             messages.success(request, "Документ загружен.")
         else:
-            for errs in form.errors.values():
-                messages.error(request, "; ".join(errs))
+            # Тест 5, п. 16.2: понятно, какое поле не заполнено
+            labels = {"file": "Файл", "kind": "Тип", "title": "Название", "valid_until": "Действует до"}
+            for name, errs in form.errors.items():
+                msg = "; ".join(errs)
+                if name == "file" and "Обязательное" in msg:
+                    msg = "выберите файл документа"
+                messages.error(request, f"{labels.get(name, 'Документ')}: {msg}")
     elif action == "delete_doc":
         HorseDocument.objects.filter(horse=h, pk=request.POST.get("document")).delete()
         audit(request.user, "horse.document_delete", h)
@@ -244,7 +249,7 @@ def horse_document(request, pk, doc_id):
     if not services.can_view_horse_documents(request.user, h):
         raise PermissionDenied
     d = get_object_or_404(HorseDocument, pk=doc_id, horse=h)
-    ext = {"application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg"}.get(d.content_type, "bin")
+    ext = {"application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/heic": "heic"}.get(d.content_type, "bin")
     resp = FileResponse(d.file.open("rb"), content_type=d.content_type, filename=f"{h.code}-{d.kind}.{ext}")
     resp["X-Content-Type-Options"] = "nosniff"
     resp["Content-Security-Policy"] = "sandbox"
@@ -254,7 +259,7 @@ def horse_document(request, pk, doc_id):
 @login_required
 def horse_search(request):
     q = request.GET.get("q", "")
-    mode = request.GET.get("mode", "name")
+    mode = request.GET.get("mode", "auto")
     results = services.search_horses(q, mode)
     return render(request, "profiles/horse_search.html", {"q": q, "mode": mode, "results": results, "next": request.GET.get("next", "")})
 

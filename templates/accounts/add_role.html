@@ -4,17 +4,11 @@
 <section class="auth">
   <div class="card auth__card">
     <a href="{% url 'accounts:profile' %}" class="back">← Профиль</a>
-    <h1 class="h1">Добавить роль</h1>
-    <p class="muted">Роль добавится в этот же аккаунт, профиль сохранится.</p>
+    <h1 class="h1">Добавить роли</h1>
+    <p class="muted">Роли добавятся в этот же аккаунт, профиль сохранится.</p>
     <form method="post" novalidate class="form">
       {% csrf_token %}
-      <fieldset class="choices">
-        <legend class="field__label">Роль</legend>
-        {% for option in form.category %}
-          <label class="choice">{{ option.tag }}<span>{{ option.choice_label }}</span></label>
-        {% endfor %}
-      </fieldset>
-      {% for error in form.category.errors %}<p class="field__error" role="alert">{{ error }}</p>{% endfor %}
+      <div class="field{% if form.category.errors %} field--error{% endif %}">{% include "partials/role_choices.html" with field=form.category %}</div>
       <button type="submit" class="btn btn--primary btn--block">Добавить</button>
     </form>
   </div>

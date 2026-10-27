@@ -27,7 +27,7 @@
       {% else %}<a class="btn btn--primary btn--block" href="{% url 'accounts:login' %}?next={% url 'entries:apply' t.pk %}">Войти и подать заявку</a>
       <p class="field__help" style="text-align: center;">Нет аккаунта? <a href="{% url 'accounts:register' %}?next={% url 'entries:apply' t.pk %}">Зарегистрироваться</a> — займёт минуту.</p>{% endif %}
     {% endif %}
-    {% if s.has_regulation %}<a class="btn btn--ghost btn--block" href="{% url 'tournaments:public_regulation' t.pk %}" target="_blank" rel="noopener">Положение (PDF)</a>{% endif %}
+    {% if s.has_regulation %}<a class="btn btn--ghost btn--block" href="{% url 'tournaments:public_regulation_page' t.pk %}">Положение</a>{% endif %}
     {% if has_stables and t.publication == "published" %}<a class="btn btn--ghost btn--block" href="{% url 'stables:book' t.pk %}">Заказать денник и услуги</a>{% endif %}
     <button type="button" class="btn btn--ghost btn--block" data-share="{{ request.scheme }}://{{ request.get_host }}{% url 'tournaments:public' t.pk %}" data-share-title="{{ s.title }}">Поделиться</button>
     {% if can_manage or can_judge or can_stable %}<a class="btn btn--dark btn--block hero-card__staff" href="{% url 'tournaments:hub' t.pk %}">Панель турнира</a><p class="table__sub" style="margin: -4px 0 0; text-align: center;">заявки, проведение, денники — для команды турнира</p>{% endif %}
@@ -35,17 +35,19 @@
   </div>
 </section>
 
-<nav class="tabs no-print" aria-label="Разделы турнира" id="tabs">
-  <a class="tabs__item{% if not tab %} is-active{% endif %}" href="?#tabs">Программа</a>
-  <a class="tabs__item{% if tab == 'starts' %} is-active{% endif %}" href="?tab=starts#tabs">Стартовые</a>
-  <a class="tabs__item{% if tab == 'results' %} is-active{% endif %}" href="?tab=results#tabs">Результаты</a>
+{# Тест 5, п. 3.1 и 4.2: вкладки закреплены; вкладка, день — меняют только нижнюю часть #}
+<div id="tview" class="tview" style="view-transition-name: swap-area;">
+<nav class="tabs tabs--sticky no-print" aria-label="Разделы турнира" id="tabs" data-swap="#tview">
+  <a class="tabs__item{% if not tab %} is-active{% endif %}" href="?">Программа</a>
+  <a class="tabs__item{% if tab == 'starts' %} is-active{% endif %}" href="?tab=starts">Стартовые</a>
+  <a class="tabs__item{% if tab == 'results' %} is-active{% endif %}" href="?tab=results">Результаты</a>
 </nav>
 
 {% if tab == "starts" or tab == "results" %}
 {% if days_nav|length > 1 %}
-<nav class="day-nav no-print" aria-label="Дни турнира">
-  {% for d in days_nav %}<a class="chip-link{% if day == d|date:'Y-m-d' %} is-active{% endif %}" href="?tab={{ tab }}&day={{ d|date:'Y-m-d' }}#tabs">{{ d|date:"j E" }}</a>{% endfor %}
-  <a class="chip-link{% if day == 'all' %} is-active{% endif %}" href="?tab={{ tab }}&day=all#tabs">Все дни</a>
+<nav class="day-nav no-print" aria-label="Дни турнира" data-swap="#tview">
+  {% for d in days_nav %}<a class="chip-link{% if day == d|date:'Y-m-d' %} is-active{% endif %}" href="?tab={{ tab }}&day={{ d|date:'Y-m-d' }}">{{ d|date:"j E" }}</a>{% endfor %}
+  <a class="chip-link{% if day == 'all' %} is-active{% endif %}" href="?tab={{ tab }}&day=all">Все дни</a>
 </nav>
 {% endif %}
 {% endif %}
@@ -54,8 +56,8 @@
 <section class="stack">
   {% for b in starts %}
     <article class="result-route" id="prog-{{ b.p.pk }}">
-    <div class="section-head"><h2 class="h3">{{ b.p.name }}<span class="table__sub">{{ b.p.day|date:"j E" }}{% if b.p.start_time %} · начало {{ b.p.start_time|time:"H:i" }}{% endif %}{% if b.pub %} · {{ b.rows|length }} пар · версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}{% endif %}</span></h2>
-      {% if b.pub %}<div class="row-actions no-print">{% if staff %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:startlist_xlsx' t.pk b.p.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button>{% endif %}<button type="button" class="btn btn--ghost btn--sm" data-share="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}?tab=starts#prog-{{ b.p.pk }}" data-share-title="{{ s.title }} — {{ b.p.name }}">Поделиться</button></div>{% endif %}</div>
+    <div class="section-head section-head--route"><h2 class="h3">{{ b.p.name }}<span class="table__sub">{{ b.p.day|date:"j E" }}{% if b.p.start_time %} · начало {{ b.p.start_time|time:"H:i" }}{% endif %}{% if b.pub %} · {{ b.rows|length }} пар · версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}{% endif %}</span></h2>
+      {% if b.pub %}<div class="row-actions no-print">{% if staff %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:startlist_xlsx' t.pk b.p.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button>{% endif %}<button type="button" class="btn btn--ghost btn--sm btn--share" aria-label="Поделиться" title="Поделиться" data-share="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}?tab=starts#prog-{{ b.p.pk }}" data-share-title="{{ s.title }} — {{ b.p.name }}">{% include "partials/share_icon.html" %}<span class="btn__label">Поделиться</span></button></div>{% endif %}</div>
     {% if not b.pub %}<div class="card empty empty--sm"><p class="muted" style="margin: 0;">Стартовый протокол ещё не опубликован — судья публикует порядок перед началом.</p></div>{% else %}
     <div class="table-wrap only-wide"><table class="table table--pub">
       <colgroup><col class="c-no">{% if b.timed %}<col class="c-time">{% endif %}<col class="c-rider"><col class="c-horse"><col class="c-class"></colgroup>
@@ -83,8 +85,8 @@
       <h2 class="h2">{{ b.p.name }}</h2>
       <p class="table__sub">{{ b.p.day|date:"j E" }} · {{ b.p.program_type_name }}{% if b.p|heights_extra %} · {{ b.p|heights_extra }}{% endif %}{% if b.p.article_label %} · {{ b.p.article_label }}{% endif %}</p>
       {% for cb in b.classes %}
-        <div class="section-head" id="class-{{ cb.c.pk }}"><h3 class="h3">{{ cb.c.label }}<span class="table__sub">версия {{ cb.pub.version }} от {{ cb.pub.published_at|date:"j E H:i" }}{% if cb.pub.version > 1 %} · исправлено{% endif %}</span></h3>
-          <div class="row-actions no-print">{% if staff %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:results_xlsx' t.pk cb.c.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button>{% endif %}<button type="button" class="btn btn--ghost btn--sm" data-share="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}?tab=results#class-{{ cb.c.pk }}" data-share-title="{{ s.title }} — {{ b.p.name }}, {{ cb.c.label }}">Поделиться</button></div></div>
+        <div class="section-head section-head--route" id="class-{{ cb.c.pk }}"><h3 class="h3">{{ cb.c.label }}<span class="table__sub">версия {{ cb.pub.version }} от {{ cb.pub.published_at|date:"j E H:i" }}{% if cb.pub.version > 1 %} · исправлено{% endif %}</span></h3>
+          <div class="row-actions no-print">{% if staff %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:results_xlsx' t.pk cb.c.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button>{% endif %}<button type="button" class="btn btn--ghost btn--sm btn--share" aria-label="Поделиться" title="Поделиться" data-share="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}?tab=results#class-{{ cb.c.pk }}" data-share-title="{{ s.title }} — {{ b.p.name }}, {{ cb.c.label }}">{% include "partials/share_icon.html" %}<span class="btn__label">Поделиться</span></button></div></div>
         {% for g in cb.groups %}
           {% if g.height %}<h4 class="label lg result-height">Высота {{ g.height }} см</h4>{% endif %}
           <div class="table-wrap only-wide"><table class="table table--pub{% if cb.pub.fields|length > 4 %} table--wide{% endif %}">
@@ -116,8 +118,9 @@
       {% for p in d.programs %}{% include "tournaments/_prog_row.html" %}{% endfor %}
     </div>
   {% endfor %}
-  {% if s.cancel_terms %}<div class="alert"><strong>Условия отмены:</strong> {{ s.cancel_terms|linebreaksbr }} <span class="muted">Условия задаёт организатор.</span></div>{% endif %}
+  {# Условия отмены — на экране подачи заявки (тест 5, п. 4.1) #}
   <p class="muted" style="font-size: 14px;">Опубликовано {{ t.published_at|date:"j E Y" }}. Сведения проверены модератором СтартЛист. Проверка сервиса не является утверждением федерацией.</p>
 </section>
 {% endif %}
+</div>
 {% endblock %}

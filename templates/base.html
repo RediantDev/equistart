@@ -12,8 +12,10 @@
   <meta name="theme-color" content="#ffcf1f">
   <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script>document.documentElement.classList.add("js");</script>
   <script src="{% static 'js/htmx.min.js' %}" defer></script>
   <script src="{% static 'js/ui.js' %}" defer></script>
+  <script src="{% static 'js/smooth.js' %}" defer></script>
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   <a class="skip-link" href="#main">Перейти к содержимому</a>
@@ -53,12 +55,13 @@
             <svg class="mnav__close" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           </summary>
           <nav class="mnav__panel" aria-label="Меню">
+            <a class="mnav__link{% if request.resolver_match.url_name == 'calendar' %} is-active{% endif %}" href="{% url 'core:calendar' %}">Календарь</a>
             <a class="mnav__link{% if request.resolver_match.app_name == 'clubs' and request.resolver_match.url_name in 'list,detail' %} is-active{% endif %}" href="{% url 'clubs:list' %}">Клубы</a>
             {% if user.is_authenticated %}
               {% if user.can_create_tournament or user.is_judge %}
                 <a class="mnav__link{% if request.resolver_match.url_name == 'mine' and request.resolver_match.app_name == 'tournaments' %} is-active{% endif %}" href="{% url 'tournaments:mine' %}">Мои соревнования</a>
               {% else %}
-                <a class="mnav__link{% if request.resolver_match.url_name == 'my_starts' %} is-active{% endif %}" href="{% url 'entries:my_starts' %}">Мои соревнования</a>
+                <a class="mnav__link{% if request.resolver_match.url_name == 'competitions' %} is-active{% endif %}" href="{% url 'entries:competitions' %}">Мои соревнования</a>
               {% endif %}
               <a class="mnav__link{% if request.resolver_match.url_name == 'cabinet' %} is-active{% endif %}" href="{% url 'accounts:cabinet' %}">Кабинет</a>
               {% if user.is_moderator %}<a class="mnav__link{% if request.resolver_match.app_name == 'moderation' %} is-active{% endif %}" href="{% url 'moderation:panel' %}">Пульт</a>{% endif %}
@@ -69,6 +72,11 @@
               <a class="mnav__link" href="{% url 'accounts:login' %}">Войти</a>
               <a class="mnav__link" href="{% url 'accounts:register' %}">Регистрация</a>
             {% endif %}
+            {# Тест 5, п. 1.2–1.3: на телефоне «Помощь» и политика ПДн — в меню, а не внизу каждой страницы #}
+            <div class="mnav__foot">
+              <a href="{% url 'support:faq' %}">Частые вопросы</a>
+              <a href="{% url 'core:privacy' %}">Обработка персональных данных</a>
+            </div>
           </nav>
         </details>
       </div>

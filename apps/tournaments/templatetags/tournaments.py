@@ -137,3 +137,11 @@ def ph(bound):
         required = bound.field.required or getattr(bound.field, "show_required", False)
         attrs["placeholder"] = "Обязательно" if required else "Необязательно"
     return bound.as_widget(attrs=attrs) if attrs else bound
+
+
+@register.filter
+def card(t):
+    """Данные карточки турнира (дата-плитка, статус приёма, дисциплины) — как в календаре."""
+    from apps.tournaments.views import _card
+
+    return _card(t)

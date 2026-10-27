@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% load tournaments %}
+{% block title %}Мои соревнования — СтартЛист{% endblock %}
+{% block content %}
+{# Вариант А (решение 27.10.2026): всё про старты в одном месте — кто бы ни подал заявку #}
+<div class="page-head">
+  <div>
+    <h1 class="h1">Мои соревнования</h1>
+    <p class="muted">Ваши заявки, выступления, куда вас заявил тренер, денники и услуги.</p>
+  </div>
+  <a class="btn btn--primary" href="{% url 'core:calendar' %}">Найти соревнования</a>
+</div>
+
+<div id="mc-view" style="view-transition-name: swap-area;">
+<nav class="tabs tabs--sticky tabs--wrap3" aria-label="Мои соревнования" data-swap="#mc-view">
+  <a class="tabs__item{% if tab == 'upcoming' %} is-active{% endif %}" href="?tab=upcoming">Предстоящие{% if counts.upcoming %} · {{ counts.upcoming }}{% endif %}</a>
+  <a class="tabs__item{% if tab == 'apps' %} is-active{% endif %}" href="?tab=apps">Заявки</a>
+  <a class="tabs__item{% if tab == 'past' %} is-active{% endif %}" href="?tab=past">Прошедшие</a>
+</nav>
+
+{% if tab == "apps" %}
+  {% if apps %}
+    <div class="list-cards">{% for r in apps %}
+      <a class="row-card row-card--link" href="{% url 'entries:application' r.app.pk %}">
+        <div style="flex: 1 1 180px; min-width: 0;">
+          <span class="h3 row-card__title">№{{ r.app.pk }} · {{ r.app.tournament.pub_title }}</span>
+          <div class="table__sub">{% daterange r.app.tournament.pub_starts_on r.app.tournament.pub_ends_on %} · выступлений: {{ r.count }}</div>
+        </div>
+        <div class="chips">{% for label, n, color in r.summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>
+      </a>
+    {% endfor %}</div>
+    <p style="margin-top: var(--space-3);"><a href="{% url 'entries:mine' %}">Поиск и фильтры по заявкам →</a></p>
+  {% else %}
+    <div class="card empty-friendly"><div class="empty-friendly__ico" aria-hidden="true">📝</div><h2 class="h3">Вы ещё не подавали заявок</h2><p class="muted">Откройте турнир в календаре и нажмите «Подать заявку».</p><div class="empty-friendly__actions"><a class="btn btn--primary btn--sm" href="{% url 'core:calendar' %}">Найти соревнования</a></div></div>
+  {% endif %}
+{% else %}
+  {% if tab == "past" %}{% with cards=past %}{% include "entries/_competition_cards.html" %}{% endwith %}
+  {% else %}{% with cards=upcoming %}{% include "entries/_competition_cards.html" %}{% endwith %}{% endif %}
+{% endif %}
+</div>
+{% endblock %}

@@ -25,10 +25,9 @@
       </div>
       {% include "partials/field.html" with field=form.fksr_number %}
       {% include "partials/field.html" with field=form.fei_id %}
-      <div class="grid-2">
-        {% include "partials/field.html" with field=form.is_pony %}
-        {% include "partials/field.html" with field=form.height_cm %}
-      </div>
+      {# Тест 5, п. 15.2: «Рост в холке» — только для пони #}
+      {% include "partials/field.html" with field=form.is_pony %}
+      <div data-show-when="is_pony:checked">{% include "partials/field.html" with field=form.height_cm %}</div>
       <details{% if form.sire.value or form.birthplace.value or form.owner_name.value %} open{% endif %}>
         <summary class="label" style="cursor: pointer;">Дополнительно: отец, место рождения, владелец</summary>
         <div class="form" style="margin-top: var(--space-3);">

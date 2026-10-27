@@ -159,7 +159,7 @@ class CabinetTests(TestCase):
         resp = self.client.get(reverse("accounts:cabinet"))
         self.assertContains(resp, "Кабинет")
         self.assertContains(resp, "Кого вы ведёте")  # тренер
-        self.assertContains(resp, "Куда вас заявил")  # спортсмен
+        self.assertContains(resp, "куда вас заявил тренер")  # спортсмен
         self.assertNotContains(resp, "Создать соревнование")
         self.assertNotContains(resp, "/cabinet/mode/")
 

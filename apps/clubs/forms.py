@@ -46,7 +46,7 @@ class NewsForm(forms.ModelForm):
         model = ClubNews
         fields = ["title", "text", "tournament"]
         widgets = {"text": forms.Textarea(attrs={"rows": 6})}
-        labels = {"tournament": "Турнир"}
+        labels = {"tournament": "О каком турнире новость"}
 
     def __init__(self, club, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -56,7 +56,8 @@ class NewsForm(forms.ModelForm):
         qs = qs | Tournament.objects.filter(owner=club.manager, publication__in=["published", "finished"])
         self.fields["tournament"].queryset = qs.distinct().order_by("-starts_on")
         self.fields["tournament"].required = False
-        self.fields["tournament"].empty_label = "— без привязки —"
+        self.fields["tournament"].empty_label = "— не о турнире —"
+        self.fields["tournament"].help_text = "Если новость о турнире на вашей площадке — выберите его: в новости появится ссылка на турнир."  # тест 5, п. 25.1
 
     def clean_photos(self):
         f = self.cleaned_data.get("photos")

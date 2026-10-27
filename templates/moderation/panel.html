@@ -11,6 +11,7 @@
     <a class="btn btn--sm" href="{% url 'moderation:queue' %}">Турниры</a>
     <a class="btn btn--sm" href="{% url 'moderation:clubs' %}">Клубы</a>
     <a class="btn btn--sm" href="{% url 'moderation:support' %}">Поддержка</a>
+    {% if user.is_superuser %}<a class="btn btn--sm" href="{% url 'moderation:moderators' %}">Модераторы</a>{% endif %}
     {% if user.is_staff %}<a class="btn btn--sm" href="{% url 'admin:index' %}">Все данные</a>{% endif %}
   </div>
 </div>

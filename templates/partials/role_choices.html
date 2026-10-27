@@ -1,0 +1,16 @@
+{# Выбор ролей карточками: пояснение — внутри карточки (тест 5, п. 7.1, 22.1). field — поле с флажками. #}
+<fieldset class="role-cards">
+  <legend class="visually-hidden">{{ field.label }}</legend>
+  {% for option in field %}
+    <label class="role-card">
+      {{ option.tag }}
+      <span class="role-card__box" aria-hidden="true"></span>
+      <span class="role-card__text">
+        <span class="role-card__title">{{ option.choice_label }}</span>
+        <span class="role-card__hint">{% if option.data.value == "athlete" %}Подаёте заявки на старты за себя{% elif option.data.value == "coach" %}Подаёте заявки за своих спортсменов и лошадей{% elif option.data.value == "organizer" %}Создаёте турниры — в календаре после проверки модератором{% elif option.data.value == "judge" %}Судите на турнирах, можете создать турнир сами{% elif option.data.value == "club" %}Страница вашего клуба — после проверки модератором{% endif %}</span>
+      </span>
+    </label>
+  {% endfor %}
+</fieldset>
+<p class="field__help">Можно выбрать несколько. Роли можно добавить или убрать позже в профиле.</p>
+{% for error in field.errors %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ error }}</p>{% endfor %}

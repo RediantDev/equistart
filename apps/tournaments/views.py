@@ -10,6 +10,7 @@ from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 from django.db.models import Q
 from django.http import FileResponse, Http404
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -18,7 +19,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from apps.core.models import AuditLog, audit
 
 from . import services
-from .disciplines import DISCIPLINE_CHOICES, DISCIPLINE_COLORS
+from .disciplines import ACTIVE_DISCIPLINES, DISCIPLINE_CHOICES, DISCIPLINE_COLORS
 from .forms import BasicsForm, ClassForm, InviteForm, ProgramForm, TermsForm
 from .models import ProgramItem, TeamMember, Tournament, TournamentClass, Venue
 from .regions import REGION_CHOICES, REGION_NAMES, tz_label
@@ -625,6 +626,24 @@ def team(request, pk):
 
 @login_required
 @require_POST
+def team_stable_contact(request, pk, member_id):
+    """Назначить одного ответственного за денники: его контакт видит участник с бронью (решение 27.10.2026)."""
+    t = get_object_or_404(Tournament, pk=pk)
+    services.require_manage(request.user, t)
+    with transaction.atomic():
+        m = get_object_or_404(TeamMember.objects.select_for_update(), pk=member_id, tournament=t,
+                              role=TeamMember.Role.STABLE, state=TeamMember.State.ACCEPTED)
+        TeamMember.objects.filter(tournament=t).exclude(pk=m.pk).update(stable_contact=False)
+        if not m.stable_contact:
+            m.stable_contact = True
+            m.save(update_fields=["stable_contact"])
+            audit(request.user, "team.stable_contact", t, member=m.pk)
+    messages.success(request, f"{m.user.full_name if m.user else m.phone} — ответственный за денники. Его телефон видят участники со своей бронью.")
+    return redirect("tournaments:team", pk=t.pk)
+
+
+@login_required
+@require_POST
 def team_revoke(request, pk, member_id):
     t = get_object_or_404(Tournament, pk=pk)
     services.require_manage(request.user, t)
@@ -697,7 +716,14 @@ def calendar(request):
     else:
         qs = qs.filter(pub_ends_on__gte=today - datetime.timedelta(days=1)).order_by("pub_starts_on")
     if q:
-        qs = qs.filter(pub_title__icontains=q)
+        # Тест 5, п. 9.5: «белая роща», «кск Белая роща», «Берёзки» — по названию, площадке, месту и региону
+        from apps.core import search
+
+        def _region(w):
+            codes = [k for k, n in REGION_CHOICES if w in search.normalize(n)]
+            return Q(pub_region__in=codes) if codes else None
+
+        qs = search.apply(qs, q, ["pub_title", "venue__name", "venue__settlement"], extra=_region)
     if discipline:
         qs = qs.filter(pub_disciplines__contains=[discipline])
     if region:
@@ -747,8 +773,9 @@ def calendar(request):
         {
             "cards": cards, "q": q, "discipline": discipline, "region": region, "month": month,
             "only_open": only_open, "past": past, "active": active, "months": months,
-            "disciplines": DISCIPLINE_CHOICES, "regions": REGION_CHOICES,
-            "filters_open": bool(discipline or region or month or only_open or past), "club": club,
+            # Тест 5, п. 1.4: в фильтре — только дисциплины, с которыми работаем
+            "disciplines": [d for d in DISCIPLINE_CHOICES if d[0] in ACTIVE_DISCIPLINES], "regions": REGION_CHOICES,
+            "filters_count": sum(bool(x) for x in (discipline, region, month, only_open, past)), "club": club,
         },
     )
 
@@ -947,6 +974,15 @@ def _public_tabs(request, t):
     return out
 
 
+@xframe_options_sameorigin
 def public_regulation(request, pk):
     t = get_object_or_404(Tournament, pk=pk, publication__in=PUBLIC_STATES)
     return _file_response(t.published_regulation, f"polozhenie-{t.pk}.pdf")
+
+
+def public_regulation_page(request, pk):
+    """Положение внутри сайта: с кнопкой «← К турниру» и «Скачать» (тест 5, п. 2.1)."""
+    t = get_object_or_404(Tournament, pk=pk, publication__in=PUBLIC_STATES)
+    if not (t.snapshot or {}).get("has_regulation") and not t.published_regulation:
+        raise Http404
+    return render(request, "tournaments/regulation.html", {"t": t, "title": t.pub_title})

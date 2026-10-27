@@ -4,14 +4,13 @@
 <div class="page-head"><div>
   <a class="back" href="{% if next %}{{ next }}{% else %}{% url 'profiles:horses' %}{% endif %}">← Назад</a>
   <h1 class="h1">Поиск лошади</h1>
-  <p class="muted">По кличке или по точному номеру ФКСР / внутреннему коду. Выбор лошади не даёт права редактировать её профиль и смотреть документы.</p>
+  <p class="muted">Введите кличку или номер ФКСР — что именно вы ввели, сервис поймёт сам. Выбор лошади не даёт права редактировать её профиль и смотреть документы.</p>
 </div></div>
-<form method="get" class="search" role="search">
+<form method="get" class="search" role="search" data-require-input>
   <input type="hidden" name="next" value="{{ next }}">
   <label class="visually-hidden" for="hq">Поиск</label>
-  <input id="hq" name="q" type="search" value="{{ q }}" placeholder="Кличка или номер">
-  <select name="mode" aria-label="Режим поиска" style="width: auto;"><option value="name"{% if mode == "name" %} selected{% endif %}>По кличке</option><option value="code"{% if mode == "code" %} selected{% endif %}>Номер ФКСР / код</option></select>
-  <button class="btn btn--primary">Найти</button>
+  <input id="hq" name="q" type="search" value="{{ q }}" placeholder="Кличка или номер ФКСР" enterkeyhint="search">
+  <button class="btn btn--primary" data-require-btn>Найти</button>
 </form>
 {% if q %}
   {% if results %}

@@ -46,7 +46,7 @@
             {% csrf_token %}
             <div class="grid-2">{% include "partials/field.html" with field=doc_form.kind %}{% include "partials/field.html" with field=doc_form.title %}</div>
             <div class="grid-2">
-              <div class="field"><label class="field__label" for="docfile">Файл</label><input id="docfile" type="file" name="file" accept="application/pdf,image/png,image/jpeg"><p class="field__help">PDF, JPEG или PNG до 20 МБ.</p></div>
+              <div class="field"><label class="field__label" for="docfile">Файл</label><input id="docfile" type="file" name="file" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,image/heic,.heic,.heif" data-max-mb="20" required><p class="field__help">PDF или фото (JPEG, PNG, WEBP, HEIC) до 20 МБ.</p></div>
               {% include "partials/field.html" with field=doc_form.valid_until %}
             </div>
             <button class="btn btn--dark">Загрузить</button>

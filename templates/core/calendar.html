@@ -9,29 +9,30 @@
   {% if user.is_authenticated and user.can_create_tournament %}<a class="btn btn--ghost" href="{% url 'tournaments:create' %}">+ Создать соревнование</a>{% endif %}
 </div>
 
-<form method="get" role="search" class="calendar-filters">
-  <div class="search" style="margin: 0;">
-    <label class="visually-hidden" for="q">Поиск по названию</label>
-    <input id="q" name="q" type="search" placeholder="Название соревнования" value="{{ q }}">
-    <button class="btn btn--primary" type="submit">Найти</button>
-  </div>
-  <details class="filters"{% if filters_open %} open{% endif %}>
-    <summary class="btn btn--ghost btn--sm">Фильтры{% if active %} · {{ active|length }}{% endif %}</summary>
-    <div class="filters__body">
-      <div class="field"><label class="field__label" for="month">Месяц</label>
-        <select id="month" name="month"><option value="">Любой</option>{% for v, label in months %}<option value="{{ v }}"{% if v == month %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <div class="field"><label class="field__label" for="discipline">Дисциплина</label>
-        <select id="discipline" name="discipline"><option value="">Все</option>{% for v, label in disciplines %}<option value="{{ v }}"{% if v == discipline %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <div class="field"><label class="field__label" for="region">Регион</label>
-        <select id="region" name="region"><option value="">Все регионы</option>{% for v, label in regions %}<option value="{{ v }}"{% if v == region %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      {% if club %}<input type="hidden" name="club" value="{{ club.pk }}">{% endif %}
-      <div class="filters__checks">
-        <label class="check"><input type="checkbox" name="open" value="1"{% if only_open %} checked{% endif %}><span>Можно подать заявку <span class="table__sub" style="display: inline;">— приём заявок ещё идёт</span></span></label>
-        <label class="check"><input type="checkbox" name="past" value="1"{% if past %} checked{% endif %}><span>Показать прошедшие</span></label>
+<form method="get" role="search" class="calendar-filters" data-require-input>
+  <label class="visually-hidden" for="q">Поиск</label>
+  <input id="q" name="q" type="search" placeholder="Турнир, клуб или город" value="{{ q }}" enterkeyhint="search">
+  {# Тест 5, п. 1.1: «Фильтры» слева, «Найти» справа — в одной строке #}
+  <div class="cal-row">
+    <details class="filters" data-filters>
+      <summary class="btn btn--ghost btn--sm">Фильтры{% if filters_count %} · {{ filters_count }}{% endif %}</summary>
+      <div class="filters__body">
+        <div class="field"><label class="field__label" for="month">Месяц</label>
+          <select id="month" name="month"><option value="">Любой</option>{% for v, label in months %}<option value="{{ v }}"{% if v == month %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="field"><label class="field__label" for="discipline">Дисциплина</label>
+          <select id="discipline" name="discipline"><option value="">Все</option>{% for v, label in disciplines %}<option value="{{ v }}"{% if v == discipline %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="field"><label class="field__label" for="region">Регион</label>
+          <select id="region" name="region"><option value="">Все регионы</option>{% for v, label in regions %}<option value="{{ v }}"{% if v == region %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        {% if club %}<input type="hidden" name="club" value="{{ club.pk }}">{% endif %}
+        <div class="filters__checks">
+          <label class="check"><input type="checkbox" name="open" value="1"{% if only_open %} checked{% endif %}><span>Можно подать заявку <span class="table__sub" style="display: inline;">— приём заявок ещё идёт</span></span></label>
+          <label class="check"><input type="checkbox" name="past" value="1"{% if past %} checked{% endif %}><span>Показать прошедшие</span></label>
+        </div>
+        <div class="filters__actions"><button type="submit" class="btn btn--dark btn--sm" data-filter-apply>Применить</button></div>
       </div>
-      <div class="filters__actions"><button type="submit" class="btn btn--dark btn--sm">Применить</button></div>
-    </div>
-  </details>
+    </details>
+    <button class="btn btn--primary btn--sm cal-row__find" type="submit" data-require-btn>Найти</button>
+  </div>
 </form>
 
 {% if active %}

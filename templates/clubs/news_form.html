@@ -7,7 +7,7 @@
     <h1 class="h1">{% if item %}Изменить новость{% else %}Новая новость{% endif %}</h1>
     {% if item.hidden %}<div class="alert alert--error">Скрыта модератором: {{ item.hidden_reason }}</div>{% endif %}
     <form method="post" enctype="multipart/form-data" novalidate class="form">
-      {% csrf_token %}
+      {% csrf_token %}<input type="hidden" name="once" value="{{ once }}">
       {% include "partials/field.html" with field=form.title %}
       {% include "partials/field.html" with field=form.text %}
       {% include "partials/field.html" with field=form.tournament %}

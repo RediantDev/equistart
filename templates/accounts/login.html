@@ -2,20 +2,27 @@
 {% load static %}
 {% block title %}Вход — СтартЛист{% endblock %}
 {% block content %}
+{# Тест 5, п. 6.1: вместо крупной картинки — аккуратная шапка входа #}
 <section class="auth">
   <div class="card auth__card">
-    <div class="auth__logo"><img src="{% static 'brand/startlist-logo.svg' %}" width="200" alt="СтартЛист"></div>
-    <h1 class="h1">Вход</h1>
-    <p class="muted">По номеру телефона и паролю.</p>
+    <div class="auth__head">
+      <img class="auth__icon" src="{% static 'brand/startlist-icon.svg' %}" width="56" height="56" alt="">
+      <div>
+        <h1 class="h1 auth__title">Вход</h1>
+        <p class="muted auth__sub">Заявки, стартовые и результаты — в одном месте</p>
+      </div>
+    </div>
     <form method="post" novalidate class="form">
       {% csrf_token %}
       {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
       {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
       {% include "partials/field.html" with field=form.phone %}
       {% include "partials/field.html" with field=form.password %}
-      <button type="submit" class="btn btn--primary btn--block">Войти</button>
+      <div class="auth__forgot"><a href="{% url 'accounts:password_reset' %}">Забыли пароль?</a></div>
+      <button type="submit" class="btn btn--primary btn--block btn--lg">Войти</button>
     </form>
-    <p class="auth__switch">Нет аккаунта? <a href="{% url 'accounts:register' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Зарегистрироваться</a></p>
+    <div class="auth__divider"><span>или</span></div>
+    <a class="btn btn--ghost btn--block" href="{% url 'accounts:register' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Создать аккаунт</a>
   </div>
 </section>
 {% endblock %}

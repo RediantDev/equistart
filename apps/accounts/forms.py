@@ -154,7 +154,9 @@ class LoginForm(forms.Form):
 
 
 class AddRoleForm(forms.Form):
-    category = forms.ChoiceField(label="Роль", choices=Category.choices, widget=forms.RadioSelect)
+    # Тест 5, п. 22.1: можно выбрать сразу несколько ролей
+    category = forms.MultipleChoiceField(label="Роли", choices=Category.choices, widget=forms.CheckboxSelectMultiple,
+                                         error_messages={"required": "Выберите хотя бы одну роль."})
 
     def __init__(self, user: User, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -162,10 +164,11 @@ class AddRoleForm(forms.Form):
         self.fields["category"].choices = [(c.value, c.label) for c in user.missing_categories()]
 
     def save(self):
-        cat = self.cleaned_data["category"]
-        self.user.add_category(cat)
+        cats = self.cleaned_data["category"]
+        for cat in cats:
+            self.user.add_category(cat)
         self.user.save(update_fields=list(CATEGORY_FIELDS.values()))
-        return cat
+        return cats
 
 
 class ProfileForm(forms.Form):
@@ -199,3 +202,48 @@ class PhoneChangeForm(forms.Form):
         if not self.user.check_password(pw):
             raise ValidationError("Неверный пароль.")
         return pw
+
+
+class PasswordResetRequestForm(forms.Form):
+    """Восстановление пароля, шаг 1: номер телефона (тест 5, п. 6.3)."""
+
+    phone = forms.CharField(label="Телефон", max_length=32)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["phone"].widget.input_type = "tel"
+        self.fields["phone"].widget.attrs.update({"inputmode": "tel", "autocomplete": "username", "placeholder": "+7 900 000-00-00"})
+
+    def clean_phone(self):
+        try:
+            return normalize_phone(self.cleaned_data["phone"])
+        except ValidationError:
+            raise ValidationError("Проверьте номер: например, +7 900 000-00-00.")
+
+
+class PasswordResetConfirmForm(forms.Form):
+    """Шаг 2: код из СМС и новый пароль."""
+
+    code = forms.CharField(label="Код из СМС", max_length=8)
+    password1 = forms.CharField(label="Новый пароль", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+                                help_text="Не короче 8 символов, не только цифры.")
+    password2 = forms.CharField(label="Повторите пароль", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}))
+
+    def __init__(self, user=None, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+        self.fields["code"].widget.attrs.update({"inputmode": "numeric", "autocomplete": "one-time-code", "maxlength": "6", "class": "input-lg"})
+
+    def clean(self):
+        from django.contrib.auth.password_validation import validate_password
+
+        cleaned = super().clean()
+        p1, p2 = cleaned.get("password1"), cleaned.get("password2")
+        if p1 and p2 and p1 != p2:
+            self.add_error("password2", "Пароли не совпадают.")
+        elif p1:
+            try:
+                validate_password(p1, self.user)
+            except ValidationError as e:
+                self.add_error("password1", e)
+        return cleaned

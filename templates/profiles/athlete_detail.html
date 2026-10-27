@@ -15,8 +15,7 @@
       <h2 class="h3">Сведения</h2>
       <dl class="facts">
         <dt>Дата рождения</dt><dd>{{ a.birth_date|date:"d.m.Y"|default:"—" }}</dd>
-        <dt>Разряд — конкур</dt><dd>{{ a.get_rank_jumping_display|default:"—" }}</dd>
-        <dt>Разряд — выездка</dt><dd>{{ a.get_rank_dressage_display|default:"—" }}</dd>
+        <dt>Разряд / звание</dt><dd>{{ a.get_rank_display|default:"—" }}</dd>
         <dt>Тренер</dt><dd>{{ a.coach_name|default:"—" }}</dd>
         <dt>Клуб</dt><dd>{{ a.club|default:"—" }}</dd>
         <dt>Регион</dt><dd>{{ a.region|default:"—" }}</dd>
@@ -35,7 +34,7 @@
       <form method="post" action="{% url 'profiles:athlete_action' a.pk 'delegate' %}" class="inline-row">
         {% csrf_token %}<label class="visually-hidden" for="dphone">Телефон тренера</label>
         <input id="dphone" name="phone" type="tel" placeholder="Телефон тренера или менеджера">
-        <button class="btn btn--dark">Разрешить</button>
+        <button class="btn btn--dark" data-confirm="Разрешить владельцу номера {value} подавать заявки за {{ a.full_name }}? Разрешение можно отозвать в любой момент." data-confirm-field="phone" data-confirm-ok="Разрешить">Разрешить</button>
       </form>
     </section>
     {% endif %}

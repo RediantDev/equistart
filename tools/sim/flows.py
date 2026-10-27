@@ -70,12 +70,20 @@ def login(sc, person, label=""):
 
 # ---------------- профили ----------------
 
+_RANKS = ["", "none", "3y", "2y", "1y", "3", "2", "1", "kms", "ms", "msmk"]
+
+
+def _rank(rank_j="", rank_d=""):
+    """Разряд один на обе дисциплины (решение 27.10.2026): берём старший из переданных."""
+    return max(rank_j or "", rank_d or "", key=_RANKS.index)
+
+
 def add_athlete(b, person, rank_j="", rank_d="", coach=""):
     b.get("/athletes/new/")
     f = b.page.form(has_field="last_name")
     data = {"last_name": person.last, "first_name": person.first, "middle_name": person.middle,
             "birth_date": f"{person.birth_year}-{R.randint(1,12):02d}-{R.randint(1,28):02d}",
-            "rank_jumping": rank_j, "rank_dressage": rank_d, "club": person.club, "region": person.region,
+            "rank": _rank(rank_j, rank_d), "club": person.club, "region": person.region,
             "coach_name": coach, "consent": "on"}
     if b.level == "novice" and R.random() < 0.6:
         # новичок не отмечает согласие с первого раза
@@ -104,7 +112,7 @@ def fill_own_profile(b, person, rank_j="", rank_d=""):
             b.friction("Профиль спортсмена", "Нет кнопки «Изменить» в профиле", "high")
             return None
     f = b.page.form(has_field="birth_date")
-    data = {"birth_date": f"{person.birth_year}-{R.randint(1,12):02d}-{R.randint(1,28):02d}", "rank_jumping": rank_j, "rank_dressage": rank_d,
+    data = {"birth_date": f"{person.birth_year}-{R.randint(1,12):02d}-{R.randint(1,28):02d}", "rank": _rank(rank_j, rank_d),
             "club": person.club, "region": person.region}
     b.submit(f, data)
     m = re.search(r"/athletes/(\d+)/", b.page.url)

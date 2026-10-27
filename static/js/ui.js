@@ -13,6 +13,10 @@
   var MONTHS = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
   var MONTHS_GEN = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
   var WEEK = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  // Телефон: календарь и списки открываются без клавиатуры (тест 5, п. 13.1, 21.3)
+  var TOUCH = window.matchMedia && matchMedia("(pointer: coarse)").matches;
+  function focusSoft(x) { if (!TOUCH && x) x.focus(); }
+  function toTop(root) { if (window.innerWidth < 720) root.scrollIntoView({ behavior: "smooth", block: "start" }); }
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -140,11 +144,12 @@
       pop.hidden = false;
       root.classList.add("is-open");
       var r = btn.getBoundingClientRect();
-      root.classList.toggle("is-up", window.innerHeight - r.bottom < 280 && r.top > 300);
+      if (window.innerWidth < 720) { root.classList.remove("is-up"); if (window.innerHeight - r.bottom < 300) toTop(root); }  // тест 5, п. 15.1: поле поднимается, список — под ним
+      else root.classList.toggle("is-up", window.innerHeight - r.bottom < 280 && r.top > 300);
       openPopup = { root: root, close: close };
       var vis = items.filter(function (li) { return !li.hidden; });
       highlight(Math.max(0, vis.indexOf(items[sel.selectedIndex])));
-      if (filter) filter.focus();
+      if (filter) focusSoft(filter);
     }
     function close() {
       pop.hidden = true;
@@ -230,7 +235,7 @@
           if (iso(today) === iso(date)) b.classList.add("is-today");
           if ((date.getDay() + 6) % 7 > 4) b.classList.add("is-weekend");
           if ((min && date < min) || (max && date > max)) b.disabled = true;
-          b.onclick = function () { set(date); close(); vis.focus(); };
+          b.onclick = function () { set(date); close(); focusSoft(vis); };
           grid.appendChild(b);
         })(d);
       }
@@ -254,10 +259,12 @@
       pop.hidden = false;
       root.classList.add("is-open");
       openPopup = { root: root, close: close };
+      var r = root.getBoundingClientRect();
+      if (window.innerHeight - r.bottom < 360) toTop(root);
     }
     function close() { pop.hidden = true; root.classList.remove("is-open"); if (openPopup && openPopup.root === root) openPopup = null; }
     vis.addEventListener("click", open);
-    icon.addEventListener("click", function () { if (pop.hidden) { open(); vis.focus(); } else close(); });
+    icon.addEventListener("click", function () { if (pop.hidden) { open(); focusSoft(vis); } else close(); });
     vis.addEventListener("keydown", function (e) { if (e.key === "ArrowDown") { e.preventDefault(); open(); } if (e.key === "Enter") { e.preventDefault(); vis.blur(); } });
     vis.addEventListener("focus", function () { var d = parseIso(input.value); if (d) vis.value = pad(d.getDate()) + "." + pad(d.getMonth() + 1) + "." + d.getFullYear(); });
     vis.addEventListener("blur", function () {
@@ -311,7 +318,7 @@
       for (var m = 0; m < 60; m += 5) (function (m) {
         var b = el("button", "tp__cell", pad(m)); b.type = "button";
         if (c[1] === m) b.classList.add("is-selected");
-        b.onclick = function () { set(c[0] === null ? 10 : c[0], m); close(); vis.focus(); };
+        b.onclick = function () { set(c[0] === null ? 10 : c[0], m); close(); focusSoft(vis); };
         mg.appendChild(b);
       })(m);
       hc.appendChild(hg); mc.appendChild(mg);
@@ -327,7 +334,7 @@
     function close() { pop.hidden = true; root.classList.remove("is-open"); if (openPopup && openPopup.root === root) openPopup = null; }
     vis.addEventListener("click", open);
     vis.addEventListener("focus", function () { setTimeout(function () { vis.select(); }, 0); });  // ввод заменяет «23:59», а не дописывается
-    icon.addEventListener("click", function () { if (pop.hidden) { open(); vis.focus(); } else close(); });
+    icon.addEventListener("click", function () { if (pop.hidden) { open(); focusSoft(vis); } else close(); });
     vis.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); vis.blur(); close(); } });
     vis.addEventListener("blur", function () {
       var raw = vis.value.trim().replace(/[.,\-]/, ":");
@@ -339,6 +346,25 @@
   }
 
   /* ---------- Выбор файла ---------- */
+  // Тест 5, п. 16.1, 24.3–24.5: проверка формата по полю accept (не только PDF), понятная ошибка,
+  // фото — миниатюрой с крестиком, несколько файлов — несколько миниатюр.
+  function acceptOk(f, accept) {
+    if (!accept) return true;
+    var name = f.name.toLowerCase(), type = (f.type || "").toLowerCase();
+    return accept.split(",").some(function (a) {
+      a = a.trim().toLowerCase();
+      if (!a) return false;
+      if (a.charAt(0) === ".") return name.slice(-a.length) === a;
+      if (/\/\*$/.test(a)) return type.indexOf(a.slice(0, -1)) === 0;
+      return type === a;
+    });
+  }
+  function acceptHuman(accept) {
+    var map = { "application/pdf": "PDF", ".pdf": "PDF", "image/jpeg": "JPEG", ".jpg": "JPEG", ".jpeg": "JPEG", "image/png": "PNG", ".png": "PNG", "image/webp": "WEBP", ".webp": "WEBP", "image/heic": "HEIC", ".heic": "HEIC", "image/*": "фото" };
+    var out = [];
+    accept.split(",").forEach(function (a) { var h = map[a.trim().toLowerCase()]; if (h && out.indexOf(h) < 0) out.push(h); });
+    return out.join(", ");
+  }
   function enhanceFile(input) {
     if (input.dataset.ui) return;
     input.dataset.ui = "1";
@@ -346,29 +372,60 @@
     input.parentNode.insertBefore(root, input);
     root.appendChild(input);
     input.classList.add("file__native");
-    var btn = el("label", "btn btn--ghost btn--sm file__btn", "Выбрать файл");
+    var imgOnly = /^(image\/|\.(jpe?g|png|webp|heic))/i.test((input.accept || "").trim()) && !/pdf/i.test(input.accept || "");
+    var btn = el("label", "btn btn--ghost btn--sm file__btn", input.multiple ? (imgOnly ? "Добавить фото" : "Выбрать файлы") : (imgOnly ? "Выбрать фото" : "Выбрать файл"));
     if (!input.id) input.id = "f" + Math.random().toString(36).slice(2);
     btn.setAttribute("for", input.id);
-    var name = el("span", "file__name", "Файл не выбран");
+    var name = el("span", "file__name", input.multiple ? "Файлы не выбраны" : "Файл не выбран");
     var clear = el("button", "file__clear", "×"); clear.type = "button"; clear.hidden = true; clear.setAttribute("aria-label", "Убрать файл");
-    root.appendChild(btn); root.appendChild(name); root.appendChild(clear);
+    var thumbs = el("div", "file__thumbs"); thumbs.hidden = true;
+    root.appendChild(btn); root.appendChild(name); root.appendChild(clear); root.appendChild(thumbs);
     var err = el("p", "field__error"); err.hidden = true; err.setAttribute("role", "alert"); root.appendChild(err);
-    function sync() {
-      var f = input.files && input.files[0];
-      var maxMb = +input.getAttribute("data-max-mb") || 0, bad = "";
-      if (f && /pdf/.test(input.accept || "") && !/\.pdf$/i.test(f.name)) bad = "Нужен файл в формате PDF.";
-      else if (f && maxMb && f.size > maxMb * 1048576) bad = "Файл больше " + maxMb + " МБ — уменьшите его и выберите снова.";
-      err.textContent = bad; err.hidden = !bad;
-      if (bad) { input.value = ""; f = null; }
-      name.textContent = f ? f.name + " · " + (f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + " КБ" : (f.size / 1048576).toFixed(1).replace(".", ",") + " МБ") : "Файл не выбран";
-      root.classList.toggle("has-file", !!f);
-      clear.hidden = !f;
+    function size(f) { return f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + " КБ" : (f.size / 1048576).toFixed(1).replace(".", ",") + " МБ"; }
+    function removeAt(idx) {
+      try {
+        var dt = new DataTransfer();
+        Array.prototype.forEach.call(input.files, function (f, i) { if (i !== idx) dt.items.add(f); });
+        input.files = dt.files;
+      } catch (e) { input.value = ""; }
+      sync(); fire(input, "change");
     }
-    input.addEventListener("change", sync);
+    function sync() {
+      var files = Array.prototype.slice.call(input.files || []);
+      var maxMb = +input.getAttribute("data-max-mb") || 0, bad = "";
+      files.forEach(function (f) {
+        if (bad) return;
+        if (!acceptOk(f, input.accept)) bad = "«" + f.name + "» — неподходящий формат." + (acceptHuman(input.accept || "") ? " Подходят: " + acceptHuman(input.accept) + "." : "");
+        else if (maxMb && f.size > maxMb * 1048576) bad = "«" + f.name + "» больше " + maxMb + " МБ — уменьшите файл и выберите снова.";
+      });
+      err.innerHTML = bad ? '<span aria-hidden="true">!</span> ' : ""; err.appendChild(document.createTextNode(bad)); err.hidden = !bad;
+      var f0 = root.closest(".field"); if (f0) f0.classList.toggle("field--error", !!bad);
+      if (bad) { input.value = ""; files = []; if (window.SL && SL.toast) SL.toast(bad, "error"); }
+      thumbs.innerHTML = "";
+      var imgs = files.filter(function (f) { return /^image\//.test(f.type) && !/heic/i.test(f.type); });
+      thumbs.hidden = !imgs.length;
+      files.forEach(function (f, i) {
+        if (!/^image\//.test(f.type) || /heic/i.test(f.type)) return;
+        var t = el("div", "file__thumb");
+        var im = el("img"); im.alt = f.name; im.src = URL.createObjectURL(f); im.onload = function () { URL.revokeObjectURL(im.src); };
+        var x = el("button", "file__thumb-x", "×"); x.type = "button"; x.setAttribute("aria-label", "Убрать " + f.name);
+        x.onclick = function () { removeAt(i); };
+        t.appendChild(im); t.appendChild(x); thumbs.appendChild(t);
+      });
+      var others = files.filter(function (f) { return imgs.indexOf(f) < 0; });
+      name.textContent = !files.length ? (input.multiple ? "Файлы не выбраны" : "Файл не выбран")
+        : others.length ? others.map(function (f) { return f.name + " · " + size(f); }).join(", ") + (imgs.length ? " и фото: " + imgs.length : "")
+        : (imgs.length > 1 ? "Фото: " + imgs.length : "");
+      root.classList.toggle("has-file", files.length > 0);
+      root.classList.toggle("has-thumbs", imgs.length > 0);
+      clear.hidden = !files.length || (imgs.length > 0 && !others.length);
+    }
+    input.addEventListener("change", function (e) { if (e.isTrusted !== false || !root._syncing) sync(); });
     clear.addEventListener("click", function () { input.value = ""; sync(); fire(input, "change"); });
     root.addEventListener("dragover", function (e) { e.preventDefault(); root.classList.add("is-drag"); });
     root.addEventListener("dragleave", function () { root.classList.remove("is-drag"); });
     root.addEventListener("drop", function (e) { e.preventDefault(); root.classList.remove("is-drag"); if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; sync(); fire(input, "change"); } });
+    sync();
   }
 
   /* ---------- Условный показ: data-show-when="name=v1,v2" | "name:checked" | "name!=" ---------- */
@@ -423,14 +480,19 @@
     var cur = 0;
     var bad = panes.findIndex(function (p) { return p.querySelector(".field--error, .alert--error"); });
     if (bad >= 0) cur = bad;
+    else { var hm = /^#step-(\d+)$/.exec(location.hash); if (hm && panes[+hm[1] - 1]) cur = +hm[1] - 1; }  // «Рассказ о клубе» → сразу шаг 2
     form.classList.add("is-stepped");
     function show(i) {
       cur = i;
       panes.forEach(function (p, j) { p.hidden = j !== i; });
       dots.forEach(function (d, j) { d.classList.toggle("is-current", j === i); d.classList.toggle("is-done", j < i); });
       var first = panes[i].querySelector("input:not([type=hidden]), button.sel__btn");
-      if (first && document.activeElement && document.activeElement !== document.body) first.focus();
+      if (first && !TOUCH && document.activeElement && document.activeElement !== document.body) first.focus({ preventScroll: true });
+      // Тест 5, п. 7.2: на новом шаге — плавно к первым полям
+      if (moved) { var top = (form.closest(".card") || form).getBoundingClientRect().top + window.scrollY - 80; window.scrollTo({ top: Math.max(0, top), behavior: "smooth" }); }
+      moved = true;
     }
+    var moved = false;
     function valid(p) {
       var ok = true;
       p.querySelectorAll("input[required], select[required]").forEach(function (inp) {
@@ -511,14 +573,7 @@
       sessionStorage.removeItem(SCROLL_KEY);
       // Ошибка в форме — плавно к первому полю с ошибкой (тест 4.2, п. 34)
       var err = document.querySelector(".field--error, .alert--error");
-      if (err && !err.closest(".messages")) {
-        setTimeout(function () {
-          err.scrollIntoView({ behavior: "smooth", block: "center" });
-          var ctl = err.querySelector("input:not([type=hidden]), textarea, .sel__btn");
-          if (ctl) ctl.focus({ preventScroll: true });
-        }, 60);
-        return;
-      }
+      if (err && !err.closest(".messages")) return;  // к ошибке ведёт smooth.js
       // Ссылка ведёт к блоку (#…) — плавно к нему, а не на прежнее место
       if (location.hash.length > 1) {
         var target = document.getElementById(location.hash.slice(1));
@@ -562,7 +617,15 @@
     if (!b || b.dataset.confirmed) return;
     e.preventDefault(); e.stopPropagation();
     var danger = b.classList.contains("btn--danger") || /удал|убра|отклон|отмен/i.test(b.textContent);
-    confirmDialog(b.getAttribute("data-confirm"), b.getAttribute("data-confirm-ok") || b.textContent.trim() || "Да", danger).then(function (ok) {
+    var text = b.getAttribute("data-confirm");
+    // {value} — значение поля формы (data-confirm-field), например телефон (тест 5, п. 18.2)
+    if (b.form && b.getAttribute("data-confirm-field")) {
+      var fld = b.form.elements[b.getAttribute("data-confirm-field")];
+      var v = fld ? fld.value.trim() : "";
+      if (!v) { if (fld) fld.focus(); return; }
+      text = text.replace("{value}", v);
+    }
+    confirmDialog(text, b.getAttribute("data-confirm-ok") || b.textContent.trim() || "Да", danger).then(function (ok) {
       if (!ok) return;
       b.dataset.confirmed = "1";
       if (b.form && (b.type === "submit" || b.tagName === "BUTTON")) {
@@ -622,17 +685,7 @@
     if (input.value) input.value = formatPhone(input.value);
   }
 
-  /* ---------- «Поделиться» ---------- */
-  document.addEventListener("click", function (e) {
-    var b = e.target.closest("[data-share]");
-    if (!b) return;
-    e.preventDefault();
-    var url = b.getAttribute("data-share") || location.href, title = b.getAttribute("data-share-title") || document.title;
-    if (navigator.share) { navigator.share({ title: title, url: url }).catch(function () {}); return; }
-    (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(function () {
-      var old = b.textContent; b.textContent = "Ссылка скопирована"; setTimeout(function () { b.textContent = old; }, 1800);
-    }).catch(function () { window.prompt("Скопируйте ссылку:", url); });
-  });
+  /* «Поделиться» — окно в smooth.js (тест 5, п. 2.2) */
 
   function init(scope) {
     scope = scope || document;
@@ -647,7 +700,7 @@
   }
   window.SL = { init: init };
   document.addEventListener("DOMContentLoaded", function () { init(document); restoreScroll(); });
-  document.addEventListener("htmx:afterSwap", function (e) { init(e.target); });
+  document.addEventListener("htmx:afterSettle", function (e) { init(e.target); });
 })();
 
 /* СтартЛист — меню на телефоне, раздел «Проведения», поля формы поддержки по теме (26.10.2026) */
@@ -666,26 +719,26 @@
   });
 
   // «Раздел: …» в «Проведении»
-  document.querySelectorAll("[data-start-drop]").forEach(function (box) {
-    var btn = box.querySelector(".start-drop__btn");
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-start-drop] .start-drop__btn");
     if (!btn) return;
-    btn.addEventListener("click", function () {
-      var open = box.classList.toggle("is-open");
-      btn.setAttribute("aria-expanded", open ? "true" : "false");
-    });
+    var box = btn.closest("[data-start-drop]");
+    var open = box.classList.toggle("is-open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
   });
 
   // Форма поддержки: показываем только поля, нужные выбранной теме (SUP-02)
-  var form = document.querySelector("[data-topic-form]");
-  if (form) {
+  function topicSync() {
+    var form = document.querySelector("[data-topic-form]");
+    if (!form) return;
     var sel = form.querySelector("select[name=topic]");
-    var sync = function () {
-      var v = sel ? sel.value : "";
-      form.querySelectorAll("[data-topics]").forEach(function (el) {
-        var on = !!v && el.getAttribute("data-topics").split(" ").indexOf(v) >= 0;
-        el.hidden = !on;
-      });
-    };
-    if (sel) { sel.addEventListener("change", sync); sync(); }
+    var v = sel ? sel.value : "";
+    form.querySelectorAll("[data-topics]").forEach(function (el) {
+      var on = !!v && el.getAttribute("data-topics").split(" ").indexOf(v) >= 0;
+      el.hidden = !on;
+    });
   }
+  document.addEventListener("change", function (e) { if (e.target.closest && e.target.closest("[data-topic-form] select[name=topic]")) topicSync(); });
+  topicSync();
+  document.addEventListener("htmx:afterSettle", topicSync);
 })();

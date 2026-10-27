@@ -20,6 +20,7 @@
             <span style="flex: 1 1 200px; min-width: 0;"><strong class="break">{% if m.user %}{{ m.user.full_name }}{% else %}{{ m.phone }}{% endif %}</strong>{% if manage %}<span class="table__sub" style="display: block;">{{ m.phone }}</span>{% endif %}</span>
             <span class="tag tag--lilac">{{ m.get_role_display }}</span>
             {% if m.state == "pending" %}<span class="chip chip--warning">Ждёт принятия</span>{% else %}<span class="chip chip--success">Принято</span>{% endif %}
+            {% if m.role == "stable" and m.state == "accepted" %}{% if m.stable_contact %}<span class="chip chip--info">Ответственный за денники</span>{% elif manage %}<form method="post" action="{% url 'tournaments:team_stable_contact' t.pk m.pk %}">{% csrf_token %}<button type="submit" class="btn btn--ghost btn--sm" title="Его имя и телефон увидят участники со своей бронью">Сделать ответственным за денники</button></form>{% endif %}{% endif %}
             {% if manage %}
               <form method="post" action="{% url 'tournaments:team_revoke' t.pk m.pk %}">{% csrf_token %}<button type="submit" class="btn btn--danger btn--sm">Отозвать</button></form>
             {% endif %}

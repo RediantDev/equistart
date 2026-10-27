@@ -6,7 +6,9 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
 
-from .forms import AddRoleForm, LoginForm, PhoneChangeForm, ProfileForm, RegistrationForm
+from .forms import (
+    AddRoleForm, LoginForm, PasswordResetConfirmForm, PasswordResetRequestForm, PhoneChangeForm, ProfileForm, RegistrationForm,
+)
 from .models import CATEGORY_FIELDS, Category
 
 
@@ -171,8 +173,8 @@ def add_role(request):
         return redirect("accounts:cabinet")
     form = AddRoleForm(request.user, request.POST or None)
     if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Роль добавлена.")
+        cats = form.save()
+        messages.success(request, "Роли добавлены." if len(cats) > 1 else "Роль добавлена.")
         return redirect("accounts:profile")
     return render(request, "accounts/add_role.html", {"form": form})
 
@@ -283,3 +285,64 @@ def change_password(request):
         messages.success(request, "Пароль изменён.")
         return redirect("accounts:profile")
     return render(request, "accounts/password.html", {"form": form})
+
+
+# ---------------- Восстановление пароля по СМС (тест 5, п. 6.3) ----------------
+
+RESET_KEY = "pwreset_phone"
+
+
+@require_http_methods(["GET", "POST"])
+def password_reset(request):
+    """Шаг 1. Не сообщаем, есть ли такой номер: ответ одинаковый (защита от перебора номеров)."""
+    from . import verification
+    from .models import User
+
+    if request.user.is_authenticated:
+        return redirect("accounts:password")
+    form = PasswordResetRequestForm(request.POST or None, initial={"phone": request.GET.get("phone", "")})
+    if request.method == "POST" and form.is_valid():
+        phone = form.cleaned_data["phone"]
+        user = User.objects.filter(phone=phone, is_active=True).first()
+        if user:
+            try:
+                verification.send_code(user, purpose="reset")
+            except ValueError as e:
+                form.add_error("phone", str(e))
+                return render(request, "accounts/password_reset.html", {"form": form})
+        request.session[RESET_KEY] = phone
+        messages.success(request, "Если этот номер зарегистрирован, мы отправили на него код.")
+        return redirect("accounts:password_reset_confirm")
+    return render(request, "accounts/password_reset.html", {"form": form})
+
+
+@require_http_methods(["GET", "POST"])
+def password_reset_confirm(request):
+    from apps.core.models import audit
+
+    from . import verification
+    from .models import User
+
+    phone = request.session.get(RESET_KEY)
+    if not phone:
+        return redirect("accounts:password_reset")
+    user = User.objects.filter(phone=phone, is_active=True).first()
+    form = PasswordResetConfirmForm(user, request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            if not user:
+                raise ValueError("Неверный код.")
+            verification.check_code(user, form.cleaned_data["code"])
+        except ValueError as e:
+            form.add_error("code", str(e))
+        else:
+            user.set_password(form.cleaned_data["password1"])
+            user.save(update_fields=["password"])
+            audit(user, "password.reset", user)
+            request.session.pop(RESET_KEY, None)
+            login(request, user, backend="apps.accounts.backends.PhoneBackend")
+            messages.success(request, "Пароль изменён — вы вошли в аккаунт.")
+            return redirect("accounts:cabinet")
+    from .phone import format_phone
+
+    return render(request, "accounts/password_reset_confirm.html", {"form": form, "phone": format_phone(phone)})

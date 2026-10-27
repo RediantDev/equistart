@@ -45,6 +45,15 @@
         <a class="btn btn--ghost btn--block" href="{% url 'accounts:password' %}">Сменить пароль</a>
       </div>
     </section>
+    {# Тест 5, п. 1.3: документы о персональных данных — в профиле #}
+    <section class="card">
+      <h2 class="h3">Документы</h2>
+      <div class="stack-sm" style="margin-top: var(--space-2);">
+        <a href="{% url 'core:privacy' %}">Обработка персональных данных</a>
+        <a href="{% url 'core:consent' %}">Согласие на обработку данных</a>
+        <a href="{% url 'support:faq' %}">Частые вопросы</a>
+      </div>
+    </section>
     <section class="card">
       <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="btn btn--dark btn--block">Выйти из аккаунта</button></form>
     </section>

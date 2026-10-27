@@ -8,10 +8,15 @@
     <p class="muted">Лошади, профилями которых вы управляете. Чужую лошадь можно выбрать в заявке через поиск.</p>
   </div>
   <div class="form-actions">
-    <a class="btn btn--ghost" href="{% url 'profiles:horse_search' %}">Найти лошадь</a>
     <a class="btn btn--primary" href="{% url 'profiles:horse_new' %}">+ Добавить лошадь</a>
   </div>
 </div>
+{# Тест 5, п. 14.1: вместо кнопки «Найти лошадь» — поле поиска; кличка или номер определяется автоматически #}
+<form method="get" action="{% url 'profiles:horse_search' %}" class="search" role="search" data-require-input>
+  <label class="visually-hidden" for="hq">Найти лошадь в сервисе</label>
+  <input id="hq" name="q" type="search" placeholder="Кличка или номер ФКСР" enterkeyhint="search">
+  <button class="btn btn--dark" data-require-btn>Найти</button>
+</form>
 {% if horses %}
   <div class="list-cards">
     {% for h in horses %}

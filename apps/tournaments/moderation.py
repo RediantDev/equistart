@@ -152,3 +152,62 @@ def decide(request, pk):
         messages.error(request, str(e))
         return redirect("moderation:detail", pk=pk)
     return redirect("moderation:queue")
+
+
+# ---------------- Модераторы (тест 5: «как добавить модератора, их может быть несколько») ----------------
+
+def _owner_required(view):
+    """Назначать и снимать модераторов может только главный модератор, который ведёт проект (решение 27.10.2026)."""
+    @wraps(view)
+    @login_required
+    def wrapper(request, *args, **kwargs):
+        if not (request.user.is_superuser and request.user.is_moderator):
+            raise PermissionDenied
+        return view(request, *args, **kwargs)
+
+    return wrapper
+
+
+@_owner_required
+def moderators(request):
+    from django.contrib import messages
+    from django.core.exceptions import ValidationError
+    from django.db import transaction
+    from django.shortcuts import redirect, render
+
+    from apps.accounts.models import User
+    from apps.accounts.phone import normalize_phone
+    from apps.core.models import audit
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        with transaction.atomic():
+            if action == "add":
+                try:
+                    phone = normalize_phone(request.POST.get("phone", ""))
+                except ValidationError:
+                    phone = None
+                u = User.objects.select_for_update().filter(phone=phone, is_active=True).first() if phone else None
+                if not u:
+                    messages.error(request, "Пользователь с таким телефоном не найден — пусть сначала зарегистрируется.")
+                elif u.is_moderator:
+                    messages.info(request, f"{u.full_name} уже модератор.")
+                else:
+                    u.is_moderator = True
+                    u.save(update_fields=["is_moderator"])
+                    audit(request.user, "user.moderator_on", u)
+                    messages.success(request, f"{u.full_name} — теперь модератор.")
+            elif action == "remove":
+                u = User.objects.select_for_update().filter(pk=request.POST.get("user"), is_moderator=True).first()
+                if not u:
+                    messages.info(request, "Этот пользователь уже не модератор.")
+                elif u.pk == request.user.pk:
+                    messages.error(request, "Снять роль с себя здесь нельзя.")
+                else:
+                    u.is_moderator = False
+                    u.save(update_fields=["is_moderator"])
+                    audit(request.user, "user.moderator_off", u)
+                    messages.success(request, f"{u.full_name} больше не модератор.")
+        return redirect("moderation:moderators")
+    mods = User.objects.filter(is_moderator=True).order_by("last_name", "first_name")
+    return render(request, "moderation/moderators.html", {"mods": mods})

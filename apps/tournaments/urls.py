@@ -7,6 +7,7 @@ app_name = "tournaments"
 urlpatterns = [
     path("t/<int:pk>/", views.public_detail, name="public"),
     path("t/<int:pk>/regulation.pdf", views.public_regulation, name="public_regulation"),
+    path("t/<int:pk>/regulation/", views.public_regulation_page, name="public_regulation_page"),
     path("organizer/", views.my_tournaments, name="mine"),
     path("organizer/new/", views.create, name="create"),
     path("organizer/t/<int:pk>/", views.hub, name="hub"),
@@ -25,6 +26,7 @@ urlpatterns = [
     path("organizer/t/<int:pk>/regulation.pdf", views.regulation_working, name="regulation_working"),
     path("organizer/t/<int:pk>/team/", views.team, name="team"),
     path("organizer/t/<int:pk>/team/<int:member_id>/revoke/", views.team_revoke, name="team_revoke"),
+    path("organizer/t/<int:pk>/team/<int:member_id>/stable-contact/", views.team_stable_contact, name="team_stable_contact"),
     path("cabinet/invitations/", views.invitations, name="invitations"),
     path("cabinet/invitations/<int:member_id>/", views.invitation_respond, name="invitation_respond"),
 ]
@@ -49,6 +51,7 @@ moderation_patterns = (
     [
         path("", moderation.queue, name="queue"),
         path("panel/", moderation.panel, name="panel"),
+        path("moderators/", moderation.moderators, name="moderators"),
         path("t/<int:pk>/", moderation.detail, name="detail"),
         path("t/<int:pk>/decide/", moderation.decide, name="decide"),
         path("clubs/", _club_mod("mod_queue"), name="clubs"),

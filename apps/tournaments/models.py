@@ -369,6 +369,8 @@ class TeamMember(models.Model):
     title = models.CharField("должность", max_length=80, blank=True, help_text="Главный судья, главный секретарь, курс-дизайнер… Прав не меняет.")
     category = models.CharField("судейская категория", max_length=20, blank=True, help_text="ВК, 1К, 2К, 3К, МК4*…")
     region = models.CharField("регион", max_length=120, blank=True)
+    stable_contact = models.BooleanField("ответственный за денники", default=False,
+                                         help_text="Его имя и телефон видит участник со своей бронью (решение 27.10.2026). Один на турнир.")
     state = models.CharField(max_length=16, choices=State.choices, default=State.PENDING)
     invited_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)

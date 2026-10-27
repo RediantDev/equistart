@@ -91,7 +91,9 @@ def class_reasons(athlete, horse, c: TournamentClass, year: int, height: int | N
         if c.rank_rule == TournamentClass.RankRule.NEVER:
             if r and rank_at_least(r, c.rank):
                 out.append(f"у всадника разряд {RANK_SHORT[r]} — зачёт для не выполнявших норматив {RANK_SHORT[c.rank]}")
-            elif not confirmed:
+            elif not r and not confirmed:
+                # Разряд в профиле указан и ниже нормы — подходит без подтверждения (решение 27.10.2026).
+                # Подтверждение нужно, только если разряд не указан.
                 out.append(f"подтвердите, что всадник не выполнял норматив {RANK_SHORT[c.rank]} и выше")
     age = year - horse.birth_year
     if c.horse_age_min and age < c.horse_age_min:
@@ -430,7 +432,7 @@ def quick_add(user, tournament_id, data: dict) -> list[Entry]:
     if athlete is None:
         athlete = Athlete.objects.create(
             last_name=data["last_name"].strip(), first_name=data["first_name"].strip(), middle_name=(data.get("middle_name") or "").strip(),
-            birth_date=data["birth_date"], rank_jumping=data["rank"], rank_dressage=data["rank"], club=(data.get("club") or "").strip(),
+            birth_date=data["birth_date"], rank=data["rank"], club=(data.get("club") or "").strip(),
             region=(data.get("region") or "").strip(), fksr_number=(data.get("fksr_number") or "").strip(),
             coach_name=(data.get("coach_name") or "").strip(), manager=user, added_by_judge=True, consent_confirmed_at=timezone.now())
         audit(user, "athlete.quick_add", athlete, tournament=t.pk)

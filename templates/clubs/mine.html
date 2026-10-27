@@ -1,96 +1,74 @@
 {% extends "base.html" %}
 {% block title %}Мой клуб — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
-    <h1 class="h1">{% if club %}{{ club.name }}{% else %}Профиль клуба{% endif %}</h1>
-    {% if club %}<div class="chips"><span class="chip{% if club.status == 'confirmed' %} chip--success{% elif club.status == 'returned' %} chip--danger{% elif club.status == 'review' %} chip--info{% endif %}">{{ club.get_status_display }}</span>
-      {% if club.is_public %}<a class="table__sub" href="{% url 'clubs:detail' club.pk %}">Публичная страница →</a>{% endif %}
-      <a class="table__sub" href="{% url 'clubs:team' %}">Управляющие: {{ club.members.count|add:1 }} →</a></div>{% endif %}
+{# Тест 5, п. 25.3: кабинет клуба по макету — статус, что заполнить, фото, новости, управляющие #}
+<a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
+
+<section class="club-status">
+  <div class="club-status__head">
+    {% if club.logo %}<img class="club-status__logo" src="{% url 'clubs:file' 'logo' club.pk %}" alt="">{% else %}<span class="club-status__logo club-status__logo--empty" aria-hidden="true">{{ club.name|slice:":1" }}</span>{% endif %}
+    <div style="min-width: 0;">
+      <h1 class="club-status__name">{{ club.name }}</h1>
+      <span class="chip{% if club.status == 'confirmed' %} chip--success{% elif club.status == 'returned' %} chip--danger{% elif club.status == 'review' %} chip--warning{% endif %}">{% if club.status == "review" %}На проверке у модератора{% else %}{{ club.get_status_display }}{% endif %}</span>
+    </div>
   </div>
-</div>
-
-{% if invites %}
-  <div class="alert alert--info">Вас пригласили управлять клубом: {% for m in invites %}«{{ m.club.name }}»{% if not forloop.last %}, {% endif %}{% endfor %}. <a href="{% url 'tournaments:invitations' %}">Принять приглашение</a> — и не создавайте второй профиль.</div>
-{% endif %}
-{% if not club %}
-  <div class="alert alert--info">Заполните профиль и отправьте на проверку. После подтверждения клуб появится в каталоге и организаторы смогут выбрать его местом проведения турнира.</div>
-{% elif club.status == "returned" %}
-  <div class="alert alert--error" role="alert"><strong>Модератор вернул профиль.</strong> {{ club.moderator_comment }}<br>Исправьте и нажмите «Сохранить и отправить на проверку».</div>
-{% elif club.status == "review" %}
-  <div class="alert alert--info" role="status">Профиль на проверке. Пока ждёте — можно добавлять фото и новости, они станут видны после подтверждения.</div>
-{% elif club.status == "draft" and missing %}
-  <div class="alert alert--warning">Чтобы отправить на проверку: {% for m in missing %}{{ m }} {% endfor %}</div>
-{% endif %}
-
-{% if similar %}<div class="alert alert--warning">В {{ club.settlement }} уже есть похожий клуб: {% for s in similar %}«{{ s.public_name }}»{% if not forloop.last %}, {% endif %}{% endfor %}. Если это ваш клуб — не создавайте второй профиль, напишите в поддержку, чтобы получить доступ.</div>{% endif %}
-<section class="card stack">
-  <h2 class="h2">Сведения</h2>
-  {% if club.is_public %}<p class="table__sub">Изменение названия, региона, города или адреса снова отправит профиль модератору. До решения все видят прежние данные.</p>{% endif %}
-  <form method="post" enctype="multipart/form-data" novalidate class="form">
-    {% csrf_token %}
-    {% if form.non_field_errors %}<div class="alert alert--error">{{ form.non_field_errors|join:" " }}</div>{% endif %}
-    {% include "partials/field.html" with field=form.name %}
-    <div class="grid-2">
-      {% include "partials/field.html" with field=form.region %}
-      {% include "partials/field.html" with field=form.settlement %}
-    </div>
-    {% include "partials/field.html" with field=form.address %}
-    {% include "partials/field.html" with field=form.description %}
-    <div class="grid-3">
-      {% include "partials/field.html" with field=form.phone %}
-      {% include "partials/field.html" with field=form.email %}
-      {% include "partials/field.html" with field=form.site %}
-    </div>
-    {% include "partials/field.html" with field=form.socials %}
-    {% if club.logo %}<div class="club-head"><img class="club-logo club-logo--lg" src="{% url 'clubs:file' 'logo' club.pk %}" alt="Текущий логотип"><label class="check"><input type="checkbox" name="logo_clear" value="1"><span>Убрать логотип</span></label></div>{% endif %}
-    {% include "partials/field.html" with field=form.logo %}
-    <div class="form__actions">
-      {% if not club or club.status == "draft" or club.status == "returned" %}
-        <button type="submit" name="submit" value="1" class="btn btn--primary">Сохранить и отправить на проверку</button>
-        <button type="submit" class="btn btn--ghost">Сохранить черновик</button>
-      {% else %}
-        <button type="submit" class="btn btn--primary">Сохранить</button>
-      {% endif %}
-    </div>
-  </form>
+  {% if club.status == "returned" %}<p class="club-status__text"><strong>Модератор вернул профиль:</strong> {{ club.moderator_comment }}</p>
+  {% elif club.status == "review" %}<p class="club-status__text">Обычно проверка занимает рабочий день. Пока ждёте — добавьте фото и первую новость: они появятся сразу после подтверждения.</p>
+  {% elif club.status == "draft" %}<p class="club-status__text">{% if missing %}Чтобы отправить на проверку: {% for m in missing %}{{ m|lower }} {% endfor %}{% else %}Всё заполнено — отправьте профиль на проверку модератору.{% endif %}</p>{% endif %}
+  <div class="club-status__actions">
+    <a class="btn btn--primary btn--sm" href="{% url 'clubs:detail' club.pk %}">{% if club.is_public %}Открыть страницу клуба{% else %}Посмотреть страницу клуба{% endif %}</a>
+    <a class="btn btn--sm club-status__ghost" href="?edit=1">{% if club.status == "draft" or club.status == "returned" %}Заполнить и отправить{% else %}Изменить сведения{% endif %}</a>
+  </div>
 </section>
 
-{% if club %}
-<section class="card stack" style="margin-top: var(--space-5);">
-  <h2 class="h2">Фото клуба <span class="tag">{{ club.photos.count }}</span></h2>
-  {% if club.photos.all %}
-    <div class="photo-grid">{% for p in club.photos.all %}
-      <figure><img src="{% url 'clubs:file' 'photo' p.pk %}" alt="{{ p.caption }}">
-        <figcaption class="photo-cap"><span class="table__sub">{{ p.caption|default:"Без подписи" }}</span>
-          <form method="post" action="{% url 'clubs:photo_delete' p.pk %}">{% csrf_token %}<button class="btn btn--ghost btn--sm" type="submit" aria-label="Удалить фото {{ p.caption }}">Удалить</button></form></figcaption></figure>
+{% if similar %}<div class="alert alert--warning" style="margin-top: var(--space-4);">В {{ club.settlement }} уже есть похожий клуб: {% for s in similar %}«{{ s.public_name }}»{% if not forloop.last %}, {% endif %}{% endfor %}. Если это ваш клуб — не создавайте второй профиль, напишите в поддержку, чтобы получить доступ.</div>{% endif %}
+
+<section class="card club-progress">
+  <div class="club-progress__head"><h2 class="h3" style="margin: 0;">Страница заполнена</h2><span class="label">{{ done }} / {{ checklist|length }}</span></div>
+  <div class="club-progress__bar"><span style="width: {% widthratio done checklist|length 100 %}%;"></span></div>
+  <ul class="club-check">
+    {% for label, ok, href in checklist %}
+      <li><a href="{{ href }}" class="club-check__row"><span class="club-check__mark{% if ok %} is-ok{% endif %}" aria-hidden="true">{% if ok %}✓{% endif %}</span><span{% if ok %} class="muted"{% endif %}>{{ label }}</span><span class="club-check__go" aria-hidden="true">›</span></a></li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card stack" id="photos">
+  <div class="club-progress__head"><h2 class="h3" style="margin: 0;">Фото</h2><span class="table__sub">{{ photos|length }}</span></div>
+  {% if photos %}
+    <div class="club-photos">{% for p in photos %}
+      <figure class="club-photo">
+        <img src="{% url 'clubs:file' 'photo' p.pk %}" alt="{{ p.caption|default:'Фото клуба' }}" loading="lazy">
+        {% if forloop.first %}<span class="club-photo__badge">Обложка</span>{% else %}<form method="post" action="{% url 'clubs:photo_cover' p.pk %}" class="club-photo__cover">{% csrf_token %}<button class="club-photo__btn" type="submit">Сделать обложкой</button></form>{% endif %}
+        <form method="post" action="{% url 'clubs:photo_delete' p.pk %}" class="club-photo__x">{% csrf_token %}<button type="submit" aria-label="Удалить фото" data-confirm="Удалить это фото?" data-confirm-ok="Удалить">×</button></form>
+      </figure>
     {% endfor %}</div>
   {% endif %}
   <form method="post" action="{% url 'clubs:photo_add' %}" enctype="multipart/form-data" class="form">
-    {% csrf_token %}
-    <div class="grid-2">
-      <div class="field"><label class="field__label" for="ph">Фото</label><input id="ph" type="file" name="file" accept="image/jpeg,image/png" required><p class="field__help">JPEG или PNG до 20 МБ.</p></div>
-      <div class="field"><label class="field__label" for="cap">Подпись</label><input id="cap" name="caption" maxlength="200" placeholder="Например, «Манеж 20×60»"></div>
-    </div>
-    <div class="form__actions"><button type="submit" class="btn btn--dark btn--sm">Добавить фото</button></div>
+    {% csrf_token %}<input type="hidden" name="once" value="{{ once }}">
+    <div class="field"><label class="field__label" for="ph">Добавить фото</label><input id="ph" type="file" name="file" accept="image/jpeg,image/png" data-max-mb="20" multiple required><p class="field__help">JPEG или PNG до 20 МБ, можно сразу несколько (до 10). Первое фото — обложка страницы.</p></div>
+    <div class="form__actions"><button type="submit" class="btn btn--dark btn--sm">Загрузить</button></div>
   </form>
 </section>
 
-<section class="card stack" style="margin-top: var(--space-5);">
-  <div class="page-head" style="margin: 0;"><h2 class="h2">Новости</h2><a class="btn btn--primary btn--sm" href="{% url 'clubs:news_new' %}">Написать новость</a></div>
+<section class="card stack" id="news">
+  <div class="club-progress__head"><h2 class="h3" style="margin: 0;">Новости</h2><a class="btn btn--primary btn--sm" href="{% url 'clubs:news_new' %}">+ Написать</a></div>
   {% if news %}
-    <div class="list-cards">{% for n in news %}
-      <article class="row-card">
-        <div style="flex: 1 1 180px; min-width: 0;"><span class="h3 row-card__title">{{ n.title }}</span>
-          <div class="table__sub">{{ n.published_at|date:"j E Y" }}{% if n.tournament %} · {{ n.tournament.pub_title|default:n.tournament.title }}{% endif %}{% if n.photos.all %} · фото: {{ n.photos.all|length }}{% endif %}</div>
-          {% if n.hidden %}<div class="alert alert--error" style="margin-top: var(--space-2);">Скрыта модератором: {{ n.hidden_reason }}</div>{% endif %}</div>
-        <a class="btn btn--ghost btn--sm" href="{% url 'clubs:news_edit' n.pk %}">Изменить</a>
-      </article>
+    <div class="club-news-list">{% for n in news %}
+      <a class="club-news-row" href="{% url 'clubs:news_edit' n.pk %}">
+        {% with ph=n.photos.all %}{% if ph %}<img src="{% url 'clubs:file' 'news' ph.0.pk %}" alt="" loading="lazy">{% else %}<span class="club-news-row__ph" aria-hidden="true">📰</span>{% endif %}{% endwith %}
+        <span style="min-width: 0; flex: 1;"><strong class="break">{{ n.title }}</strong><span class="table__sub" style="display: block;">{{ n.published_at|date:"j E Y" }}{% if n.tournament %} · к турниру {{ n.tournament.pub_title|default:n.tournament.title|truncatechars:30 }}{% endif %}</span>
+          {% if n.hidden %}<span class="chip chip--danger">Скрыта модератором: {{ n.hidden_reason }}</span>{% endif %}</span>
+        <span aria-hidden="true" class="muted">›</span>
+      </a>
     {% endfor %}</div>
   {% else %}
-    <p class="muted">Новостей пока нет. Расскажите о турнире, сборах или новом манеже.</p>
+    <p class="muted" style="margin: 0;">Новостей пока нет. Расскажите о турнире, сборах или новом манеже.</p>
   {% endif %}
 </section>
-{% endif %}
+
+<section class="card club-links">
+  <a href="{% url 'clubs:team' %}">Управляющие клубом<span class="muted">{{ members_count }} ›</span></a>
+  <a href="{% url 'core:calendar' %}?club={{ club.pk }}">Турниры на площадке клуба<span class="muted">{{ venue_t }} ›</span></a>
+</section>
 {% endblock %}

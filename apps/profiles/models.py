@@ -22,7 +22,6 @@ RANKS = [
 RANK_SHORT = {"none": "б/р", "3y": "III юн.", "2y": "II юн.", "1y": "I юн.", "3": "III", "2": "II", "1": "I", "kms": "КМС", "ms": "МС", "msmk": "МСМК"}
 # Шкала ЕВСК по возрастанию: для условий зачёта «не ниже …» и «не выполнявшие … и выше».
 RANK_ORDER = {code: i for i, (code, _) in enumerate(RANKS)}
-DISCIPLINE_RANK_FIELD = {"jumping": "rank_jumping", "dressage": "rank_dressage"}
 
 
 def rank_at_least(rank: str, minimum: str) -> bool:
@@ -55,8 +54,8 @@ class Athlete(models.Model):
     first_name = models.CharField("имя", max_length=100)
     middle_name = models.CharField("отчество", max_length=100, blank=True)
     birth_date = models.DateField("дата рождения", null=True, blank=True)
-    rank_jumping = models.CharField("разряд / звание — конкур", max_length=8, choices=RANKS, blank=True)
-    rank_dressage = models.CharField("разряд / звание — выездка", max_length=8, choices=RANKS, blank=True)
+    # Одно поле на обе дисциплины (решение заказчика 27.10.2026).
+    rank = models.CharField("разряд / звание", max_length=8, choices=RANKS, blank=True)
     fksr_number = models.CharField("номер ФКСР", max_length=40, blank=True)
     fei_id = models.CharField("FEI ID", max_length=20, blank=True)
     club = models.CharField("клуб", max_length=200, blank=True)
@@ -104,24 +103,16 @@ class Athlete(models.Model):
     def birth_year(self):
         return self.birth_date.year if self.birth_date else None
 
-    def rank_for(self, discipline: str | None) -> str:
-        """Код разряда по дисциплине (конкур или выездка); для прочих — лучший из двух."""
-        field = DISCIPLINE_RANK_FIELD.get(discipline or "")
-        if field:
-            return getattr(self, field) or ""
-        return max((self.rank_jumping, self.rank_dressage), key=lambda r: RANK_ORDER.get(r or "none", 0)) or ""
+    def rank_for(self, discipline: str | None = None) -> str:
+        """Код разряда. Разряд один для всех дисциплин (решение 27.10.2026); аргумент оставлен для совместимости."""
+        return self.rank or ""
 
     def rank_short_for(self, discipline: str | None) -> str:
         return RANK_SHORT.get(self.rank_for(discipline), "")
 
     @property
     def rank_short(self):
-        parts = []
-        if self.rank_jumping:
-            parts.append(f"конкур {RANK_SHORT[self.rank_jumping]}")
-        if self.rank_dressage:
-            parts.append(f"выездка {RANK_SHORT[self.rank_dressage]}")
-        return ", ".join(parts)
+        return RANK_SHORT.get(self.rank, "") if self.rank else ""
 
     def summary(self):
         parts = [str(self.birth_year) if self.birth_year else "", self.rank_short, self.club]

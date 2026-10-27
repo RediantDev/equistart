@@ -4,8 +4,10 @@
 {% block content %}
 <section class="auth">
   <div class="card auth__card auth__card--wide">
-    <div class="auth__logo"><img src="{% static 'brand/startlist-logo.svg' %}" width="200" alt="СтартЛист"></div>
-    <h1 class="h1">Регистрация</h1>
+    <div class="auth__head">
+      <img class="auth__icon" src="{% static 'brand/startlist-icon.svg' %}" width="56" height="56" alt="">
+      <div><h1 class="h1 auth__title">Регистрация</h1><p class="muted auth__sub">Три коротких шага — около минуты</p></div>
+    </div>
     <ol class="steps-mini" aria-label="Шаги регистрации" data-steps-nav>
       <li data-step-dot="1">1. О вас</li><li data-step-dot="2">2. Роли</li><li data-step-dot="3">3. Телефон и пароль</li>
     </ol>
@@ -26,14 +28,7 @@
 
       <fieldset class="form__group step-pane" data-step="2">
         <legend class="h3">Кем вы будете в СтартЛисте</legend>
-        {% include "partials/field.html" with field=form.categories hide_label=True %}
-        <ul class="field__help" style="margin: 0 0 var(--space-3); padding-left: 1.2em;">
-          <li><strong>Спортсмен</strong> — подаёте заявки на старты за себя.</li>
-          <li><strong>Тренер / представитель</strong> — подаёте заявки за своих спортсменов и лошадей.</li>
-          <li><strong>Организатор</strong> — создаёте турниры; в календаре они появляются после проверки модератором.</li>
-          <li><strong>Судья</strong> — судите на турнирах и можете создать турнир сами.</li>
-          <li><strong>Клуб</strong> — страница клуба; клуб проверяет модератор.</li>
-        </ul>
+        <div class="field{% if form.categories.errors %} field--error{% endif %}">{% include "partials/role_choices.html" with field=form.categories %}</div>
         <div class="form-actions step-pane__nav"><button type="button" class="btn btn--ghost" data-step-prev>Назад</button><button type="button" class="btn btn--primary" data-step-next>Далее</button></div>
       </fieldset>
 
