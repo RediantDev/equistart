@@ -79,19 +79,17 @@ class WizardTests(Base):
         self.assertEqual(t.status, Tournament.Status.DRAFT)
         self.assertFalse(t.venue.confirmed)
 
-    def test_yakutia_requires_zone(self):
+    def test_yakutia_uses_main_zone(self):
+        # тест 4: поле «Часовой пояс района» убрано — берётся основной пояс региона
         self.client.force_login(self.org)
         data = {"title": "Якутия", "starts_on": self.start.isoformat(), "venue_name": "Клуб", "venue_region": "sa",
-                "venue_settlement": "Якутск", "contact_name": "Клуб"}
-        resp = self.client.post(reverse("tournaments:create"), data)
-        self.assertContains(resp, "Выберите часовой пояс района")
-        data["venue_timezone"] = "Asia/Srednekolymsk"
+                "venue_settlement": "Якутск", "contact_name": "Клуб", "contact": "+79001112233"}
         self.client.post(reverse("tournaments:create"), data)
-        self.assertEqual(Tournament.objects.get().timezone, "Asia/Srednekolymsk")
+        self.assertEqual(Tournament.objects.get().timezone, "Asia/Yakutsk")
 
     def test_one_day_ignores_end_and_multiday_validates(self):
         self.client.force_login(self.org)
-        base = {"title": "X", "starts_on": self.start.isoformat(), "venue_name": "К", "venue_region": "mos", "venue_settlement": "Н", "contact_name": "О"}
+        base = {"title": "X", "starts_on": self.start.isoformat(), "venue_name": "К", "venue_region": "mos", "venue_settlement": "Н", "contact_name": "О", "contact": "+79001112233"}
         resp = self.client.post(reverse("tournaments:create"), {**base, "multiday": "on", "ends_on": self.start.isoformat()})
         self.assertContains(resp, "Дата окончания должна быть позже")
         self.client.post(reverse("tournaments:create"), {**base, "ends_on": (self.start - datetime.timedelta(days=5)).isoformat()})
@@ -304,7 +302,7 @@ class ModerationTests(Base):
         old = t.published_regulation
         self.client.force_login(self.org)
         self.client.post(reverse("tournaments:step", args=[t.pk, 3]), {
-            "revision": t.revision, "entry_deadline": t.entry_deadline.isoformat(), "cancel_terms": "x",
+            "revision": t.revision, "entry_deadline": t.entry_deadline.isoformat(), "entry_deadline_time": "18:00", "cancel_terms": "x",
             "regulation": SimpleUploadedFile("new.pdf", PDF + b"new", "application/pdf"),
         })
         t.refresh_from_db()
@@ -407,3 +405,22 @@ class TeamTests(Base):
         t = self.make_ready()
         self.client.force_login(self.coach)
         self.assertEqual(self.client.get(reverse("tournaments:team", args=[t.pk])).status_code, 403)
+
+
+class ContactPhoneVisibilityTests(Base):
+    """Решение 26.10.2026: телефон контакта турнира виден только вошедшим (ISSUES-run1 №32)."""
+
+    def test_guest_sees_login_hint_instead_of_phone(self):
+        t = self.publish(self.make_ready())
+        resp = self.client.get(reverse("tournaments:public", args=[t.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "000-00-00")
+        self.assertNotContains(resp, "tel:")
+        self.assertContains(resp, "Войдите, чтобы увидеть телефон")
+
+    def test_logged_in_user_sees_phone(self):
+        t = self.publish(self.make_ready())
+        self.client.force_login(self.coach)
+        resp = self.client.get(reverse("tournaments:public", args=[t.pk]))
+        self.assertContains(resp, "000-00-00")
+        self.assertNotContains(resp, "Войдите, чтобы увидеть телефон")

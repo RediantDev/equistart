@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Судья · {{ p.name }} — EquiStart{% endblock %}
+{% block title %}Судья · {{ p.name }} — СтартЛист{% endblock %}
 {% block content %}
 <div class="live">
   <div class="live__head">
@@ -25,8 +25,8 @@
         <button class="btn btn--primary btn--block">Сохранить и следующий</button>
       </form>
       {% if current.status == "waiting" %}
-        <form method="post" action="{% url 'conduct:action' t.pk p.pk 'status' %}" class="live__extra">{% csrf_token %}<input type="hidden" name="slot" value="{{ current.pk }}"><input type="hidden" name="next" value="{% url 'conduct:live' t.pk p.pk %}">
-          <button class="btn btn--ghost btn--sm" name="status" value="started">На поле</button><button class="btn btn--ghost btn--sm" name="status" value="no_show">Не явился</button><button class="btn btn--ghost btn--sm" name="status" value="withdrawn">Снят</button></form>
+        <form method="post" action="{% url 'conduct:action' t.pk p.pk 'participation' %}" class="live__extra">{% csrf_token %}<input type="hidden" name="slot" value="{{ current.pk }}"><input type="hidden" name="next" value="{% url 'conduct:live' t.pk p.pk %}">
+          <button class="btn btn--ghost btn--sm" name="value" value="skip">Не стартует</button></form>
       {% endif %}
     </section>
   {% else %}

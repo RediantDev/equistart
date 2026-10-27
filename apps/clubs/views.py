@@ -32,7 +32,9 @@ def club_list(request):
     region = request.GET.get("region", "")
     qs = Club.objects.filter(confirmed_at__isnull=False, merged_into__isnull=True)
     if q:
-        qs = qs.filter(Q(pub_name__icontains=q) | Q(pub_settlement__icontains=q))
+        # тест 4.2: одно поле поиска — название, город или регион
+        regs = [code for code, label in REGION_CHOICES if q.lower() in label.lower()]
+        qs = qs.filter(Q(pub_name__icontains=q) | Q(pub_settlement__icontains=q) | Q(pub_region__in=regs))
     if region:
         qs = qs.filter(pub_region=region)
     return render(request, "clubs/list.html", {"clubs": qs.order_by("pub_name"), "q": q, "region": region, "regions": REGION_CHOICES})
@@ -156,7 +158,11 @@ def news_edit(request, pk=None):
     club = _my_club(request.user)
     if not club:
         raise Http404
-    item = get_object_or_404(ClubNews, pk=pk, club=club) if pk else None
+    item = ClubNews.objects.filter(pk=pk, club=club).first() if pk else None
+    if pk and not item:
+        # «Назад» после удаления новости: без технической страницы 404
+        messages.info(request, "Этой новости уже нет — возможно, она удалена.")
+        return redirect("clubs:mine")
     form = NewsForm(club, request.POST or None, request.FILES or None, instance=item)
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():

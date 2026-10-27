@@ -1,61 +1,70 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Заявки — {{ t.pub_title|default:t.title }} — EquiStart{% endblock %}
+{% block title %}Заявки — {{ t.pub_title|default:t.title }} — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <a class="back" href="{% if is_manager %}{% url 'tournaments:step' t.pk 4 %}{% else %}{% url 'conduct:overview' t.pk %}{% endif %}">← {{ t.title }}</a>
-    <h1 class="h1">Заявки турнира</h1>
-    <div class="chips">{% for label, n, color in counts %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>
+    {% include "partials/crumbs.html" with here="Заявки" %}
+    <h1 class="h1">Заявки</h1>
+    <p class="muted">{{ t.pub_title|default:t.title }}</p>
   </div>
-  <div class="form-actions"><a class="btn btn--dark" href="{% url 'conduct:overview' t.pk %}">Проведение</a>{% if t.publication == "published" %}<a class="btn btn--ghost" href="{% url 'entries:apply' t.pk %}?late=1">+ Добавить участника</a>{% endif %}</div>
+  <div class="form-actions">
+    {% if t.publication == "published" %}<a class="btn btn--ghost" href="{% url 'entries:quick_add' t.pk %}">+ Добавить участника</a>{% endif %}
+    <a class="btn btn--dark" href="{% url 'conduct:overview' t.pk %}">Проведение</a>
+  </div>
 </div>
-<form method="get" class="filters__body" style="margin: 0 0 var(--space-4);">
-  <div class="field"><label class="field__label" for="q">Поиск</label><input id="q" name="q" type="search" value="{{ f.q }}" placeholder="Спортсмен, лошадь, контакт"></div>
-  <div class="field"><label class="field__label" for="program">Программа</label><select id="program" name="program"><option value="">Все</option>{% for p in programs %}<option value="{{ p.pk }}"{% if f.program == p.pk|stringformat:"s" %} selected{% endif %}>{{ p.day|date:"d.m" }} · {{ p.name }}</option>{% endfor %}</select></div>
-  <div class="field"><label class="field__label" for="decision">Решение</label><select id="decision" name="decision"><option value="">Любое</option>{% for v, l in decisions %}<option value="{{ v }}"{% if v == f.decision %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
-  <div class="filters__actions"><button class="btn btn--dark btn--sm">Показать</button></div>
-</form>
-{% if entries %}
-<form method="post" action="{% url 'entries:decide' t.pk %}">
-  {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
-  <input type="hidden" name="f_q" value="{{ f.q }}"><input type="hidden" name="f_decision" value="{{ f.decision }}"><input type="hidden" name="f_program" value="{{ f.program }}">
-  <div class="bulk-bar bulk-bar--sticky">
-    <label class="check"><input type="checkbox" id="pick-page"><span>Все на странице</span></label>
-    <select name="action" aria-label="Действие" style="width: auto;">{% for v, l in actions.items %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
-    <button class="btn btn--dark btn--sm">Выбранные…</button>
-    <button class="btn btn--ghost btn--sm" name="scope" value="filter">Все по фильтру ({{ total }})…</button>
-  </div>
-  <p class="table__sub">Показано {{ page.start_index }}–{{ page.end_index }} из {{ total }}.{% if not f.decision %} Совет: фильтр «Решение: На рассмотрении» оставит только то, что ждёт решения.{% endif %}</p>
-  <div class="table-wrap">
-    <table class="table table--cards">
-      <thead><tr><th><span class="visually-hidden">Выбор</span></th><th>Спортсмен / лошадь</th><th>Программа и зачёт</th><th>Состояние</th><th>Заявка</th></tr></thead>
-      <tbody>
-      {% for e in entries %}
-        <tr{% if not e.is_active %} class="is-muted"{% endif %}>
-          <td><input type="checkbox" name="entry" value="{{ e.pk }}" aria-label="Выбрать {{ e.athlete_snapshot.name }}"{% if e.decision == "cancelled" %} disabled{% endif %}><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}"></td>
-          <td><strong>{{ e.athlete_snapshot.name }}</strong><span class="table__sub">{{ e.athlete_snapshot.birth_date|isodate|default:"дата рождения не указана" }} · {{ e.athlete_snapshot.rank }} · {{ e.athlete_snapshot.club }}</span><span class="table__sub">{{ e.horse_snapshot.name }} · {{ e.horse_snapshot.birth_year }} · {{ e.horse_snapshot.sex }}</span></td>
-          <td>{{ e.program_name }}<span class="table__sub">{{ e.day|date:"j E" }} · {{ e.class_name }}</span></td>
-          <td>{% include "entries/_entry_chips.html" %}</td>
-          <td><a href="{% url 'entries:application' e.application_id %}">№{{ e.application_id }}</a><span class="table__sub">{{ e.application.contact_name }}</span><span class="table__sub num">{{ e.application.contact_phone|phone }}</span></td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</form>
-{% if page.has_other_pages %}
-<nav class="pager" aria-label="Страницы">
-  {% if page.has_previous %}<a class="btn btn--ghost btn--sm" href="?{{ params }}{% if params %}&{% endif %}page={{ page.previous_page_number }}">← Назад</a>{% endif %}
-  <span class="label">Страница {{ page.number }} из {{ page.paginator.num_pages }}</span>
-  {% if page.has_next %}<a class="btn btn--ghost btn--sm" href="?{{ params }}{% if params %}&{% endif %}page={{ page.next_page_number }}">Дальше →</a>{% endif %}
+
+<nav class="tabs tabs--wrap" aria-label="Решение по заявкам" style="margin-top: 0;">
+  {% for k, label, n in tabs %}<a class="tabs__item{% if tab == k %} is-active{% endif %}" href="?tab={{ k }}{% if params %}&{{ params }}{% endif %}">{{ label }}{% if n %} <span class="count-pill{% if k != 'pending' %} count-pill--muted{% endif %}">{{ n }}</span>{% endif %}</a>{% endfor %}
 </nav>
-{% endif %}
-<script>
-(function () { var all = document.getElementById("pick-page"); if (!all) return;
-  all.addEventListener("change", function () { document.querySelectorAll('input[name="entry"]:not(:disabled)').forEach(function (c) { c.checked = all.checked; }); }); })();
-</script>
-{% else %}
-  <div class="card empty"><h2 class="h3">Заявок нет</h2><p class="muted">Когда участники подадут заявки, они появятся здесь.</p></div>
-{% endif %}
+
+<form method="get" class="filters-row">
+  <input type="hidden" name="tab" value="{{ tab }}">
+  <div class="field" style="flex: 2 1 240px;"><label class="field__label" for="q">Поиск</label><input id="q" name="q" type="search" value="{{ f.q }}" placeholder="Спортсмен, лошадь, контакт"></div>
+  <div class="field" style="flex: 1 1 220px;"><label class="field__label" for="program">Маршрут / езда</label><select id="program" name="program" onchange="this.form.submit()"><option value="">Все</option>{% for p in programs %}<option value="{{ p.pk }}"{% if f.program == p.pk|stringformat:"s" %} selected{% endif %}>{{ p.day|date:"j E" }} · {{ p.name }}</option>{% endfor %}</select></div>
+  <button class="btn btn--dark">Найти</button>
+</form>
+
+{% for g in groups %}
+  <section class="entry-group">
+    <h2 class="h3 entry-group__title">{% if g.p.start_time %}<span class="prog-row__time">{{ g.p.start_time|time:"H:i" }}</span> {% endif %}{{ g.p.name }}<span class="table__sub">{{ g.p.day|date:"l, j E" }} · пар: {{ g.n }}</span></h2>
+    {% for c in g.classes %}
+      <div class="entry-class">
+        <div class="entry-class__head"><strong>{{ c.c.label }}</strong><span class="table__sub">{{ c.c.conditions|default:"без ограничений" }} · {{ c.entries|length }}</span></div>
+        <ul class="entry-list">
+          {% for e in c.entries %}
+            <li class="entry-line" id="e{{ e.pk }}">
+              <div class="entry-line__who">
+                <strong>{{ e.athlete_snapshot.name }}</strong>
+                <span class="table__sub">{{ e.athlete_snapshot.birth_date|isodate|default:"дата рождения не указана" }}{% if e.athlete_snapshot.rank %} · {{ e.athlete_snapshot.rank }}{% endif %}{% if e.athlete_snapshot.club %} · {{ e.athlete_snapshot.club }}{% endif %}</span>
+              </div>
+              <div class="entry-line__horse"><strong>{{ e.horse_snapshot.name }}</strong><span class="table__sub">{{ e.horse_snapshot.birth_year }}{% if e.horse_snapshot.sex %} · {{ e.horse_snapshot.sex }}{% endif %}{% if e.horse_snapshot.color %} · {{ e.horse_snapshot.color }}{% endif %}</span></div>
+              <div class="entry-line__app"><a href="{% url 'entries:application' e.application_id %}">Заявка №{{ e.application_id }}</a><span class="table__sub">{{ e.application.contact_name }}{% if e.application.contact_phone %} · {{ e.application.contact_phone|phone }}{% endif %}</span>
+                {% if e.pending_proposal %}<span class="chip chip--warning">Изменение на рассмотрении</span>{% endif %}
+                {% if e.decision_reason and e.decision == "rejected" %}<span class="table__sub">Причина: {{ e.decision_reason }}</span>{% endif %}</div>
+              <div class="entry-line__act">
+                {% if e.decision == "pending" or e.decision == "rejected" %}
+                  <form method="post" action="{% url 'entries:decide' t.pk %}">{% csrf_token %}<input type="hidden" name="confirm" value="1"><input type="hidden" name="action" value="accept"><input type="hidden" name="items" value="{{ e.pk }}:{{ e.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="btn btn--primary btn--sm">Принять</button></form>
+                {% endif %}
+                {% if e.decision == "pending" or e.decision == "accepted" %}
+                  <details class="inline-details reject">
+                    <summary class="btn btn--danger btn--sm">Отклонить</summary>
+                    <form method="post" action="{% url 'entries:decide' t.pk %}" class="reject__form">{% csrf_token %}<input type="hidden" name="confirm" value="1"><input type="hidden" name="action" value="reject"><input type="hidden" name="items" value="{{ e.pk }}:{{ e.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+                      <label class="field"><span class="field__label">Причина — увидит подавший заявку</span><input name="reason" required placeholder="Например: не подходит по году рождения"></label>
+                      <button class="btn btn--danger btn--sm">Отклонить</button></form>
+                  </details>
+                {% endif %}
+                {% if e.decision == "cancelled" %}<span class="table__sub">{{ e.cancel_reason|default:"Отменено" }}</span>{% endif %}
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endfor %}
+  </section>
+{% empty %}
+  <div class="card empty"><h2 class="h3">{% if tab == "pending" %}Нет заявок на рассмотрении{% elif tab == "accepted" %}Принятых пока нет{% elif tab == "rejected" %}Отклонённых нет{% else %}Отменённых нет{% endif %}</h2>
+    {% if f.q or f.program %}<p class="muted">С учётом поиска. <a href="?tab={{ tab }}">Сбросить</a></p>{% endif %}</div>
+{% endfor %}
 {% endblock %}

@@ -88,8 +88,8 @@ def book(user, category_id, horse, arrive, depart, key, required=False, contact_
     t = c.tournament
     if not booking_open(t) or not c.is_active:
         raise ValueError("Бронирование в этой категории закрыто.")
-    if horse.manager_id != user.pk:
-        raise PermissionDenied
+    if horse.manager_id != user.pk and not can_stable(user, t):
+        raise PermissionDenied  # тест 4.2: организатор и конюшня бронируют за участника вручную
     check_period(c, arrive, depart)
     if Booking.objects.filter(tournament=t, horse=horse, state__in=Booking.HOLDING, arrive__lt=depart, depart__gt=arrive).exists():
         raise ValueError(f"У лошади «{horse.name}» уже есть бронь на эти даты.")
@@ -249,7 +249,7 @@ def order(user, service_id, quantity, key, horse=None, trailer="", for_date=None
     if s.recipient == Service.Recipient.HORSE:
         if horse is None:
             raise ValueError("Выберите лошадь.")
-        if horse.manager_id != user.pk:
+        if horse.manager_id != user.pk and not can_stable(user, t):
             raise PermissionDenied
         label = horse.name
     elif s.recipient == Service.Recipient.TRAILER:

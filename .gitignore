@@ -9,3 +9,8 @@ media/
 .DS_Store
 .idea/
 .vscode/
+
+# служебные файлы локальной работы
+_*.tgz
+test-result.txt
+qa_tmp_none/

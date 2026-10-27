@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Добавить участника — {{ t.pub_title|default:t.title }} — СтартЛист{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    {% url 'entries:manage' t.pk as em %}{% include "partials/crumbs.html" with mid="Заявки" mid_url=em here="Добавить участника" %}
+    <h1 class="h1">Добавить участника</h1>
+    <p class="muted">{{ t.pub_title|default:t.title }}. Быстрое добавление, если участник не смог подать заявку сам: выступление сразу принято и встанет в конец стартового порядка.</p>
+  </div>
+</div>
+<form method="post" novalidate class="form qa" id="qa" data-search-url="{% url 'entries:quick_search' t.pk %}">
+  {% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+  {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
+  <div class="qa__grid">
+    <section class="card qa__part" data-pick="athlete">
+      <div class="qa__step"><span class="pf-step__n">1</span><h2 class="h3">Всадник</h2></div>
+      {{ form.athlete_id }}
+      <div class="field qa-search"><label class="field__label" for="qa-athlete">Найти в базе</label>
+        <input id="qa-athlete" type="search" autocomplete="off" placeholder="Фамилия или имя" data-kind="athlete">
+        <ul class="qa-results" hidden></ul></div>
+      <div class="qa-picked" hidden><div><strong data-title></strong><span class="table__sub" data-sub></span></div><button type="button" class="btn btn--ghost btn--sm" data-unpick>Другой</button></div>
+      <div class="qa-fields">
+        <p class="table__sub">Нет в базе — заполните:</p>
+        <div class="grid-3">{% include "partials/field.html" with field=form.last_name %}{% include "partials/field.html" with field=form.first_name %}{% include "partials/field.html" with field=form.middle_name %}</div>
+        <div class="grid-2">{% include "partials/field.html" with field=form.birth_date %}{% include "partials/field.html" with field=form.rank %}</div>
+        <div class="grid-2">{% include "partials/field.html" with field=form.club %}{% include "partials/field.html" with field=form.region %}</div>
+        {% include "partials/field.html" with field=form.fksr_number %}
+      </div>
+      <div class="grid-2">{% include "partials/field.html" with field=form.coach_name %}{% include "partials/field.html" with field=form.coach_phone %}</div>
+    </section>
+
+    <section class="card qa__part" data-pick="horse">
+      <div class="qa__step"><span class="pf-step__n">2</span><h2 class="h3">Лошадь</h2></div>
+      {{ form.horse_id }}
+      <div class="field qa-search"><label class="field__label" for="qa-horse">Найти в базе</label>
+        <input id="qa-horse" type="search" autocomplete="off" placeholder="Кличка" data-kind="horse">
+        <ul class="qa-results" hidden></ul></div>
+      <div class="qa-picked" hidden><div><strong data-title></strong><span class="table__sub" data-sub></span></div><button type="button" class="btn btn--ghost btn--sm" data-unpick>Другая</button></div>
+      <div class="qa-fields">
+        <p class="table__sub">Нет в базе — заполните:</p>
+        <div class="grid-2">{% include "partials/field.html" with field=form.horse_name %}{% include "partials/field.html" with field=form.horse_year %}</div>
+        <div class="grid-3">{% include "partials/field.html" with field=form.horse_sex %}{% include "partials/field.html" with field=form.horse_color %}{% include "partials/field.html" with field=form.horse_breed %}</div>
+        <details{% if form.horse_passport.value or form.horse_sire.value %} open{% endif %}><summary class="label" style="cursor: pointer;">Паспорт, отец, место рождения, владелец</summary>
+          <div class="form" style="margin-top: var(--space-3);">
+            <div class="grid-2">{% include "partials/field.html" with field=form.horse_passport %}{% include "partials/field.html" with field=form.horse_sire %}</div>
+            <div class="grid-2">{% include "partials/field.html" with field=form.horse_birthplace %}{% include "partials/field.html" with field=form.horse_owner %}</div>
+          </div></details>
+      </div>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="qa__step"><span class="pf-step__n">3</span><h2 class="h3">Маршрут и зачёт</h2></div>
+    <div class="field{% if form.classes.errors %} field--error{% endif %}">
+      {% for p, items in groups %}
+        <div class="qa-prog"><div class="label">{% if p.start_time %}{{ p.start_time|time:"H:i" }} · {% endif %}{{ p.name }} <span class="table__sub" style="display: inline;">{{ p.day|date:"j E" }}</span></div>
+          <div class="tpl-grid">{% for k, c in items %}<label class="choice choice--sm"><input type="checkbox" name="classes" value="{{ k }}"{% if k in selected %} checked{% endif %}><span>{{ c.label }}<span class="table__sub">{{ c.conditions|default:"без ограничений" }}</span></span></label>{% endfor %}</div></div>
+      {% endfor %}
+      {% for error in form.classes.errors %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ error }}</p>{% endfor %}
+    </div>
+  </section>
+
+  <div class="form-actions">
+    <button class="btn btn--ghost" name="more" value="1">Сохранить и добавить ещё</button>
+    <button class="btn btn--primary">Добавить</button>
+  </div>
+</form>
+<script>
+(function () {
+  var form = document.getElementById("qa"), url = form.dataset.searchUrl;
+  form.querySelectorAll("[data-pick]").forEach(function (part) {
+    var kind = part.dataset.pick, hidden = part.querySelector('input[name="' + kind + '_id"]');
+    var input = part.querySelector(".qa-search input"), list = part.querySelector(".qa-results");
+    var picked = part.querySelector(".qa-picked"), fields = part.querySelector(".qa-fields"), timer;
+    function setPicked(item) {
+      hidden.value = item ? item.id : "";
+      picked.hidden = !item; fields.hidden = !!item; part.querySelector(".qa-search").hidden = !!item;
+      if (item) { picked.querySelector("[data-title]").textContent = item.title; picked.querySelector("[data-sub]").textContent = item.sub; }
+      list.hidden = true;
+    }
+    input.addEventListener("input", function () {
+      clearTimeout(timer);
+      var q = input.value.trim();
+      if (q.length < 2) { list.hidden = true; return; }
+      timer = setTimeout(function () {
+        fetch(url + "?kind=" + kind + "&q=" + encodeURIComponent(q), { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (j) {
+          list.innerHTML = "";
+          if (!j.items.length) { var li = document.createElement("li"); li.className = "qa-results__empty"; li.textContent = "Не найдено — заполните поля ниже"; list.appendChild(li); }
+          j.items.forEach(function (it) {
+            var li = document.createElement("li"), b = document.createElement("button");
+            b.type = "button"; b.innerHTML = "<strong></strong><span class='table__sub'></span>";
+            b.querySelector("strong").textContent = it.title; b.querySelector("span").textContent = it.sub;
+            b.addEventListener("click", function () { setPicked(it); });
+            li.appendChild(b); list.appendChild(li);
+          });
+          list.hidden = false;
+        });
+      }, 200);
+    });
+    part.querySelector("[data-unpick]").addEventListener("click", function () { setPicked(null); input.value = ""; input.focus(); });
+    if (hidden.value) setPicked({ id: hidden.value, title: "Выбран ранее", sub: "" });
+  });
+})();
+</script>
+{% endblock %}

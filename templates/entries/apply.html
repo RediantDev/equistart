@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Заявка — {{ s.title }} — EquiStart{% endblock %}
+{% block title %}Заявка — {{ s.title }} — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
@@ -44,7 +44,7 @@
         {% else %}
           <form method="post" class="pair-form">
             {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="a" value="{{ pair.a.pk }}"><input type="hidden" name="h" value="{{ pair.h.pk }}"><input type="hidden" name="open" value="{{ pair.a.pk }}-{{ pair.h.pk }}">
-            <p class="table__sub">Выберите зачёт в нужных маршрутах и нажмите «Добавить выбранные». Недоступные зачёты показаны с причиной.</p>
+            <p class="table__sub">Отметьте зачёт в нужных маршрутах и нажмите «Добавить выбранные». Серые — не подходят паре, причина указана.</p>
             {% for row in pair.programs %}
               <div class="pair-prog">
                 <div class="pair-prog__head">
@@ -57,16 +57,20 @@
                     <button class="btn btn--ghost btn--sm" name="remove" value="{{ i }}" aria-label="Убрать {{ l.tclass.label }}">Убрать</button></div>
                 {% endfor %}
                 {% if row.opts %}
-                  <select name="sel_{{ row.p.pk }}" aria-label="Зачёт: {{ row.p.name }}" class="pair-prog__select">
-                    <option value="">— не участвует —</option>
-                    {% for o in row.opts %}<option value="{{ o.value }}"{% if o.why %} disabled{% endif %}>{{ o.label }}{% if o.why %} — {{ o.why|join:"; " }}{% elif o.conditions %} · {{ o.conditions }}{% endif %}</option>{% endfor %}
-                  </select>
+                  <div class="opt-grid" data-single="{% if row.p.heights|length > 1 %}0{% else %}1{% endif %}">
+                    {% for o in row.opts %}
+                      <label class="opt{% if o.why %} is-off{% endif %}"><input type="checkbox" name="sel_{{ row.p.pk }}" value="{{ o.value }}"{% if o.why %} disabled{% endif %}>
+                        <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">{% if o.why %}{{ o.why|join:"; " }}{% else %}{{ o.conditions|default:"без ограничений" }}{% endif %}</span></span></label>
+                    {% endfor %}
+                  </div>
+                  {% if row.p.heights|length > 1 %}<p class="table__sub" style="margin: 0;">Можно отметить несколько высот.</p>{% endif %}
                   {% if not row.has_ok %}<p class="table__sub">Паре не подходит ни один зачёт этого маршрута.</p>{% endif %}
+                  {% if row.need_birth %}<p class="table__sub">Часть зачётов закрыта: <a href="{% url 'profiles:athlete_edit' pair.a.pk %}?next={{ request.get_full_path|urlencode }}">укажите дату рождения всадника</a> — после сохранения вернётесь в заявку.</p>{% endif %}
                   {% if row.never %}<label class="check"><input type="checkbox" name="confirm_{{ row.p.pk }}" value="1"><span>Подтверждаю: не выполнял норматив, указанный в зачёте</span></label>{% endif %}
                 {% else %}<p class="table__sub">Зачётов нет.</p>{% endif %}
               </div>
             {% endfor %}
-            <div class="pair-form__actions"><button class="btn btn--primary btn--lg" name="action" value="add_many">Добавить выбранные</button></div>
+            <div class="pair-form__actions"><button class="btn btn--primary btn--lg" name="action" value="add_many" data-add-many>Добавить выбранные</button></div>
           </form>
         {% endif %}
       </section>
@@ -76,17 +80,20 @@
     <section class="card" id="add">
       <h2 class="h3">Добавить пару «всадник + лошадь»</h2>
       {% if not athletes %}
-        <div class="alert alert--warning">Сначала <a href="{% url 'profiles:athlete_new' %}">добавьте спортсмена</a>{% if user.is_athlete %} или <a href="{% url 'profiles:athlete_new' %}?me=1">создайте свой профиль спортсмена</a>{% endif %}.</div>
+        <div class="alert alert--warning">Сначала <a href="{% url 'profiles:athlete_new' %}?next={{ request.path|urlencode }}">добавьте спортсмена</a>{% if user.is_athlete %} или <a href="{% url 'profiles:athlete_new' %}?me=1&amp;next={{ request.path|urlencode }}">создайте свой профиль спортсмена</a>{% endif %}. После сохранения вы вернётесь сюда.</div>
       {% else %}
       <form method="post" class="form" novalidate>
         {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}">
         <div class="grid-2">
           <div class="field"><label class="field__label" for="athlete">Всадник</label>
-            <select id="athlete" name="athlete"><option value="">— выберите —</option>{% for a in athletes %}<option value="{{ a.pk }}">{{ a.full_name }}{% if a.birth_year %} ({{ a.birth_year }}){% endif %}</option>{% endfor %}</select>
-            <p class="field__help"><a href="{% url 'profiles:athlete_new' %}">+ новый спортсмен</a> — регистрация ему не нужна.</p></div>
+            <select id="athlete" name="athlete"><option value="">— выберите —</option>{% for a in athletes %}<option value="{{ a.pk }}"{% if a.pk == sel_a %} selected{% endif %}>{{ a.full_name }}{% if a.birth_year %} ({{ a.birth_year }}){% endif %}</option>{% endfor %}</select>
+            <p class="field__help"><a href="{% url 'profiles:athlete_new' %}?next={{ request.path|urlencode }}">+ новый спортсмен</a> — регистрация ему не нужна.</p></div>
           <div class="field"><label class="field__label" for="horse">Лошадь</label>
-            <select id="horse" name="horse"><option value="">— выберите —</option>{% for h in horses %}<option value="{{ h.pk }}">{{ h.name }} · {{ h.summary }}</option>{% endfor %}</select>
-            <p class="field__help"><a href="{% url 'profiles:horse_search' %}?next={{ request.get_full_path|urlencode }}">Найти лошадь в сервисе</a> или <a href="{% url 'profiles:horse_new' %}">добавить свою</a>.</p></div>
+            {% if horses %}<select id="horse" name="horse"><option value="">— выберите —</option>{% for h in horses %}<option value="{{ h.pk }}"{% if h.pk == sel_h %} selected{% endif %}>{{ h.name }} · {{ h.summary }}</option>{% endfor %}</select>
+            <p class="field__help"><a href="{% url 'profiles:horse_new' %}?next={{ request.path|urlencode }}">+ добавить свою лошадь</a> или <a href="{% url 'profiles:horse_search' %}?next={{ request.get_full_path|urlencode }}">найти в сервисе</a>.</p>
+            {% else %}<p class="muted" style="margin: 0 0 var(--space-2);">У вас пока нет лошадей.</p>
+            <a class="btn btn--primary" href="{% url 'profiles:horse_new' %}?next={{ request.path|urlencode }}">+ Добавить лошадь</a>
+            <p class="field__help">После сохранения вы вернётесь в заявку. Лошадь уже есть в сервисе? <a href="{% url 'profiles:horse_search' %}?next={{ request.get_full_path|urlencode }}">Найти её</a>.</p>{% endif %}</div>
         </div>
         <div class="form-actions"><button class="btn btn--dark" name="action" value="pair_add">+ Добавить пару</button></div>
       </form>
@@ -100,14 +107,51 @@
       <p class="muted">Выступлений в заявке: <strong>{{ lines|length }}</strong>{% if pairs|length > 1 %} · пар: {{ pairs|length }}{% endif %}</p>
       <form method="post" class="form" style="margin-top: var(--space-3);">
         {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="key" value="{{ key }}">
-        <div class="field"><label class="field__label" for="cn">Контактное лицо</label><input id="cn" name="contact_name" type="text" value="{{ user.full_name }}"></div>
-        <div class="field"><label class="field__label" for="cp">Телефон для связи</label><input id="cp" name="contact_phone" type="tel" value="{{ user.phone_display }}"><p class="field__help">Виден только организатору и судьям турнира.</p></div>
-        <div class="field"><label class="field__label" for="cm">Комментарий <span class="field__optional">необязательно</span></label><textarea id="cm" name="comment" rows="3"></textarea></div>
+        <div class="field"><label class="field__label" for="cn">Контактное лицо</label><input id="cn" name="contact_name" type="text" value="{% if request.POST.contact_name %}{{ request.POST.contact_name }}{% else %}{{ user.full_name }}{% endif %}"></div>
+        <div class="field"><label class="field__label" for="cp">Телефон для связи</label><input id="cp" name="contact_phone" type="tel" value="{% if request.POST.contact_phone %}{{ request.POST.contact_phone }}{% else %}{{ user.phone_display }}{% endif %}"><p class="field__help">Виден только организатору и судьям турнира.</p></div>
+        <div class="field"><label class="field__label" for="cm">Комментарий</label><textarea id="cm" name="comment" rows="3" maxlength="1000" placeholder="Необязательно">{{ request.POST.comment }}</textarea></div>
         <p class="field__help">Публично в протоколах будут: фамилия и имя, год рождения, разряд, клуб, тренер; кличка, год, пол, масть, порода лошади.</p>
         <p class="field__help">Денник и услуги для лошади можно заказать на странице турнира после отправки.</p>
-        <button class="btn btn--primary btn--block" name="action" value="submit"{% if not lines %} disabled{% endif %}>Отправить заявку</button>
+        <div class="alert alert--warning" data-pending hidden style="margin-bottom: var(--space-3);">
+          Отмечено зачётов: <strong data-pending-count>0</strong> — они ещё не в заявке.
+          <button type="button" class="btn btn--dark btn--sm btn--block" style="margin-top: 8px;" data-add-pending>Добавить выбранные</button>
+        </div>
+        <button class="btn btn--primary btn--block" name="action" value="submit" data-submit{% if not lines %} disabled{% endif %}>Отправить заявку</button>
+        {% if not lines %}<p class="field__help" data-submit-hint>Кнопка станет активной, когда в заявке будет хотя бы одно выступление: отметьте зачёт у пары и нажмите «Добавить выбранные».</p>{% endif %}
       </form>
     </section>
   </aside>
 </div>
+<script>
+(function () { // в маршруте с одной высотой — один зачёт
+  document.querySelectorAll('.opt-grid[data-single="1"]').forEach(function (g) {
+    g.addEventListener("change", function (e) {
+      if (!e.target.checked) return;
+      g.querySelectorAll("input[type=checkbox]").forEach(function (c) { if (c !== e.target) c.checked = false; });
+    });
+  });
+})();
+(function () { // тест первых пользователей: отмеченные, но не добавленные зачёты видны у кнопки отправки
+  var form = document.querySelector(".pair-form"), addBtn = document.querySelector("[data-add-many]");
+  var box = document.querySelector("[data-pending]"), cnt = document.querySelector("[data-pending-count]");
+  var submit = document.querySelector("[data-submit]");
+  if (!form || !addBtn || !box) return;
+  function count() { return form.querySelectorAll('.opt-grid input[type=checkbox]:checked').length; }
+  function sync() {
+    var n = count();
+    addBtn.textContent = n ? "Добавить выбранные (" + n + ")" : "Добавить выбранные";
+    addBtn.disabled = !n;
+    cnt.textContent = n;
+    box.hidden = !n;
+  }
+  form.addEventListener("change", sync);
+  box.querySelector("[data-add-pending]").addEventListener("click", function () {
+    if (form.requestSubmit) form.requestSubmit(addBtn); else addBtn.click();
+  });
+  if (submit) submit.closest("form").addEventListener("submit", function (e) {
+    if (count()) { e.preventDefault(); box.scrollIntoView({ behavior: "smooth", block: "center" }); }
+  });
+  sync();
+})();
+</script>
 {% endblock %}

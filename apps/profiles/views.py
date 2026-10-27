@@ -5,6 +5,7 @@ from django.db import IntegrityError, transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.accounts.models import User
@@ -48,13 +49,16 @@ def athlete_edit(request, pk=None):
                 a.manager = request.user
                 if myself:
                     a.linked_user = request.user
-            if form.cleaned_data.get("consent") and not a.consent_confirmed_at:
-                a.consent_confirmed_at = timezone.now()
+            if not a.consent_confirmed_at:
+                a.consent_confirmed_at = timezone.now()  # тест 4: отдельной галочки нет, согласие даётся при регистрации
             a.save()
             audit(request.user, "athlete.save", a, created=not athlete)
         messages.success(request, f"Спортсмен «{a.full_name}» сохранён.")
+        nxt = _back_to(request)
+        if nxt:
+            return redirect(nxt if athlete else _with_param(nxt, "athlete", a.pk))
         return redirect("profiles:athlete", pk=a.pk)
-    return render(request, "profiles/athlete_form.html", {"form": form, "athlete": athlete, "myself": myself})
+    return render(request, "profiles/athlete_form.html", {"form": form, "athlete": athlete, "myself": myself, "next": _back_to(request)})
 
 
 @login_required
@@ -119,11 +123,25 @@ def athlete_action(request, pk, action):
     return redirect("profiles:athlete", pk=a.pk)
 
 
+def _back_to(request):
+    """Адрес возврата (например, в заявку), если он безопасный."""
+    nxt = request.POST.get("next") or request.GET.get("next") or ""
+    if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        return nxt
+    return ""
+
+
+def _with_param(url, key, value):
+    base, _, frag = url.partition("#")
+    base += ("&" if "?" in base else "?") + f"{key}={value}"
+    return base + "#add"
+
+
 # ---------------- лошади ----------------
 
 @login_required
 def horses(request):
-    items = Horse.objects.filter(manager=request.user, archived=False)
+    items = Horse.objects.filter(manager=request.user, archived=False, added_by_judge=False)
     return render(request, "profiles/horses.html", {"horses": items})
 
 
@@ -152,8 +170,11 @@ def horse_edit(request, pk=None):
                 form.add_error("fksr_number", "Лошадь с таким номером ФКСР уже есть в сервисе.")
             else:
                 messages.success(request, f"Лошадь «{h.name}» сохранена. Внутренний код: {h.code}.")
+                nxt = _back_to(request)
+                if nxt and not horse:
+                    return redirect(_with_param(nxt, "horse", h.pk))
                 return redirect("profiles:horse", pk=h.pk)
-    return render(request, "profiles/horse_form.html", {"form": form, "horse": horse, "similar": similar})
+    return render(request, "profiles/horse_form.html", {"form": form, "horse": horse, "similar": similar, "next": _back_to(request)})
 
 
 @login_required

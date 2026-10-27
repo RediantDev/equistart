@@ -75,7 +75,19 @@ def page_not_found(request, exception=None):
     return _render(request, 404, 404, _message(exception))
 
 
+def _record_error(request):
+    """Счётчик «ошибки за сутки» на пульте. Сбой записи (например, база недоступна) не мешает показать страницу."""
+    try:
+        from .models import AuditLog
+
+        AuditLog.objects.create(action="service.error", target_type="service", target_id=0,
+                                data={"path": getattr(request, "path", "")[:200]})
+    except Exception:
+        log.warning("could not record server error", exc_info=True)
+
+
 def server_error(request):
+    _record_error(request)
     return _render(request, 500, 500)
 
 

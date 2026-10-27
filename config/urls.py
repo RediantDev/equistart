@@ -18,6 +18,7 @@ urlpatterns = [
     path("", include("apps.sport.urls")),
     path("", include("apps.stables.urls")),
     path("", include("apps.accounts.urls")),
+    path("", include("apps.support.urls")),
     path("", include("apps.core.urls")),
 ]
 

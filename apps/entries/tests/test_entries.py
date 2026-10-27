@@ -73,9 +73,8 @@ class Base(TestCase):
 class ProfileTests(Base):
     def test_athlete_requires_only_name_and_consent(self):
         self.client.force_login(self.coach)
+        # тест 4: отдельной галочки согласия в карточке спортсмена нет
         resp = self.client.post(reverse("profiles:athlete_new"), {"last_name": "Ким", "first_name": "Алина"})
-        self.assertContains(resp, "Без согласия")
-        resp = self.client.post(reverse("profiles:athlete_new"), {"last_name": "Ким", "first_name": "Алина", "consent": "on"})
         a = Athlete.objects.get(last_name="Ким")
         self.assertRedirects(resp, reverse("profiles:athlete", args=[a.pk]))
         self.assertEqual(a.manager, self.coach)

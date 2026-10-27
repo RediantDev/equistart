@@ -35,7 +35,7 @@ def _staff_tournament(request, pk):
 
 
 def _my_horses(user):
-    return Horse.objects.filter(manager=user, archived=False).order_by("name")
+    return Horse.objects.filter(manager=user, archived=False, added_by_judge=False).order_by("name")
 
 
 # ---------------- представитель ----------------
@@ -47,28 +47,51 @@ def book(request, pk):
     t = get_object_or_404(Tournament, pk=pk, publication__in=PUBLIC)
     cats = list(t.stable_categories.filter(is_active=True))
     svcs = list(t.services.filter(is_active=True))
+    staff = services.can_stable(request.user, t)
     horses = list(_my_horses(request.user))
+    if staff:
+        # тест 4.2: организатор и конюшня видят лошадей всех заявок турнира и могут ввести лошадь вручную
+        from apps.entries.models import Entry
+
+        ids = set(Entry.objects.filter(tournament=t).exclude(decision="cancelled").values_list("horse_id", flat=True))
+        ids |= set(t.bookings.values_list("horse_id", flat=True))
+        have = {h.pk for h in horses}
+        horses += [h for h in Horse.objects.filter(pk__in=ids - have).order_by("name")]
     preview, errors = None, []
     form = {"category": request.POST.get("category") or request.GET.get("category", ""), "horse": request.POST.get("horse", ""),
             "arrive": request.POST.get("arrive", ""), "depart": request.POST.get("depart", ""), "required": request.POST.get("required") == "on",
-            "contact_phone": request.POST.get("contact_phone", ""), "comment": request.POST.get("comment", ""), "key": request.POST.get("key") or uuid.uuid4().hex}
+            "contact_phone": request.POST.get("contact_phone", ""), "comment": request.POST.get("comment", ""), "key": request.POST.get("key") or uuid.uuid4().hex,
+            "new_horse": request.POST.get("new_horse", "").strip(), "new_owner": request.POST.get("new_owner", "").strip()}
     if request.method == "POST":
         try:
             c = next((x for x in cats if str(x.pk) == form["category"]), None)
             h = next((x for x in horses if str(x.pk) == form["horse"]), None)
             if not c:
                 raise ValueError("Выберите категорию денника.")
+            if staff and form["horse"] == "new":
+                if not form["new_horse"]:
+                    raise ValueError("Впишите кличку лошади.")
+                if request.POST.get("confirm") == "1":
+                    h = Horse.objects.create(name=form["new_horse"][:100], birth_year=0, color="", sex="", breed="",
+                                             owner_name=form["new_owner"][:200], manager=request.user, added_by_judge=True)
+                    form["horse"] = str(h.pk)
+                else:
+                    h = Horse(name=form["new_horse"])
             if not h:
-                raise ValueError("Выберите свою лошадь.")
+                raise ValueError("Выберите лошадь." if staff else "Выберите свою лошадь.")
             arrive, depart = _date(form["arrive"]), _date(form["depart"])
             services.check_period(c, arrive, depart)
             phone = ""
             if form["contact_phone"].strip():
                 phone = normalize_phone(form["contact_phone"])
                 if not phone:
-                    raise ValueError("Телефон: мобильный номер России, Казахстана или Беларуси.")
+                    raise ValueError("Телефон: мобильный номер с кодом страны, например +7 999 123-45-67.")
             if request.POST.get("confirm") == "1":
-                services.book(request.user, c.pk, h, arrive, depart, form["key"], form["required"], phone, form["comment"])
+                b = services.book(request.user, c.pk, h, arrive, depart, form["key"], form["required"], phone,
+                                  (form["comment"] + (f" Владелец/контакт: {form['new_owner']}" if form["new_owner"] else "")).strip())
+                if staff:
+                    messages.success(request, f"Бронь для «{h.name}» создана. Подтвердите её и назначьте номер денника.")
+                    return redirect(reverse("stables:manage", args=[t.pk]) + "?tab=bookings")
                 messages.success(request, "Бронь отправлена. Конюшня подтвердит её и назначит номер денника.")
                 return redirect("stables:my")
             free = services.free_for(c, arrive, depart)
@@ -81,7 +104,7 @@ def book(request, pk):
             errors.append(str(e))
     for c in cats:
         c.free_total = services.free_for(c, c.available_from, c.available_to)
-    return render(request, "stables/book.html", {"t": t, "cats": cats, "svcs": svcs, "horses": horses, "form": form, "preview": preview,
+    return render(request, "stables/book.html", {"t": t, "staff": staff, "cats": cats, "svcs": svcs, "horses": horses, "form": form, "preview": preview,
                                                  "errors": errors, "open": services.booking_open(t), "okey": uuid.uuid4().hex})
 
 
@@ -92,11 +115,11 @@ def order(request, pk):
     s = get_object_or_404(Service, pk=request.POST.get("service"), tournament=t)
     horse = None
     if request.POST.get("horse"):
-        horse = get_object_or_404(Horse, pk=request.POST["horse"], manager=request.user)
+        horse = get_object_or_404(Horse, pk=request.POST["horse"])
     try:
         services.order(request.user, s.pk, request.POST.get("quantity"), request.POST.get("key") or uuid.uuid4().hex, horse=horse,
                        trailer=request.POST.get("trailer", ""), for_date=_date(request.POST.get("for_date")), comment=request.POST.get("comment", ""))
-        messages.success(request, f"Заказ «{s.name}» оформлен. Оплата — в кассе турнира.")
+        messages.success(request, f"Заказ «{s.name}» оформлен.")
         return redirect("stables:my")
     except (ValueError, services.Conflict) as e:
         messages.error(request, str(e))

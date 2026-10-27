@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Помощь и частые вопросы — СтартЛист{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="h1">Помощь</h1>
+    <p class="muted">Ответы на частые вопросы. Не нашли ответ — напишите нам.</p>
+  </div>
+  <a class="btn btn--primary" href="{% url 'support:new' %}">Написать в поддержку</a>
+</div>
+{% if sections %}
+  {% if sections|length > 1 %}<nav class="chips" aria-label="Разделы">{% for code, label, rows in sections %}<a class="tag" href="#faq-{{ code }}">{{ label }}</a>{% endfor %}</nav>{% endif %}
+  {% for code, label, rows in sections %}
+    <section class="card section-gap" id="faq-{{ code }}">
+      <h2 class="h2">{{ label }}</h2>
+      {% for i in rows %}<details class="faq"><summary class="h3">{{ i.question }}</summary><div class="faq__answer">{{ i.answer|linebreaks }}</div></details>{% endfor %}
+    </section>
+  {% endfor %}
+{% else %}
+  <div class="card empty"><h2 class="h3">Раздел наполняется</h2><p class="muted">Пока ответов здесь нет — напишите в поддержку, ответим в течение 1 рабочего дня.</p></div>
+{% endif %}
+{% if telegram %}<p class="table__sub section-gap">Поддержка в Telegram: <a href="https://t.me/{{ telegram|cut:'@' }}" target="_blank" rel="noopener">@{{ telegram|cut:'@' }}</a></p>{% endif %}
+{% endblock %}

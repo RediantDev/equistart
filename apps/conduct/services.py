@@ -80,18 +80,23 @@ def draw(user, program_id) -> int:
     new = [e for e in Entry.objects.filter(program=p, decision=Entry.Decision.ACCEPTED) if e.pk not in existing and eligible(e, blocked)]
     top = p.slots.aggregate(m=Max("position"))["m"] or 0
     StartSlot.objects.bulk_create([StartSlot(program=p, entry=e, position=top + i) for i, e in enumerate(new, start=1)])
-    slots = list(p.slots.order_by("position"))
+    slots = list(p.slots.select_related("entry").order_by("position"))
     movable = [s for s in slots if s.status == StartSlot.Status.WAITING]
     positions = [s.position for s in movable]
-    random.shuffle(movable)
-    if len(p.heights) > 1:
-        movable.sort(key=lambda s: entry_height(s.entry) or 0)  # блоки по высотам, внутри блока — жребий (JMP-02)
+    before = [s.pk for s in movable]
+    # Жребий: если порядок совпал с прежним, тянем ещё раз — иначе кажется, что «жеребьёвка не работает» (тест 4)
+    for _ in range(20):
+        random.shuffle(movable)
+        if len(p.heights) > 1:
+            movable.sort(key=lambda s: entry_height(s.entry) or 0)  # блоки по высотам, внутри блока — жребий (JMP-02)
+        if [s.pk for s in movable] != before or len(movable) < 2:
+            break
     for pos, s in zip(sorted(positions), movable):
         s.position = pos
         s.save(update_fields=["position"])
     _recompute_times(p)
-    audit(user, "startlist.draw", p, added=len(new))
-    return len(new)
+    audit(user, "startlist.draw", p, added=len(new), shuffled=len(movable))
+    return {"added": len(new), "shuffled": len(movable)}
 
 
 @transaction.atomic
@@ -108,6 +113,22 @@ def add_missing(user, program_id) -> int:
     if new:
         audit(user, "startlist.add", p, added=len(new))
     return len(new)
+
+
+@transaction.atomic
+def force_add(user, program_id, entry_id) -> StartSlot:
+    """Тест 4.2: судья ставит принятую пару в порядок, даже если обязательный денник ещё не подтверждён."""
+    p = _lock_program(user, program_id)
+    e = Entry.objects.get(pk=entry_id, program=p)
+    if e.decision != Entry.Decision.ACCEPTED:
+        raise ValueError("Сначала примите заявку этой пары.")
+    if StartSlot.objects.filter(entry=e).exists():
+        raise ValueError("Пара уже в порядке.")
+    top = p.slots.aggregate(m=Max("position"))["m"] or 0
+    slot = StartSlot.objects.create(program=p, entry=e, position=top + 1)
+    _recompute_times(p)
+    audit(user, "startlist.force_add", p, entry=e.pk)
+    return slot
 
 
 @transaction.atomic
@@ -169,6 +190,87 @@ def set_status(user, slot_id, status, reason=""):
         r.updated_by = user
         r.save()
     audit(user, f"slot.{status}", slot.program, slot=slot.pk, reason=reason)
+
+
+@transaction.atomic
+def set_participation(user, slot_id, starts: bool):
+    """Тест 4: вместо «На поле / Снят / Не явился» — «Стартует / Не стартует». Можно вернуть обратно, пока нет результата."""
+    slot = StartSlot.objects.select_related("program", "entry").get(pk=slot_id)
+    p = _lock_program(user, slot.program_id)
+    slot.refresh_from_db()
+    off = (StartSlot.Status.WITHDRAWN, StartSlot.Status.NO_SHOW)
+    if starts:
+        if slot.status not in off:
+            return slot
+        slot.status = StartSlot.Status.WAITING
+        slot.save(update_fields=["status", "updated_at"])
+        r = Result.objects.filter(entry=slot.entry).first()
+        if r and r.status in (Result.Status.WITHDRAWN, Result.Status.NO_SHOW):
+            r.delete()
+        from .models import JumpRound
+        JumpRound.objects.filter(entry=slot.entry, status__in=["withdrawn", "no_show"]).delete()
+    else:
+        if slot.status == StartSlot.Status.FINISHED:
+            raise ValueError("Пара уже выступила — сначала уберите её результат.")
+        if slot.status in off:
+            return slot
+        slot.status = StartSlot.Status.WITHDRAWN
+        slot.save(update_fields=["status", "updated_at"])
+        if p.is_manual:
+            r, _ = Result.objects.get_or_create(entry=slot.entry)
+            r.status, r.updated_by = Result.Status.WITHDRAWN, user
+            r.save()
+    if not p.is_manual:
+        scoring.recompute(p)
+    audit(user, "slot.starts" if starts else "slot.skip", p, slot=slot.pk)
+    return slot
+
+
+SNAP_ATHLETE = ("name", "birth_year", "rank", "club", "region", "coach")
+SNAP_HORSE = ("name", "birth_year", "sex", "color", "breed")
+
+
+@transaction.atomic
+def edit_pair(user, entry_id, athlete: dict, horse: dict, tclass_id=None):
+    """Судья правит данные пары для протоколов этого турнира (снимок выступления, профиль не меняется)."""
+    e = Entry.objects.select_for_update(of=("self",)).select_related("program", "tournament").get(pk=entry_id)
+    require_judge(user, e.tournament)
+    a, h = dict(e.athlete_snapshot), dict(e.horse_snapshot)
+    old_year = a.get("birth_year")
+    for k in SNAP_ATHLETE:
+        if k in athlete:
+            a[k] = athlete[k]
+    for k in SNAP_HORSE:
+        if k in horse:
+            h[k] = horse[k]
+    if not (a.get("name") or "").strip():
+        raise ValueError("Укажите фамилию и имя всадника.")
+    if not (h.get("name") or "").strip():
+        raise ValueError("Укажите кличку лошади.")
+    if a.get("birth_year") != old_year:
+        a["birth_date"] = None
+    e.athlete_snapshot, e.horse_snapshot = a, h
+    fields = ["athlete_snapshot", "horse_snapshot"]
+    if tclass_id and int(tclass_id) != e.tclass_id:
+        c = TournamentClass.objects.get(pk=tclass_id, program=e.program)
+        e.tclass, e.class_name = c, c.name
+        fields += ["tclass", "class_name"]
+    e.save(update_fields=fields)
+    if not e.program.is_manual:
+        scoring.recompute(e.program)
+    audit(user, "entry.edit_pair", e, athlete=a.get("name"), horse=h.get("name"))
+    return e
+
+
+def has_real_result(result) -> bool:
+    """Есть что публиковать: место или итоговый статус выступившей пары, а не «снят / не стартовал»."""
+    if result is None:
+        return False
+    if result.status in (Result.Status.WITHDRAWN, Result.Status.NO_SHOW):
+        return False
+    if (result.values or {}).get("pending"):
+        return False
+    return bool(result.place or result.status or result.values)
 
 
 @transaction.atomic
@@ -298,7 +400,7 @@ def publish_results(user, class_id) -> ResultPublication:
     if c.merged_into_id:
         raise ValueError(f"Зачёт объединён с «{c.merged_into.label}» — публикуйте результаты объединённого зачёта.")
     if p.is_dressage and not p.is_manual and not scoring.is_scorer(user, p) and not can_manage(user, p.tournament):
-        raise ValueError("Результаты езды публикует судья-подсчёт.")
+        raise ValueError("Результаты езды публикует судья по итогам.")
     classes = [c] + list(c.merged.all())
     entries = list(Entry.objects.filter(tclass__in=classes, decision=Entry.Decision.ACCEPTED).select_related("result", "tclass"))
     with_results = [e for e in entries if hasattr(e, "result") and not (e.result.values or {}).get("pending")]

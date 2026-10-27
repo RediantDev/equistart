@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Календарь соревнований — EquiStart{% endblock %}
+{% block title %}Календарь соревнований — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
@@ -26,8 +26,8 @@
         <select id="region" name="region"><option value="">Все регионы</option>{% for v, label in regions %}<option value="{{ v }}"{% if v == region %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
       {% if club %}<input type="hidden" name="club" value="{{ club.pk }}">{% endif %}
       <div class="filters__checks">
-        <label class="check"><input type="checkbox" name="open" value="1"{% if only_open %} checked{% endif %}><span>Только с открытым приёмом</span></label>
-        <label class="check"><input type="checkbox" name="past" value="1"{% if past %} checked{% endif %}><span>Прошедшие</span></label>
+        <label class="check"><input type="checkbox" name="open" value="1"{% if only_open %} checked{% endif %}><span>Можно подать заявку <span class="table__sub" style="display: inline;">— приём заявок ещё идёт</span></span></label>
+        <label class="check"><input type="checkbox" name="past" value="1"{% if past %} checked{% endif %}><span>Показать прошедшие</span></label>
       </div>
       <div class="filters__actions"><button type="submit" class="btn btn--dark btn--sm">Применить</button></div>
     </div>
@@ -53,7 +53,7 @@
         </div>
         <div class="event-card__body">
           <a class="h3 row-card__title" href="{% url 'tournaments:public' c.t.pk %}">{{ c.t.pub_title }}</a>
-          <div class="table__sub">{{ c.venue.name }} · {{ c.venue.region_name }}, {{ c.venue.settlement }} · {{ c.tz_label }}</div>
+          <div class="table__sub">{{ c.venue.name }} · {{ c.venue.region_name }}, {{ c.venue.settlement }}</div>
           <div class="chips">
             {% if c.t.publication == "cancelled" %}<span class="chip chip--danger">Отменён</span>
             {% elif c.open %}<span class="chip chip--info">Приём заявок открыт</span>

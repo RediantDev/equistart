@@ -1,58 +1,70 @@
 {% extends "base.html" %}
-{% block title %}Регистрация — EquiStart<script>
-(function () {
-  var box = document.getElementById("pub-consent"), cb = document.querySelector('input[name="categories"][value="athlete"]');
-  if (!box || !cb) return;
-  function sync() { box.hidden = !cb.checked && !box.querySelector(".field__error"); }
-  cb.addEventListener("change", sync); sync();
-})();
-</script>
-{% endblock %}
+{% load static %}
+{% block title %}Регистрация — СтартЛист{% endblock %}
 {% block content %}
 <section class="auth">
   <div class="card auth__card auth__card--wide">
+    <div class="auth__logo"><img src="{% static 'brand/startlist-logo.svg' %}" width="200" alt="СтартЛист"></div>
     <h1 class="h1">Регистрация</h1>
-    <p class="muted">Номер телефона будет вашим логином.</p>
-    <form method="post" novalidate class="form">
+    <ol class="steps-mini" aria-label="Шаги регистрации" data-steps-nav>
+      <li data-step-dot="1">1. О вас</li><li data-step-dot="2">2. Роли</li><li data-step-dot="3">3. Телефон и пароль</li>
+    </ol>
+    <form method="post" novalidate class="form" data-steps>
       {% csrf_token %}
       {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
 
-      <div class="form__group">
-        <h2 class="h3">Вход в аккаунт</h2>
-        {% include "partials/field.html" with field=form.phone %}
-        <div class="grid-2">
-          {% include "partials/field.html" with field=form.password1 %}
-          {% include "partials/field.html" with field=form.password2 %}
-        </div>
-      </div>
-
-      <div class="form__group">
-        <h2 class="h3">О вас</h2>
+      <fieldset class="form__group step-pane" data-step="1">
+        <legend class="h3">О вас</legend>
         <div class="grid-3">
           {% include "partials/field.html" with field=form.last_name %}
           {% include "partials/field.html" with field=form.first_name %}
           {% include "partials/field.html" with field=form.middle_name %}
         </div>
         {% include "partials/field.html" with field=form.email %}
-      </div>
+        <div class="form-actions step-pane__nav"><button type="button" class="btn btn--primary" data-step-next>Далее</button></div>
+      </fieldset>
 
-      <div class="form__group">
-        {% include "partials/field.html" with field=form.categories %}
-        <div id="pub-consent">{% include "partials/field.html" with field=form.publication_consent %}</div>
-      </div>
+      <fieldset class="form__group step-pane" data-step="2">
+        <legend class="h3">Кем вы будете в СтартЛисте</legend>
+        {% include "partials/field.html" with field=form.categories hide_label=True %}
+        <ul class="field__help" style="margin: 0 0 var(--space-3); padding-left: 1.2em;">
+          <li><strong>Спортсмен</strong> — подаёте заявки на старты за себя.</li>
+          <li><strong>Тренер / представитель</strong> — подаёте заявки за своих спортсменов и лошадей.</li>
+          <li><strong>Организатор</strong> — создаёте турниры; в календаре они появляются после проверки модератором.</li>
+          <li><strong>Судья</strong> — судите на турнирах и можете создать турнир сами.</li>
+          <li><strong>Клуб</strong> — страница клуба; клуб проверяет модератор.</li>
+        </ul>
+        <div class="form-actions step-pane__nav"><button type="button" class="btn btn--ghost" data-step-prev>Назад</button><button type="button" class="btn btn--primary" data-step-next>Далее</button></div>
+      </fieldset>
 
-      {% include "partials/field.html" with field=form.pd_consent consent_link=True %}
-      <button type="submit" class="btn btn--primary btn--block">Создать аккаунт</button>
+      <fieldset class="form__group step-pane" data-step="3" style="border-bottom: 0;">
+        <legend class="h3">Телефон и пароль</legend>
+        <p class="muted">Номер телефона будет вашим логином.</p>
+        {% include "partials/field.html" with field=form.phone %}
+        <div class="grid-2">
+          {% include "partials/field.html" with field=form.password1 %}
+          {% include "partials/field.html" with field=form.password2 %}
+        </div>
+        {% include "partials/field.html" with field=form.pd_consent consent_link=True %}
+        <div class="form-actions step-pane__nav"><button type="button" class="btn btn--ghost" data-step-prev>Назад</button><button type="submit" class="btn btn--primary">Создать аккаунт</button></div>
+      </fieldset>
     </form>
     <p class="auth__switch">Уже есть аккаунт? <a href="{% url 'accounts:login' %}">Войти</a></p>
   </div>
 </section>
 <script>
-(function () {
-  var box = document.getElementById("pub-consent"), cb = document.querySelector('input[name="categories"][value="athlete"]');
-  if (!box || !cb) return;
-  function sync() { box.hidden = !cb.checked && !box.querySelector(".field__error"); }
-  cb.addEventListener("change", sync); sync();
+(function () { // тест судьи и клуба: без галочки согласия форма не уходит — пароли не стираются ответом сервера
+  var form = document.querySelector("form[data-steps]"), box = form && form.querySelector('input[name="pd_consent"]');
+  if (!box) return;
+  form.addEventListener("submit", function (e) {
+    if (box.checked) return;
+    e.preventDefault();
+    var field = box.closest(".field"), err = field.querySelector("[data-consent-err]");
+    if (!err) { err = document.createElement("p"); err.className = "field__error"; err.setAttribute("role", "alert"); err.setAttribute("data-consent-err", "");
+      err.textContent = "Отметьте согласие на обработку персональных данных — без него регистрация невозможна."; field.appendChild(err); }
+    field.classList.add("field--error"); box.focus(); field.scrollIntoView({ block: "center" });
+  });
+  box.addEventListener("change", function () { var f = box.closest(".field"), err = f.querySelector("[data-consent-err]"); if (box.checked && err) { err.remove(); f.classList.remove("field--error"); } });
 })();
 </script>
 {% endblock %}

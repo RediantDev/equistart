@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Помощь — СтартЛист{% endblock %}
+{% block content %}
+<section class="auth">
+  <div class="card auth__card auth__card--wide">
+    {% if user.is_authenticated %}<a class="back" href="{% url 'support:my' %}">← Мои обращения</a>{% endif %}
+    <h1 class="h1">Написать в поддержку</h1>
+    <p class="muted">Ответим в течение {{ within }}{% if user.is_authenticated %} — уведомлением на сайте и письмом, если в профиле указан email{% else %} — письмом на email и по ссылке из письма{% endif %}. Частые вопросы — <a href="{% url 'support:faq' %}">на странице помощи</a>.</p>
+    {% if live %}<div class="alert alert--warning">Сегодня идёт ваш турнир. Если вопрос срочный — выберите турнир и отметьте «Идёт турнир»: обращение встанет первым в очереди.</div>{% endif %}
+    <form method="post" enctype="multipart/form-data" novalidate class="form" data-topic-form>
+      {% csrf_token %}
+      {% for e in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ e }}</div>{% endfor %}
+      {{ form.page }}
+      {% include "partials/field.html" with field=form.topic %}
+      <div data-topics="review results bug other">
+        {% include "partials/field.html" with field=form.tournament %}
+        <p class="field__help" data-topics="other" style="margin-top: -6px;">Вопросы по условиям турнира, заявкам, денникам и услугам решает организатор — его контакт на странице турнира. Отправить обращение сюда всё равно можно.</p>
+        {% if form.urgent %}{% include "partials/field.html" with field=form.urgent %}{% endif %}
+      </div>
+      {% if form.athlete %}<div data-topics="data duplicate dispute">{% include "partials/field.html" with field=form.athlete %}</div>{% endif %}
+      {% if form.horse %}<div data-topics="data duplicate dispute">{% include "partials/field.html" with field=form.horse %}</div>{% endif %}
+      <div data-topics="duplicate dispute review other">{% include "partials/field.html" with field=form.club %}</div>
+      {% include "partials/field.html" with field=form.text %}
+      <div class="field{% if form.attachments.errors %} field--error{% endif %}">
+        <label class="field__label" for="{{ form.attachments.id_for_label }}">{{ form.attachments.label }} <span class="field__optional">необязательно</span></label>
+        <input type="file" name="attachments" id="{{ form.attachments.id_for_label }}" accept="image/jpeg,image/png" multiple>
+        <p class="field__help">{{ form.attachments.help_text }}</p>
+        {% for error in form.attachments.errors %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ error }}</p>{% endfor %}
+      </div>
+      {% if form.name %}
+        <h2 class="h3" style="margin-top: var(--space-4);">Как с вами связаться</h2>
+        {% include "partials/field.html" with field=form.name %}
+        {% include "partials/field.html" with field=form.phone %}
+        {% include "partials/field.html" with field=form.email %}
+        <p class="table__sub" data-topics="login">Для темы «Вход и пароль» укажите телефон, с которым вы зарегистрированы: по нему администратор найдёт аккаунт.</p>
+        {% include "partials/field.html" with field=form.consent consent_link=True %}
+      {% endif %}
+      <details class="support-context">
+        <summary class="table__sub">Что ещё будет передано поддержке</summary>
+        <ul class="table__sub">
+          <li>Страница: {% if page %}{{ page }}{% else %}не указана{% endif %}</li>
+          {% if user.is_authenticated %}<li>Аккаунт: {{ user.full_name }}</li>{% endif %}
+          <li>Устройство и браузер: {{ ua|default:"не определены"|truncatechars:120 }}</li>
+        </ul>
+      </details>
+      <div class="form__actions"><button type="submit" class="btn btn--primary">Отправить</button></div>
+    </form>
+  </div>
+</section>
+{% endblock %}

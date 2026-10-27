@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Клубы — EquiStart{% endblock %}
+{% block title %}Клубы — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
@@ -7,13 +7,12 @@
     <p class="muted">Подтверждённые модератором клубы: адреса, контакты, ближайшие турниры.</p>
   </div>
 </div>
-<form method="get" class="filters" role="search">
-  <div class="filters__row">
-    <div class="field" style="flex: 2; min-width: 0;"><label class="field__label" for="q">Название или город</label>
-      <input id="q" name="q" type="search" value="{{ q }}" placeholder="Например, «Виват» или «Казань»"></div>
-    <div class="field" style="flex: 1 1 180px; min-width: 0;"><label class="field__label" for="region">Регион</label>
-      <select id="region" name="region"><option value="">Все регионы</option>{% for v, label in regions %}<option value="{{ v }}"{% if v == region %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-    <div class="filters__actions"><button type="submit" class="btn btn--dark btn--sm">Найти</button>{% if q or region %} <a class="btn btn--ghost btn--sm" href="{% url 'clubs:list' %}">Сбросить</a>{% endif %}</div>
+<form method="get" role="search" class="searchbar">
+  <label class="field__label" for="q">Название, город или регион</label>
+  <div class="searchbar__row">
+    <input id="q" name="q" type="search" value="{{ q }}" placeholder="Например, «Виват», «Казань» или «Татарстан»">
+    <button type="submit" class="btn btn--dark">Найти</button>
+    {% if q or region %}<a class="btn btn--ghost" href="{% url 'clubs:list' %}">Сбросить</a>{% endif %}
   </div>
 </form>
 {% if clubs %}
@@ -31,6 +30,6 @@
     {% endfor %}
   </div>
 {% else %}
-  <div class="card empty"><h2 class="h3">Ничего не нашли</h2><p class="muted">{% if q or region %}Попробуйте другое название или уберите регион.{% else %}Клубы появятся здесь после проверки модератором.{% endif %}</p></div>
+  <div class="card empty"><h2 class="h3">Ничего не нашли</h2><p class="muted">{% if q or region %}Попробуйте другое название, город или регион.{% else %}Клубы появятся здесь после проверки модератором.{% endif %}</p></div>
 {% endif %}
 {% endblock %}

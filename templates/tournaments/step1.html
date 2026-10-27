@@ -2,7 +2,8 @@
 {% block step %}
 <form method="post" novalidate class="card form" style="margin-top: 0;">
   {% csrf_token %}
-  {% if t %}<input type="hidden" name="revision" value="{{ t.revision }}">{% endif %}
+  {% if t %}<input type="hidden" name="revision" value="{{ t.revision }}">{% else %}<input type="hidden" name="create_key" value="{{ create_key }}">
+  <div class="alert alert--info">Понадобятся: даты и место, маршруты или езды с зачётами, срок приёма заявок и <strong>положение о соревновании в PDF</strong> (до 20 МБ) — без него турнир не отправить на проверку. Черновик можно сохранить и вернуться позже.</div>{% endif %}
   {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
 
   <div class="form__group">
@@ -10,16 +11,16 @@
     {% include "partials/field.html" with field=form.title %}
     <div class="grid-2">
       {% include "partials/field.html" with field=form.starts_on %}
-      {% include "partials/field.html" with field=form.ends_on %}
+      <div data-show-when="multiday:checked">{% include "partials/field.html" with field=form.ends_on %}</div>
     </div>
     {% include "partials/field.html" with field=form.multiday %}
-    <p class="field__help" style="margin-top: calc(-1 * var(--space-2));">Для однодневного соревнования дата окончания не нужна.</p>
   </div>
 
   <div class="form__group">
     <h2 class="h3">Место проведения</h2>
     {% include "partials/field.html" with field=form.venue %}
-    <p class="field__help">Или добавьте новое место — модератор проверит его вместе с турниром. Часовой пояс определится по региону.</p>
+    <div data-show-when="venue=" class="form__sub">
+    <p class="field__help">Новое место модератор проверит вместе с турниром.</p>
     <div class="grid-2">
       {% include "partials/field.html" with field=form.venue_name %}
       {% include "partials/field.html" with field=form.venue_region %}
@@ -28,7 +29,7 @@
       {% include "partials/field.html" with field=form.venue_settlement %}
       {% include "partials/field.html" with field=form.venue_address %}
     </div>
-    {% include "partials/field.html" with field=form.venue_timezone %}
+    </div>
   </div>
 
   <div class="form__group" style="border-bottom: 0; padding-bottom: 0;">
@@ -44,12 +45,8 @@
   </div>
 
   <div class="form-actions">
-    {% if t %}
-      <button type="submit" name="save" class="btn btn--ghost"{% if t.is_locked %} disabled{% endif %}>Сохранить черновик</button>
-      <button type="submit" name="next" class="btn btn--primary"{% if t.is_locked %} disabled{% endif %}>Далее: программа</button>
-    {% else %}
-      <button type="submit" class="btn btn--primary">Создать черновик и перейти к программе</button>
-    {% endif %}
+    <button type="submit" name="save" class="btn btn--ghost"{% if t.is_locked %} disabled{% endif %}>Сохранить черновик</button>
+    <button type="submit" name="next" class="btn btn--primary"{% if t.is_locked %} disabled{% endif %}>Далее: программа</button>
   </div>
 </form>
 {% endblock %}

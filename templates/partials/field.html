@@ -1,8 +1,8 @@
-{# Универсальный вывод поля формы: подпись, поле, подсказка, ошибки. #}
+{% load tournaments %}{# Универсальный вывод поля формы: подпись, поле, подсказка, ошибки. #}
 <div class="field{% if field.errors %} field--error{% endif %}{% if field.field.widget.input_type == 'checkbox' and not field.field.widget.allow_multiple_selected %} field--check{% endif %}">
   {% if field.field.widget.allow_multiple_selected %}
     <fieldset class="choices">
-      <legend class="field__label">{{ field.label }}</legend>
+      <legend class="field__label{% if hide_label %} visually-hidden{% endif %}">{{ field.label }}</legend>
       {% for option in field %}
         <label class="choice">{{ option.tag }}<span>{{ option.choice_label }}</span></label>
       {% endfor %}
@@ -13,8 +13,8 @@
       <span>{{ field.label }}{% if consent_link %} на условиях <a href="{% url 'core:consent' %}" target="_blank" rel="noopener">согласия</a> и <a href="{% url 'core:privacy' %}" target="_blank" rel="noopener">политики</a>{% endif %}</span>
     </label>
   {% else %}
-    <label class="field__label" for="{{ field.id_for_label }}">{{ field.label }}{% if not field.field.required %} <span class="field__optional">необязательно</span>{% endif %}</label>
-    {{ field }}
+    <label class="field__label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.widget.input_type == "select" %}{% if not field.field.required and not field.field.show_required %} <span class="field__optional">необязательно</span>{% endif %}{% endif %}</label>
+    {{ field|ph }}
   {% endif %}
   {% if field.help_text %}<p class="field__help" id="{{ field.auto_id }}_help">{{ field.help_text }}</p>{% endif %}
   {% for error in field.errors %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ error }}</p>{% endfor %}

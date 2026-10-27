@@ -16,7 +16,7 @@ from django.utils import timezone
 from apps.core.models import audit, notify
 from apps.profiles.models import RANK_SHORT, Athlete, Horse, rank_at_least
 from apps.profiles.services import athletes_for_entry
-from apps.tournaments.models import TeamMember, Tournament, TournamentClass
+from apps.tournaments.models import ProgramItem, TeamMember, Tournament, TournamentClass
 from apps.tournaments.services import roles_of
 
 from .models import Application, ChangeProposal, Entry
@@ -119,8 +119,6 @@ def check_line(user, tournament, line: Line, late=False, allowed_athletes=None) 
     a = line.athlete
     if a.pk not in allowed:
         errors.append(f"Нет права подавать заявку за спортсмена «{a.public_name}».")
-    if not a.consent_confirmed_at:
-        errors.append(f"«{a.public_name}»: не подтверждено согласие на обработку и публикацию.")
     year = (tournament.pub_starts_on or tournament.starts_on or timezone.localdate()).year
     for r in class_reasons(a, line.horse, c, year, line.height, line.confirmed):
         errors.append(f"«{a.public_name} / {line.horse.name}» — зачёт «{c.label}»: {r}.")
@@ -249,7 +247,18 @@ def decide(user, tournament_id, items: list[tuple[int, str]], action: str, reaso
         except Entry.DoesNotExist:
             results.append(RowResult(entry_id, False, "позиция не найдена в этом турнире"))
     _notify_decisions(t, done)
+    _append_to_orders(user, [e for e, _ in done if e.decision == Entry.Decision.ACCEPTED])
     return results
+
+
+def _append_to_orders(user, entries):
+    """Тест 4: принятое после жеребьёвки выступление само встаёт в конец стартового порядка
+    (раньше для этого была кнопка «Добавить готовых в конец»)."""
+    from apps.conduct import services as cs
+
+    for pid in {e.program_id for e in entries}:
+        if ProgramItem.objects.filter(pk=pid, slots__isnull=False).exists():
+            cs.add_missing(user, pid)
 
 
 def _notify_decisions(t, done):
@@ -398,3 +407,67 @@ def summarize(entries) -> list[tuple[str, int, str]]:
         counts[e.decision] = counts.get(e.decision, 0) + 1
     colors = {"pending": "warning", "accepted": "success", "rejected": "danger", "cancelled": ""}
     return [(Entry.Decision(k).label, v, colors[k]) for k, v in counts.items()]
+
+
+# ---------------- быстрое добавление пары судьёй (тест 4) ----------------
+
+@transaction.atomic
+def quick_add(user, tournament_id, data: dict) -> list[Entry]:
+    """Судья вносит пару вручную: выступления сразу приняты, профили помечены «внесён судьёй»
+    и не появляются в списках «Мои спортсмены / Мои лошади» судьи."""
+    import uuid
+
+    t = Tournament.objects.select_for_update(of=("self",)).get(pk=tournament_id)
+    require_judge(user, t)
+    if t.publication != Tournament.Publication.PUBLISHED:
+        raise ValueError("Турнир завершён или отменён — добавлять участников уже нельзя."
+                         if t.publication in (Tournament.Publication.FINISHED, Tournament.Publication.CANCELLED)
+                         else "Добавлять участников можно только в опубликованный турнир.")
+    classes = data["class_list"]
+    if not classes:
+        raise ValueError("Отметьте хотя бы один зачёт.")
+    athlete = data.get("athlete")
+    if athlete is None:
+        athlete = Athlete.objects.create(
+            last_name=data["last_name"].strip(), first_name=data["first_name"].strip(), middle_name=(data.get("middle_name") or "").strip(),
+            birth_date=data["birth_date"], rank_jumping=data["rank"], rank_dressage=data["rank"], club=(data.get("club") or "").strip(),
+            region=(data.get("region") or "").strip(), fksr_number=(data.get("fksr_number") or "").strip(),
+            coach_name=(data.get("coach_name") or "").strip(), manager=user, added_by_judge=True, consent_confirmed_at=timezone.now())
+        audit(user, "athlete.quick_add", athlete, tournament=t.pk)
+    horse = data.get("horse")
+    if horse is None:
+        horse = Horse.objects.create(
+            name=data["horse_name"].strip(), birth_year=data["horse_year"], fksr_number=(data.get("horse_passport") or "").strip(),
+            sex=data.get("horse_sex") or "", color=data.get("horse_color") or "", breed=(data.get("horse_breed") or "").strip(),
+            sire=(data.get("horse_sire") or "").strip(), birthplace=(data.get("horse_birthplace") or "").strip(),
+            owner_name=(data.get("horse_owner") or "").strip(), manager=user, added_by_judge=True)
+        audit(user, "horse.quick_add", horse, tournament=t.pk)
+    lines = [Line(athlete, horse, c, height=c.height or (max(c.program.heights) if c.program.heights else None), confirmed=True) for c in classes]
+    dup = Entry.objects.filter(tournament=t, athlete=athlete, horse=horse, tclass__in=classes).exclude(decision=Entry.Decision.CANCELLED)
+    if dup.exists():
+        d = dup.first()
+        raise ValueError(f"Эта пара уже заявлена: {d.program_name} · {d.class_name}.")
+    app = Application.objects.create(
+        tournament=t, submitted_by=user, contact_name=(data.get("coach_name") or "").strip() or user.full_name,
+        contact_phone=_phone_or_blank(data.get("coach_phone")), comment="Внесено судьёй вручную", late=True,
+        idempotency_key=uuid.uuid4().hex, content_hash=content_hash(lines))
+    now = timezone.now()
+    out = []
+    for l in lines:
+        out.append(Entry.objects.create(
+            application=app, tournament=t, program=l.tclass.program, tclass=l.tclass, athlete=athlete, horse=horse,
+            athlete_snapshot=athlete.private_snapshot(l.tclass.program.discipline), horse_snapshot=horse.public_snapshot(),
+            height=l.height, conditions_confirmed=True, program_name=l.tclass.program.name, class_name=l.tclass.name,
+            day=l.tclass.program.day, decision=Entry.Decision.ACCEPTED, decided_by=user, decided_at=now))
+    audit(user, "application.quick_add", app, tournament=t.pk, entries=len(out))
+    _append_to_orders(user, out)
+    return out
+
+
+def _phone_or_blank(raw):
+    from apps.accounts.phone import normalize_phone
+
+    try:
+        return normalize_phone(raw) if (raw or "").strip() else ""
+    except Exception:
+        return ""

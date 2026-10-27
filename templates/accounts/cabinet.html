@@ -1,14 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Главная — EquiStart{% endblock %}
+{% block title %}Кабинет — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1 class="h1">Главная</h1>
-    <p class="muted">{{ user.full_name }} · {{ user.phone_display }} · <a href="{% url 'accounts:password' %}">Сменить пароль</a></p>
-  </div>
-  <div class="mode-bar">
-    {% for l in labels %}<span class="badge">{{ l }}</span>{% endfor %}
-    {% if can_add_role %}<a href="{% url 'accounts:add_role' %}" class="btn btn--ghost btn--sm">+ Добавить роль</a>{% endif %}
+    <h1 class="h1">Кабинет</h1>
   </div>
 </div>
 
@@ -30,13 +25,37 @@
 <section class="card" style="margin-bottom: var(--space-4);">
   <div class="section-head"><h2 class="h3" style="margin: 0;">Нужно действие</h2></div>
   <div class="list-cards">
-    {% for a in actions %}
-      {% if a.url %}<a class="row-card row-card--link" href="{{ a.url }}">{% else %}<div class="row-card">{% endif %}
-        <div style="flex: 1 1 180px; min-width: 0;">{{ a.label }}</div>{% if a.count %}<span class="count-pill">{{ a.count }}</span>{% endif %}
-      {% if a.url %}</a>{% else %}</div>{% endif %}
-    {% endfor %}
+    {% for a in actions|slice:":3" %}{% include "accounts/_action.html" %}{% endfor %}
   </div>
+  {% if actions|length > 3 %}
+  <details class="show-more">
+    <summary class="btn btn--ghost btn--sm">Показать все ({{ actions|length }})</summary>
+    <div class="list-cards">{% for a in actions|slice:"3:" %}{% include "accounts/_action.html" %}{% endfor %}</div>
+  </details>
+  {% endif %}
 </section>
+{% endif %}
+
+{% if user.is_judge and not judge_tournaments %}
+<section class="card" style="margin-bottom: var(--space-5);">
+  <h2 class="h3" style="margin-top: 0;">Как начать судить</h2>
+  <p class="muted" style="margin: 0;">Организатор турнира приглашает судей по номеру телефона — сообщите ему ваш номер {{ user.phone_display }}. Приглашение появится здесь, в блоке «Нужно действие»; после принятия откроется панель турнира с экраном судьи. Свой турнир судья может создать и сам — «Мои соревнования».</p>
+</section>
+{% endif %}
+
+{% if judge_tournaments %}
+<h2 class="h2">Судейство и проведение</h2>
+<div class="list-cards" style="margin-bottom: var(--space-5);">
+  {% for jt in judge_tournaments %}
+    <article class="row-card">
+      <div style="flex: 1 1 240px; min-width: 0;"><a class="h3 row-card__title" href="{% url 'tournaments:hub' jt.pk %}">{{ jt.pub_title|default:jt.title }}</a><span class="table__sub">{{ jt.pub_starts_on|date:"j E Y" }}{% if jt.publication == "finished" %} · завершён{% elif jt.publication == "cancelled" %} · отменён{% endif %}</span></div>
+      <div class="row-actions">
+        <a class="btn btn--ghost btn--sm" href="{% url 'entries:manage' jt.pk %}">Заявки{% if jt.pending_count %} <span class="count-pill">{{ jt.pending_count }}</span>{% endif %}</a>
+        <a class="btn btn--dark btn--sm" href="{% url 'conduct:overview' jt.pk %}">Проведение</a>
+      </div>
+    </article>
+  {% endfor %}
+</div>
 {% endif %}
 
 {% if user.is_athlete or user.is_coach %}
@@ -70,6 +89,7 @@
 {% if user.is_moderator %}
 <h2 class="h2">Модерация</h2>
 <div class="tiles" style="margin-bottom: var(--space-5);">
+  <a class="tile tile--link" href="{% url 'moderation:panel' %}"><span class="tag tag--lemon" style="align-self: flex-start; margin-bottom: 6px;">Пульт</span><h3 class="h3">Пульт</h3><p class="muted">Что ждёт решения, состояние сервиса и цифры за неделю.</p></a>
   <a class="tile tile--link" href="{% url 'moderation:queue' %}"><span class="tag tag--lemon" style="align-self: flex-start; margin-bottom: 6px;">Модерация</span><h3 class="h3">Турниры на проверке</h3><p class="muted">Положение, даты, место, программа и зачёты перед публикацией.</p></a>
   <a class="tile tile--link" href="{% url 'moderation:clubs' %}"><span class="tag tag--mint" style="align-self: flex-start; margin-bottom: 6px;">Клубы</span><h3 class="h3">Клубы на проверке</h3><p class="muted">Новые профили клубов и правки названия или адреса.</p></a>
 </div>

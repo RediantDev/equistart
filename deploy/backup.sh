@@ -21,4 +21,6 @@ find "$BACKUP_DIR" -name 'media-*.tgz' -mtime +"$KEEP_DAYS" -delete
 if [ -n "${RCLONE_REMOTE:-}" ]; then
   rclone copy "$BACKUP_DIR" "$RCLONE_REMOTE" --max-age 2d
 fi
+# отметка для пульта администратора (последняя копия)
+docker compose exec -T web python manage.py backup_done "$STAMP"
 echo "$(date -Iseconds) backup ok: $STAMP"

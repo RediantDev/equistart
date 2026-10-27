@@ -42,7 +42,7 @@ class DrawTests(ConductBase):
         app = self.submit(self.coach, [eservices.Line(self.a2, self.h1, self.c_open)], key="k2")
         pending = app.entries.get()
         n = services.draw(self.judge, self.p1.pk)
-        self.assertEqual(n, 2)
+        self.assertEqual(n["added"], 2)
         ids = set(self.p1.slots.values_list("entry_id", flat=True))
         self.assertEqual(ids, {self.e1.pk, self.e2.pk})
         self.assertNotIn(pending.pk, ids)
@@ -109,7 +109,7 @@ class DrawTests(ConductBase):
     def test_unpublished_start_list_hidden(self):
         services.draw(self.judge, self.p1.pk)
         resp = self.client.get(reverse("tournaments:public", args=[self.t.pk]) + "?tab=starts")
-        self.assertContains(resp, "ещё не опубликованы")
+        self.assertContains(resp, "ещё не опубликован")
         self.assertEqual(self.client.get(reverse("conduct:startlist_xlsx", args=[self.t.pk, self.p1.pk])).status_code, 404)
 
 
@@ -123,6 +123,7 @@ class ResultTests(ConductBase):
             services.save_result(self.judge, self.e1.pk, {"penalties": "abc"}, "", "")
         resp = self.client.get(reverse("tournaments:public", args=[self.t.pk]) + "?tab=results")
         self.assertContains(resp, "Результаты ещё не опубликованы")
+        self.assertNotContains(resp, "Excel")  # тест 4.2: выгрузка только у судей и организатора
         services.publish_results(self.judge, self.c_kids.pk)
         pub = ResultPublication.objects.get(tclass=self.c_kids)
         self.assertEqual(pub.rows[0]["values"], {"penalties": 4.0})
@@ -133,6 +134,8 @@ class ResultTests(ConductBase):
         self.assertEqual(self.c_kids.result_publications.count(), 2)
         resp = self.client.get(reverse("tournaments:public", args=[self.t.pk]) + "?tab=results")
         self.assertContains(resp, '<td class="num">8</td>')
+        self.assertEqual(self.client.get(reverse("conduct:results_xlsx", args=[self.t.pk, self.c_kids.pk])).status_code, 404)
+        self.client.force_login(self.judge)
         x = self.client.get(reverse("conduct:results_xlsx", args=[self.t.pk, self.c_kids.pk]))
         self.assertEqual(x.status_code, 200)
         with zipfile.ZipFile(io.BytesIO(x.content)) as z:

@@ -6,7 +6,8 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
 
-from .forms import AddRoleForm, LoginForm, RegistrationForm
+from .forms import AddRoleForm, LoginForm, PhoneChangeForm, ProfileForm, RegistrationForm
+from .models import CATEGORY_FIELDS, Category
 
 
 def _safe_next(request, default="accounts:cabinet"):
@@ -24,8 +25,8 @@ def register(request):
     if request.method == "POST" and form.is_valid():
         user = form.save()
         login(request, user, backend="apps.accounts.backends.PhoneBackend")
-        messages.success(request, "Аккаунт создан. Добро пожаловать в EquiStart!")
-        return redirect("accounts:cabinet")
+        messages.success(request, "Аккаунт создан. Добро пожаловать в СтартЛист!")
+        return redirect(_safe_next(request))  # из «Подать заявку» — сразу обратно к заявке
     return render(request, "accounts/register.html", {"form": form})
 
 
@@ -91,7 +92,7 @@ def cabinet(request):
         actions.append(("Предложения: связь с профилем или передача управления", n, "profiles:offers"))
     if judged_ids:
         pending = Entry.objects.filter(tournament__in=judged_ids, tournament__publication=Tournament.Publication.PUBLISHED, decision=Entry.Decision.PENDING)
-        for t_id, title in pending.values_list("tournament_id", "tournament__pub_title").distinct():
+        for t_id, title in pending.order_by().values_list("tournament_id", "tournament__pub_title").distinct():
             cnt = pending.filter(tournament_id=t_id).count()
             actions.append((f"Заявки на рассмотрении: {title}", cnt, ("entries:manage", t_id)))
         props = ChangeProposal.objects.filter(entry__tournament__in=judged_ids, state=ChangeProposal.State.PENDING).count()
@@ -101,7 +102,7 @@ def cabinet(request):
         from apps.stables.models import Booking
 
         for t_id, title in (Booking.objects.filter(tournament__in=stable_ids, state=Booking.State.PENDING)
-                            .values_list("tournament_id", "tournament__pub_title").distinct()):
+                            .order_by().values_list("tournament_id", "tournament__pub_title").distinct()):
             cnt = Booking.objects.filter(tournament_id=t_id, state=Booking.State.PENDING).count()
             actions.append((f"Брони денников ждут подтверждения: {title}", cnt, ("stables:manage", t_id)))
     from apps.entries.models import ApplicationDraft
@@ -118,6 +119,11 @@ def cabinet(request):
         n = Tournament.objects.filter(status=Tournament.Status.REVIEW).count()
         if n:
             actions.append(("Турниры на проверке", n, "moderation:queue"))
+        from apps.clubs.models import Club
+
+        n = Club.objects.filter(status=Club.Status.REVIEW).count()
+        if n:
+            actions.append(("Клубы на проверке", n, "moderation:clubs"))
 
     rows = []
     for label, count, target in actions:
@@ -129,10 +135,22 @@ def cabinet(request):
             url = ""
         rows.append({"label": label, "count": count, "url": url})
 
+    judge_tournaments = list(
+        Tournament.objects.filter(pk__in=judged_ids).exclude(publication=Tournament.Publication.NONE).order_by("-starts_on")[:12]
+    ) if judged_ids else []
+    pend = {}
+    if judge_tournaments:
+        from django.db.models import Count
+
+        pend = dict(Entry.objects.filter(tournament__in=judge_tournaments, decision=Entry.Decision.PENDING).order_by()
+                    .values("tournament_id").annotate(n=Count("id")).values_list("tournament_id", "n"))
+    for jt in judge_tournaments:
+        jt.pending_count = pend.get(jt.pk, 0)
     return render(
         request,
         "accounts/cabinet.html",
         {
+            "judge_tournaments": judge_tournaments,
             "labels": user.category_labels(),
             "can_add_role": bool(user.missing_categories()),
             "actions": rows,
@@ -155,8 +173,70 @@ def add_role(request):
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Роль добавлена.")
-        return redirect("accounts:cabinet")
+        return redirect("accounts:profile")
     return render(request, "accounts/add_role.html", {"form": form})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def profile(request):
+    """Профиль: сведения о себе, телефон, пароль, роли, выход (тест 4, п. 12–16)."""
+    from apps.core.models import audit
+
+    user = request.user
+    form = ProfileForm(request.POST or None, initial={"last_name": user.last_name, "first_name": user.first_name,
+                                                      "middle_name": user.middle_name, "email": user.email})
+    if request.method == "POST" and form.is_valid():
+        c = form.cleaned_data
+        user.last_name, user.first_name = c["last_name"].strip(), c["first_name"].strip()
+        user.middle_name, user.email = c.get("middle_name", "").strip(), c.get("email", "")
+        user.save(update_fields=["last_name", "first_name", "middle_name", "email"])
+        audit(user, "user.profile_edit", user)
+        messages.success(request, "Сведения сохранены.")
+        return redirect("accounts:profile")
+    roles = [{"value": c.value, "label": c.label, "on": getattr(user, CATEGORY_FIELDS[c])} for c in Category]
+    return render(request, "accounts/profile.html", {"form": form, "roles": roles, "can_add_role": bool(user.missing_categories())})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def change_phone(request):
+    from apps.core.models import audit
+
+    form = PhoneChangeForm(request.user, request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        user = request.user
+        old = user.phone
+        user.phone = form.cleaned_data["phone"]
+        user.phone_verified_at = None
+        user.save(update_fields=["phone", "phone_verified_at"])
+        audit(user, "user.phone_change", user, old=old[-4:])
+        messages.success(request, f"Телефон изменён. Теперь входите по номеру {user.phone_display}.")
+        return redirect("accounts:profile")
+    return render(request, "accounts/phone.html", {"form": form})
+
+
+@login_required
+@require_POST
+def remove_role(request):
+    from apps.core.models import audit
+
+    user = request.user
+    cat = request.POST.get("category", "")
+    if cat not in CATEGORY_FIELDS or not getattr(user, CATEGORY_FIELDS[cat]):
+        messages.error(request, "Такой роли у вас нет.")
+        return redirect("accounts:profile")
+    if len(user.categories()) <= 1:
+        messages.error(request, "Нельзя убрать единственную роль — сначала добавьте другую.")
+        return redirect("accounts:profile")
+    if cat == Category.CLUB and _club_of(user):
+        messages.error(request, "Вы управляете клубом. Передайте управление другому человеку, затем уберите роль «Клуб».")
+        return redirect("accounts:profile")
+    setattr(user, CATEGORY_FIELDS[cat], False)
+    user.save(update_fields=[CATEGORY_FIELDS[cat]])
+    audit(user, "user.role_remove", user, role=cat)
+    messages.success(request, f"Роль «{Category(cat).label}» убрана. Данные сохранены — роль можно вернуть в любой момент.")
+    return redirect("accounts:profile")
 
 
 @login_required
@@ -201,5 +281,5 @@ def change_password(request):
         update_session_auth_hash(request, user)
         audit(user, "user.password_change", user)
         messages.success(request, "Пароль изменён.")
-        return redirect("accounts:cabinet")
+        return redirect("accounts:profile")
     return render(request, "accounts/password.html", {"form": form})

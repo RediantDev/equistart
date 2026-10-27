@@ -1,0 +1,9 @@
+# Запуск без пересборки образа и без доступа к Docker Hub:
+# уже собранный образ equistart-web + текущий код из этой папки.
+#   docker compose -f docker-compose.local.yml -f docker-compose.code.yml up
+services:
+  web:
+    pull_policy: never
+    volumes:
+      - .:/app
+      - local_media:/app/media

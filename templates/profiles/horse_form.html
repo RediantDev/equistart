@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}{% if horse %}{{ horse.name }}{% else %}Новая лошадь{% endif %} — EquiStart{% endblock %}
+{% block title %}{% if horse %}{{ horse.name }}{% else %}Новая лошадь{% endif %} — СтартЛист{% endblock %}
 {% block content %}
 <section class="auth">
   <div class="card auth__card auth__card--wide">
-    <a class="back" href="{% if horse %}{% url 'profiles:horse' horse.pk %}{% else %}{% url 'profiles:horses' %}{% endif %}">← Назад</a>
+    <a class="back" href="{% if next %}{{ next }}{% elif horse %}{% url 'profiles:horse' horse.pk %}{% else %}{% url 'profiles:horses' %}{% endif %}">{% if next %}← Вернуться к заявке{% else %}← Назад{% endif %}</a>
     <h1 class="h1">{% if horse %}Изменить лошадь{% else %}Новая лошадь{% endif %}</h1>
     {% if similar %}
       <div class="alert alert--warning" role="alert">

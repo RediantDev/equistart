@@ -14,14 +14,14 @@ from apps.tournaments.regions import MULTI_ZONE, REGION_TZ
 
 from .models import Club, ClubMember, ClubNews
 
-IMG_MAX = 10 * 1024 * 1024
+IMG_MAX = 20 * 1024 * 1024
 IMG_SIGNATURES = (b"\x89PNG\r", b"\xff\xd8\xff")
 
 
 def check_image(f):
-    """JPEG или PNG до 10 МБ — по содержимому, а не по расширению."""
+    """JPEG или PNG до 20 МБ — по содержимому, а не по расширению."""
     if f.size > IMG_MAX:
-        raise ValidationError("Файл больше 10 МБ.")
+        raise ValidationError("Файл больше 20 МБ.")
     head = f.read(5)
     f.seek(0)
     if not any(head.startswith(s) for s in IMG_SIGNATURES):

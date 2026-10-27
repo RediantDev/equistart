@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Добавить роль — EquiStart{% endblock %}
+{% block title %}Добавить роль — СтартЛист{% endblock %}
 {% block content %}
 <section class="auth">
   <div class="card auth__card">
-    <a href="{% url 'accounts:cabinet' %}" class="back">← Кабинет</a>
+    <a href="{% url 'accounts:profile' %}" class="back">← Профиль</a>
     <h1 class="h1">Добавить роль</h1>
     <p class="muted">Роль добавится в этот же аккаунт, профиль сохранится.</p>
     <form method="post" novalidate class="form">

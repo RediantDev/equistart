@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Денники и услуги — {{ t.pub_title }} — EquiStart{% endblock %}
+{% block title %}Денники и услуги — {{ t.pub_title }} — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head"><div><a class="back" href="{% url 'tournaments:public' t.pk %}">← {{ t.pub_title }}</a><h1 class="h1">Денники и услуги</h1><p class="muted">Выберите категорию и свой период — конкретный денник назначит конюшня после подтверждения. Оплата — в кассе турнира.</p></div><a class="btn btn--ghost" href="{% url 'stables:my' %}">Мои брони и заказы</a></div>
+<div class="page-head"><div>{% if staff %}{% url 'stables:manage' t.pk as sm %}{% include "partials/crumbs.html" with mid="Денники и услуги" mid_url=sm here="Ручная бронь" %}{% else %}<a class="back" href="{% url 'tournaments:public' t.pk %}">← {{ t.pub_title }}</a>{% endif %}<h1 class="h1">{% if staff %}Бронь и заказ за участника{% else %}Денники и услуги{% endif %}</h1><p class="muted">{% if staff %}Вы в команде турнира: можно выбрать лошадь любой заявки или вписать лошадь вручную.{% else %}Выберите категорию и свой период — конкретный денник назначит конюшня после подтверждения.{% endif %}</p></div>{% if not staff %}<a class="btn btn--ghost" href="{% url 'stables:my' %}">Мои брони и заказы</a>{% endif %}</div>
 {% if not open %}<div class="alert">Бронирование закрыто: турнир {% if t.publication == "cancelled" %}отменён{% else %}завершён{% endif %}.</div>{% endif %}
 
 <div class="wizard-grid wizard-grid--aside-first">
@@ -37,14 +37,18 @@
     <form method="post" class="card form" id="book">{% csrf_token %}<input type="hidden" name="key" value="{{ form.key }}">
       <h2 class="h3">Забронировать денник</h2>
       {% for e in errors %}<div class="alert alert--error">{{ e }}</div>{% endfor %}
-      {% if not horses %}<div class="alert">Сначала добавьте лошадь в <a href="{% url 'profiles:horses' %}">«Лошади»</a> — бронь оформляется на лошадь.</div>{% endif %}
+      {% if not horses and not staff %}<div class="alert">Бронь оформляется на лошадь. Добавьте её в профиль: <a href="{% url 'profiles:horse_new' %}">+ Добавить лошадь</a> — это займёт минуту.</div>{% endif %}
       <div class="field"><label class="field__label" for="b-cat">Категория</label><select id="b-cat" name="category" required><option value="">—</option>{% for c in cats %}<option value="{{ c.pk }}"{% if form.category == c.pk|stringformat:"s" %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
-      <div class="field"><label class="field__label" for="b-horse">Лошадь</label><select id="b-horse" name="horse" required><option value="">—</option>{% for h in horses %}<option value="{{ h.pk }}"{% if form.horse == h.pk|stringformat:"s" %} selected{% endif %}>{{ h.name }}</option>{% endfor %}</select></div>
+      <div class="field"><label class="field__label" for="b-horse">Лошадь</label><select id="b-horse" name="horse" required><option value="">— выберите —</option>{% for h in horses %}<option value="{{ h.pk }}"{% if form.horse == h.pk|stringformat:"s" %} selected{% endif %}>{{ h.name }}</option>{% endfor %}{% if staff %}<option value="new"{% if form.horse == "new" %} selected{% endif %}>+ Вписать лошадь вручную</option>{% endif %}</select></div>
+      {% if staff %}<div data-show-when="horse=new" class="form-row">
+        <div class="field"><label class="field__label" for="b-nh">Кличка</label><input id="b-nh" name="new_horse" value="{{ form.new_horse }}" placeholder="Обязательно"></div>
+        <div class="field"><label class="field__label" for="b-no">Владелец или всадник</label><input id="b-no" name="new_owner" value="{{ form.new_owner }}" placeholder="Необязательно"></div>
+      </div>{% endif %}
       <div class="form-row"><div class="field"><label class="field__label" for="b-a">Заезд</label><input id="b-a" type="date" name="arrive" value="{{ form.arrive }}" required></div><div class="field"><label class="field__label" for="b-d">Выезд</label><input id="b-d" type="date" name="depart" value="{{ form.depart }}" required></div></div>
       <label class="check"><input type="checkbox" name="required"{% if form.required %} checked{% endif %}><span>Без денника выступления этой лошади невозможны</span></label>
       <p class="field__help">Тогда выступления лошади попадут в стартовый протокол только после подтверждения брони.</p>
-      <div class="field"><label class="field__label" for="b-p">Телефон для связи по брони <span class="field__optional">необязательно</span></label><input id="b-p" type="tel" name="contact_phone" value="{{ form.contact_phone }}" placeholder="+7 900 000-00-00"><p class="field__help">Увидит только конюшня турнира.</p></div>
-      <div class="field"><label class="field__label" for="b-c">Комментарий <span class="field__optional">необязательно</span></label><input id="b-c" type="text" name="comment" value="{{ form.comment }}" maxlength="500"></div>
+      <div class="field"><label class="field__label" for="b-p">Телефон для связи по брони </label><input id="b-p" placeholder="Необязательно" type="tel" name="contact_phone" value="{{ form.contact_phone }}"><p class="field__help">Увидит только конюшня турнира.</p></div>
+      <div class="field"><label class="field__label" for="b-c">Комментарий</label><input id="b-c" placeholder="Необязательно" type="text" name="comment" value="{{ form.comment }}" maxlength="500"></div>
       {% if preview %}
         <div class="summary-box">
           <div class="caption muted">ПРОВЕРЬТЕ БРОНЬ</div>
@@ -54,7 +58,7 @@
         <input type="hidden" name="confirm" value="1">
         <button class="btn btn--primary btn--block">Забронировать</button>
       {% else %}
-        <button class="btn btn--dark btn--block"{% if not horses %} disabled{% endif %}>Проверить даты</button>
+        <button class="btn btn--dark btn--block"{% if not horses and not staff %} disabled{% endif %}>Проверить даты</button>
       {% endif %}
     </form>
     {% endif %}
@@ -62,7 +66,7 @@
 </div>
 <script>
 document.querySelectorAll("#book select, #book input[type=date]").forEach(function (el) {
-  el.addEventListener("change", function () { var c = document.querySelector("#book input[name=confirm]"); if (c) { c.remove(); var b = document.querySelector("#book button.btn--primary"); if (b) { b.className = "btn btn--dark btn--block"; b.textContent = "Пересчитать сумму"; } } });
+  el.addEventListener("change", function () { var c = document.querySelector("#book input[name=confirm]"); if (c) { c.remove(); var b = document.querySelector("#book button.btn--primary"); if (b) { b.className = "btn btn--dark btn--block"; b.textContent = "Проверить снова"; } } });
 });
 </script>
 {% endblock %}

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}{% if athlete %}{{ athlete.full_name }}{% else %}Новый спортсмен{% endif %} — EquiStart{% endblock %}
+{% block title %}{% if athlete %}{{ athlete.full_name }}{% else %}Новый спортсмен{% endif %} — СтартЛист{% endblock %}
 {% block content %}
 <section class="auth">
   <div class="card auth__card auth__card--wide">
-    <a class="back" href="{% if athlete %}{% url 'profiles:athlete' athlete.pk %}{% else %}{% url 'profiles:athletes' %}{% endif %}">← Назад</a>
+    <a class="back" href="{% if next %}{{ next }}{% elif athlete %}{% url 'profiles:athlete' athlete.pk %}{% else %}{% url 'profiles:athletes' %}{% endif %}">{% if next %}← Вернуться к заявке{% else %}← Назад{% endif %}</a>
     <h1 class="h1">{% if athlete %}Изменить спортсмена{% elif myself %}Мой профиль спортсмена{% else %}Новый спортсмен{% endif %}</h1>
     <p class="muted">Обязательно только ФИО. Остальное — когда этого требует зачёт.</p>
     <form method="post" novalidate class="form">
@@ -29,8 +29,7 @@
         {% include "partials/field.html" with field=form.fei_id %}
         {% include "partials/field.html" with field=form.coach_name %}
       </div>
-      {% include "partials/field.html" with field=form.consent %}
-      <p class="field__help">Публикуются фамилия, имя, год рождения, разряд, клуб и тренер — по <a href="{% url 'core:publication_consent' %}" target="_blank" rel="noopener">согласию на публикацию</a>.</p>
+      <p class="field__help">В протоколах публикуются фамилия, имя, год рождения, разряд, клуб и тренер.</p>
       <button type="submit" class="btn btn--primary btn--block">Сохранить</button>
     </form>
   </div>

@@ -1,0 +1,1 @@
+<span class="chip {% if t.status == 'resolved' %}chip--success{% elif t.status == 'waiting' %}chip--warning{% else %}chip--info{% endif %}">{{ t.get_status_display }}</span>{% if t.urgent %} <span class="chip chip--danger">Идёт турнир</span>{% endif %}

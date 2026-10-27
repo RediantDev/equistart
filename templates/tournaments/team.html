@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Команда — {{ t.title }} — EquiStart{% endblock %}
+{% block title %}Команда — {{ t.title }} — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <a class="back" href="{% if manage %}{% url 'tournaments:step' t.pk 4 %}{% else %}{% url 'tournaments:mine' %}{% endif %}">← {{ t.title }}</a>
+    {% include "partials/crumbs.html" with here="Команда турнира" %}
     <h1 class="h1">Команда турнира</h1>
     <p class="muted">Роли выдаются по номеру телефона. Права появляются, когда человек примет приглашение в своём кабинете.</p>
   </div>

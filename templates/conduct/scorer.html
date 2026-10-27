@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Судья-подсчёт · {{ p.name }} — EquiStart{% endblock %}
+{% block title %}Итоги езды · {{ p.name }} — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
     <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← {{ p.name }}</a>
-    <h1 class="h1">Судья-подсчёт</h1>
+    <h1 class="h1">Итоги езды</h1>
+    <p class="muted">Судья по итогам сводит листы судей, проверяет расхождения, утверждает и публикует результаты.</p>
     <p class="muted">{{ test.name }}. Итог пары — среднее процентов судей, когда все листы подписаны. Если процент одного судьи отличается от среднего остальных на 5 пунктов и больше, его ячейка подсвечена — повод проверить лист; вернуть лист можно с причиной, судья увидит её.</p>
   </div>
   <form method="post" action="{% url 'conduct:scorer_action' t.pk p.pk 'approve_all' %}">{% csrf_token %}<button class="btn btn--dark">Утвердить все готовые</button></form>

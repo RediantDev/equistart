@@ -1,0 +1,31 @@
+{# Боковая навигация старта: экраны этого маршрута/езды и переход к другим (тест 4, п. 81) #}
+<nav class="start-nav" aria-label="Этот старт">
+  <div class="start-nav__block">
+    {% if has_panel %}
+      {% for l in my_letters %}<a class="btn btn--dark btn--block" href="{% url 'conduct:judge_sheet' t.pk p.pk l %}">Мой лист · {{ l }}</a>{% endfor %}
+      {% if is_scorer or user.pk == t.owner_id %}<a class="btn btn--dark btn--block" href="{% url 'conduct:scorer' t.pk p.pk %}">Итоги езды</a>{% endif %}
+    {% else %}
+      <a class="btn btn--dark btn--block" href="{% url 'conduct:live' t.pk p.pk %}">Экран судьи</a>
+    {% endif %}
+  </div>
+  <ul class="start-nav__list">
+    {% for k, label in tabs %}<li><a class="start-nav__link{% if tab == k %} is-active{% endif %}" href="?tab={{ k }}">{{ label }}</a></li>{% endfor %}
+  </ul>
+  <div class="start-nav__cap">Как видят участники</div>
+  <ul class="start-nav__list">
+    <li><a class="start-nav__link" href="{% url 'tournaments:public' t.pk %}?tab=results#prog-{{ p.pk }}">Результаты</a></li>
+    <li><a class="start-nav__link" href="{% url 'tournaments:public' t.pk %}">Программа турнира</a></li>
+  </ul>
+  <div class="start-nav__cap">Турнир</div>
+  <ul class="start-nav__list">
+    <li><a class="start-nav__link" href="{% url 'conduct:overview' t.pk %}">Все маршруты и езды</a></li>
+    <li><a class="start-nav__link" href="{% url 'tournaments:hub' t.pk %}">Панель турнира</a></li>
+    <li><a class="start-nav__link" href="{% url 'entries:manage' t.pk %}">Все заявки турнира</a></li>
+  </ul>
+  {% if others %}
+  <div class="start-nav__cap">Другие старты</div>
+  <ul class="start-nav__list">
+    {% for o in others %}<li><a class="start-nav__link start-nav__link--sm" href="{% url 'conduct:program' t.pk o.pk %}">{% if o.start_time %}<span class="num">{{ o.start_time|time:"H:i" }}</span> {% endif %}{{ o.name }}<span class="table__sub">{{ o.day|date:"j E" }}</span></a></li>{% endfor %}
+  </ul>
+  {% endif %}
+</nav>

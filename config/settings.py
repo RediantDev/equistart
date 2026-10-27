@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     "apps.stables",
     "apps.sport",
     "apps.clubs",
+    "apps.support",
 ]
 
 MIDDLEWARE = [
@@ -124,7 +125,7 @@ LOGIN_REDIRECT_URL = "accounts:cabinet"
 LOGOUT_REDIRECT_URL = "core:calendar"
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "apps.accounts.validators.PersonalDataSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -212,7 +213,7 @@ LOGGING = {
     "root": {"handlers": ["console"], "level": "INFO" if IS_PRODUCTION else "WARNING"},
 }
 
-SITE_NAME = "EquiStart"
+SITE_NAME = "СтартЛист"
 
 # В разработке WhiteNoise отдаёт файлы прямо из static/ без collectstatic.
 WHITENOISE_USE_FINDERS = not IS_PRODUCTION
@@ -233,8 +234,27 @@ LEGAL_DOCS_VERSION = "2026-10-14"
 # только через view с проверкой прав. В production — S3-совместимое хранилище в РФ.
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT") or BASE_DIR / "media")
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2_621_440
-DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 22 * 1024 * 1024
 
 # Ограничение числа полей формы снято: судья принимает решения по сотням выступлений за раз (отчёт тестирования 22.10.2026, К1).
 DATA_UPLOAD_MAX_NUMBER_FIELDS = None
 CSRF_FAILURE_VIEW = "apps.core.errors.csrf_failure"
+
+# Поддержка пользователей (ТЗ 13.2)
+SUPPORT_TELEGRAM = os.environ.get("SUPPORT_TELEGRAM", "")  # адрес Telegram поддержки для подвала (Q11 — пришлёт заказчик)
+SUPPORT_ALERT_EMAIL = os.environ.get("SUPPORT_ALERT_EMAIL", "")  # куда дублировать срочные обращения «Идёт турнир»
+SUPPORT_MAX_PER_HOUR_GUEST = int(os.environ.get("SUPPORT_MAX_PER_HOUR_GUEST", "3"))
+SUPPORT_MAX_PER_HOUR_USER = int(os.environ.get("SUPPORT_MAX_PER_HOUR_USER", "10"))
+
+# Почта — только письма поддержки (SUP-05, SUP-07). Без настроек SMTP письма пишутся в журнал сервера.
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND") or (
+    "django.core.mail.backends.smtp.EmailBackend" if os.environ.get("EMAIL_HOST") else "django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "465"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", default=EMAIL_PORT == 465)
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", default=EMAIL_PORT == 587)
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "СтартЛист <support@localhost>")  # адрес отправителя — Q11

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ club.name }} — модерация — EquiStart{% endblock %}
+{% block title %}{{ club.name }} — модерация — СтартЛист{% endblock %}
 {% block content %}
 <a class="back" href="{% url 'moderation:clubs' %}">← Клубы на проверке</a>
 <h1 class="h1 break">{{ club.name }} <span class="chip">{% if club.merged_into %}Объединён{% else %}{{ club.get_status_display }}{% endif %}</span></h1>
@@ -12,7 +12,7 @@
   <div class="summary__grid">
     <div><div class="caption muted">РЕГИОН, ГОРОД</div><div class="label">{{ club.region_name }}, {{ club.settlement }}</div></div>
     <div><div class="caption muted">АДРЕС</div><div class="label">{{ club.address }}</div></div>
-    <div><div class="caption muted">КОНТАКТЫ</div><div class="label break">{{ club.phone }} {{ club.email }} {{ club.site }}</div></div>
+    <div><div class="caption muted">КОНТАКТЫ</div><div class="label break">{{ club.phone }} {{ club.email }} {{ club.site }}</div>{% if club.socials %}<div class="caption muted" style="margin-top: 6px;">СОЦСЕТИ (станут ссылками на странице клуба)</div><div class="label break">{{ club.socials }}</div>{% endif %}{% if club.logo %}<img class="club-logo" src="{% url 'clubs:file' 'logo' club.pk %}" alt="Логотип" style="margin-top: 6px;">{% endif %}</div>
     <div><div class="caption muted">УПРАВЛЯЮТ</div>{% for u in managers %}<div class="label">{{ u.full_name }} · {{ u.phone }}{% if forloop.first %} (владелец){% endif %}</div>{% endfor %}</div>
   </div>
   {% if club.is_public and club.substantial_changed %}
@@ -46,7 +46,7 @@
 <section class="card stack" style="margin-top: var(--space-4);">
   <h2 class="h2">Новости клуба</h2>
   {% for n in news %}
-    <article class="row-card"><div style="flex: 1 1 180px; min-width: 0;"><strong>{{ n.title }}</strong><div class="table__sub">{{ n.published_at|date:"j E Y" }}{% if n.hidden %} · скрыта: {{ n.hidden_reason }}{% endif %}</div><p class="table__sub">{{ n.text|truncatechars:200 }}</p></div>
+    <article class="row-card"><div class="break" style="flex: 1 1 180px; min-width: 0;"><strong>{{ n.title }}</strong><div class="table__sub">{{ n.published_at|date:"j E Y" }}{% if n.hidden %} · скрыта: {{ n.hidden_reason }}{% endif %}</div><p class="table__sub">{{ n.text|truncatechars:200 }}</p></div>
       {% if not n.hidden %}<form method="post" class="form">{% csrf_token %}<input type="hidden" name="news" value="{{ n.pk }}"><input name="reason" placeholder="Причина" aria-label="Причина скрытия" required><button class="btn btn--ghost btn--sm" name="decision" value="hide_news">Скрыть</button></form>{% endif %}
     </article>
   {% endfor %}

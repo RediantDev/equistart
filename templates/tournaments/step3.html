@@ -11,8 +11,8 @@
       <p>Загружено: <a href="{% url 'tournaments:regulation_working' t.pk %}" target="_blank" rel="noopener">открыть положение (PDF)</a>. Чтобы заменить, выберите новый файл.</p>
     {% endif %}
     <div class="field{% if form.regulation.errors %} field--error{% endif %}">
-      <label class="field__label" for="{{ form.regulation.id_for_label }}">{% if t.regulation %}Новый файл{% else %}Файл положения{% endif %}</label>
-      <input type="file" name="regulation" id="{{ form.regulation.id_for_label }}" accept="application/pdf">
+      <label class="field__label" for="{{ form.regulation.id_for_label }}">{% if t.regulation %}Новый файл{% else %}Файл положения <span class="field__optional">обязательно для отправки на проверку</span>{% endif %}</label>
+      <input type="file" name="regulation" id="{{ form.regulation.id_for_label }}" accept="application/pdf,.pdf" data-max-mb="20">
       <p class="field__help">{{ form.regulation.help_text }}</p>
       {% for error in form.regulation.errors %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ error }}</p>{% endfor %}
     </div>
@@ -20,10 +20,15 @@
 
   <div class="form__group" style="border-bottom: 0; padding-bottom: 0;">
     <h2 class="h3">Сроки и условия</h2>
-    <div class="grid-2">{% include "partials/field.html" with field=form.entry_deadline %}</div>
+    <div class="grid-2">{% include "partials/field.html" with field=form.entry_deadline %}{% include "partials/field.html" with field=form.entry_deadline_time %}</div>
     {% include "partials/field.html" with field=form.cancel_terms %}
   </div>
 
+  {% if left3 %}
+  <div class="alert alert--error" role="alert" style="margin-top: var(--space-4);">
+    <strong>Чтобы перейти к проверке, осталось:</strong>
+    <ul style="margin: 6px 0 0; padding-left: 1.2em;">{% for text in left3 %}<li>{{ text }}</li>{% endfor %}</ul>
+  </div>{% endif %}
   <div class="form-actions">
     <a class="btn btn--ghost" href="{% url 'tournaments:step' t.pk 2 %}">← Программа и зачёты</a>
     <button type="submit" name="save" class="btn btn--ghost"{% if t.is_locked %} disabled{% endif %}>Сохранить</button>

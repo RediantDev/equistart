@@ -15,4 +15,6 @@ urlpatterns = [
     path("proposals/<int:pk>/decide/", views.proposal_decide, name="proposal_decide"),
     path("organizer/t/<int:pk>/entries/", views.manage, name="manage"),
     path("organizer/t/<int:pk>/entries/decide/", views.manage_decide, name="decide"),
+    path("organizer/t/<int:pk>/entries/add/", views.quick_add, name="quick_add"),
+    path("organizer/t/<int:pk>/entries/add/search/", views.quick_search, name="quick_search"),
 ]

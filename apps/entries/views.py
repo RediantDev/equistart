@@ -2,11 +2,12 @@ import uuid
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.accounts.phone import normalize_phone
@@ -82,6 +83,7 @@ def _parse_choice(raw):
     return _int(cid), _int(ht)
 
 
+@never_cache  # «Назад» в браузере не показывает устаревшую форму без новой лошади
 @login_required
 @require_http_methods(["GET", "POST"])
 def apply(request, pk):
@@ -98,7 +100,7 @@ def apply(request, pk):
     cart = _cart(request, t, late)
     athletes = list(athletes_for_entry(request.user))
     by_a = {a.pk: a for a in athletes}
-    horse_ids = set(Horse.objects.filter(manager=request.user, archived=False).values_list("pk", flat=True)) | set(cart["horses"])
+    horse_ids = set(Horse.objects.filter(manager=request.user, archived=False, added_by_judge=False).values_list("pk", flat=True)) | set(cart["horses"])
     horses = list(Horse.objects.filter(pk__in=horse_ids).order_by("name"))
     by_h = {h.pk: h for h in horses}
     programs = _programs(t)
@@ -157,9 +159,15 @@ def apply(request, pk):
                 picks.append((cid, ht, request.POST.get("confirm") == "1"))
             else:
                 for p in programs:
-                    cid, ht = _parse_choice(request.POST.get(f"sel_{p.pk}"))
-                    if cid:
-                        picks.append((cid, ht, request.POST.get(f"confirm_{p.pk}") == "1"))
+                    chosen = [v for v in request.POST.getlist(f"sel_{p.pk}") if v]
+                    multi = p.heights and len(p.heights) > 1
+                    if len(chosen) > 1 and not multi:
+                        errors.append(f"{p.name}: в одном маршруте пара выступает в одном зачёте — оставьте один.")
+                        continue
+                    for raw in chosen:  # тест 4.2: в маршруте с несколькими высотами — можно несколько высот
+                        cid, ht = _parse_choice(raw)
+                        if cid:
+                            picks.append((cid, ht, request.POST.get(f"confirm_{p.pk}") == "1"))
             if not (a and h):
                 errors.append("Пара не найдена — добавьте её заново.")
             elif not picks:
@@ -190,15 +198,21 @@ def apply(request, pk):
                     _save_cart(request, t, late, cart)
                     messages.success(request, f"{a.public_name} / {h.name}: добавлено {len(added)} — " + "; ".join(added) + ".")
                 if not errors:
-                    return back((a.pk, h.pk))
+                    # тест 4.2: после «Добавить выбранные» выбор сворачивается, видна сводка пары
+                    url = _apply_url(t, late)
+                    return redirect(url + ("&" if "?" in url else "?") + f"open=-#pair-{a.pk}-{h.pk}")
                 open_pair = f"{a.pk}-{h.pk}"
         if action == "submit":
             lines = _load_lines(cart)
             try:
                 phone = normalize_phone(request.POST.get("contact_phone") or request.user.phone)
-            except Exception:
-                phone = request.user.phone
+            except ValidationError as e:
+                # тест первых пользователей: неверный телефон не подменяем молча телефоном из профиля
+                errors.append("Телефон для связи: " + e.messages[0])
+                phone = None
             try:
+                if not phone:
+                    raise ValueError(errors)
                 app = services.submit(
                     request.user, t.pk, lines, cart["key"], contact_name=request.POST.get("contact_name", "").strip(),
                     contact_phone=phone, comment=request.POST.get("comment", "").strip(), late=late,
@@ -246,7 +260,8 @@ def apply(request, pk):
                         opts.append({"value": f"{c.pk}|{ht}" if ht else str(c.pk), "label": label, "why": why, "conditions": c.conditions})
                 added = [(i, l) for i, l in mine if l.tclass.program_id == p.pk]
                 progs.append({"p": p, "opts": opts, "added": added, "never": any(c.rank_rule == "never" for c in p.classes.all()),
-                              "has_ok": any(not o["why"] for o in opts)})
+                              "has_ok": any(not o["why"] for o in opts),
+                              "need_birth": any("нужна дата рождения всадника" in (o["why"] or []) for o in opts)})
         pairs.append({"a": a, "h": h, "programs": progs, "count": len(mine), "open": is_open, "mine": mine})
     warnings = rules.entry_warnings(t, lines)
     return render(
@@ -254,6 +269,9 @@ def apply(request, pk):
         {
             "t": t, "s": t.snapshot, "late": late, "pairs": pairs, "lines": lines, "errors": errors, "warnings": warnings,
             "athletes": athletes, "horses": horses, "key": cart["key"],
+            # тест первых пользователей: единственный всадник/лошадь и только что созданные выбраны сразу
+            "sel_a": _int(request.GET.get("athlete")) or (athletes[0].pk if len(athletes) == 1 else None),
+            "sel_h": _int(request.GET.get("horse")) or (horses[0].pk if len(horses) == 1 else None),
         },
     )
 
@@ -372,7 +390,7 @@ def propose(request, pk):
     if e.application.submitted_by_id != request.user.pk:
         raise PermissionDenied
     athletes = list(athletes_for_entry(request.user))
-    horse_ids = set(Horse.objects.filter(manager=request.user, archived=False).values_list("pk", flat=True)) | {e.horse_id}
+    horse_ids = set(Horse.objects.filter(manager=request.user, archived=False, added_by_judge=False).values_list("pk", flat=True)) | {e.horse_id}
     horses = list(Horse.objects.filter(pk__in=horse_ids).order_by("name"))
     class_groups, classes = _class_choices(e.tournament)
     if request.method == "POST":
@@ -419,23 +437,40 @@ def _manage_qs(t, f):
 PAGE_SIZE = 50
 
 
+TABS = [("pending", "На рассмотрении"), ("accepted", "Принятые"), ("rejected", "Отклонённые"), ("cancelled", "Отменённые")]
+
+
 @login_required
 def manage(request, pk):
-    from django.core.paginator import Paginator
-
+    """Экран заявок судьи (тест 4): вкладки по решению, внутри — маршрут → зачёт → пары; принять / отклонить в строке."""
     t = get_object_or_404(Tournament, pk=pk)
     services.require_judge(request.user, t)
-    f = {k: request.GET.get(k, "") for k in ("q", "decision", "program")}
-    qs = _manage_qs(t, f).select_related("application", "tclass").prefetch_related("proposals").order_by("day", "program_id", "pk")
-    page = Paginator(qs, PAGE_SIZE).get_page(request.GET.get("page"))
-    entries = list(page.object_list)
-    for e in entries:
+    from django.db.models import Count
+
+    counts = dict(Entry.objects.filter(tournament=t).order_by().values("decision").annotate(n=Count("id")).values_list("decision", "n"))
+    tab = request.GET.get("tab") or request.GET.get("decision") or ("pending" if counts.get("pending") else "accepted")
+    if tab not in dict(TABS):
+        tab = "pending"
+    f = {"q": request.GET.get("q", ""), "program": request.GET.get("program", ""), "decision": tab}
+    qs = (_manage_qs(t, f).select_related("application", "tclass", "program").prefetch_related("proposals")
+          .order_by("day", "program__start_time", "program__position", "program_id", "tclass__position", "tclass_id", "athlete_snapshot__name", "pk"))
+    groups, by_prog = [], {}
+    for e in qs:
         e.pending_proposal = next((p for p in e.proposals.all() if p.state == ChangeProposal.State.PENDING), None)
-    params = "&".join(f"{k}={v}" for k, v in f.items() if v)
+        g = by_prog.get(e.program_id)
+        if g is None:
+            g = by_prog[e.program_id] = {"p": e.program, "classes": [], "by_class": {}, "n": 0}
+            groups.append(g)
+        c = g["by_class"].get(e.tclass_id)
+        if c is None:
+            c = g["by_class"][e.tclass_id] = {"c": e.tclass, "entries": []}
+            g["classes"].append(c)
+        c["entries"].append(e)
+        g["n"] += 1
+    params = "&".join(f"{k}={v}" for k, v in (("q", f["q"]), ("program", f["program"])) if v)
     return render(request, "entries/manage.html", {
-        "t": t, "entries": entries, "page": page, "total": page.paginator.count, "params": params, "f": f,
-        "programs": t.programs.all(), "actions": services.ACTIONS, "decisions": Entry.Decision.choices,
-        "counts": services.summarize(Entry.objects.filter(tournament=t)),
+        "t": t, "groups": groups, "tab": tab, "tabs": [(k, l, counts.get(k, 0)) for k, l in TABS], "f": f, "params": params,
+        "programs": t.programs.all().order_by("day", "start_time", "position"), "total": sum(g["n"] for g in groups),
         "is_manager": tservices.can_manage(request.user, t),
     })
 
@@ -489,7 +524,11 @@ def manage_decide(request, pk):
 def _report(request, results):
     ok = [r for r in results if r.ok]
     bad = [r for r in results if not r.ok]
-    if ok:
+    if len(results) == 1 and ok:
+        e = Entry.objects.filter(pk=ok[0].entry_id).first()
+        who = f": {e.athlete_snapshot.get('name')} / {e.horse_snapshot.get('name')} — {e.program_name} · {e.class_name}" if e else ""
+        messages.success(request, f"{ok[0].text}{who}.")
+    elif ok:
         messages.success(request, f"Выполнено для {len(ok)} из {len(results)}.")
     reasons = {}
     for r in bad:
@@ -497,3 +536,63 @@ def _report(request, results):
     for text, ids in reasons.items():
         tail = ", ".join(f"#{i}" for i in ids[:5]) + (f" и ещё {len(ids) - 5}" if len(ids) > 5 else "")
         messages.error(request, f"Не выполнено для {len(ids)}: {text} ({tail}).")
+
+
+# ---------------- быстрое добавление пары судьёй (тест 4) ----------------
+
+@login_required
+def quick_add(request, pk):
+    from .forms import QuickAddForm
+
+    t = get_object_or_404(Tournament, pk=pk)
+    services.require_judge(request.user, t)
+    nxt = request.GET.get("next") or request.POST.get("next") or ""
+    nxt = nxt if nxt.startswith("/") and not nxt.startswith("//") else ""
+    program = request.GET.get("program", "")
+    initial = {}
+    if program.isdigit():
+        initial["classes"] = [str(c) for c in TournamentClass.objects.filter(program_id=int(program), program__tournament=t,
+                                                                            merged_into__isnull=True).values_list("pk", flat=True)[:1]]
+    form = QuickAddForm(t, request.POST or None, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        try:
+            entries = services.quick_add(request.user, t.pk, form.cleaned_data)
+        except ValueError as e:
+            messages.error(request, str(e))
+        else:
+            e = entries[0]
+            messages.success(request, f"Добавлено: {e.athlete_snapshot.get('name')} / {e.horse_snapshot.get('name')} — "
+                                      + ", ".join(f"{x.program_name} · {x.class_name}" for x in entries) + ". Выступления приняты.")
+            if "more" in request.POST:
+                return redirect(reverse("entries:quick_add", args=[t.pk]) + (f"?next={nxt}" if nxt else ""))
+            return redirect(nxt or reverse("entries:manage", args=[t.pk]) + "?tab=accepted")
+    groups = {}
+    for k, c in form.class_objs.items():
+        groups.setdefault(c.program, []).append((k, c))
+    selected = form["classes"].value() or []
+    return render(request, "entries/quick_add.html", {"t": t, "form": form, "groups": list(groups.items()), "selected": [str(x) for x in selected], "next": nxt})
+
+
+@login_required
+def quick_search(request, pk):
+    """Поиск спортсмена или лошади по всей базе для быстрого добавления (только судьям турнира)."""
+    from django.http import JsonResponse
+
+    from apps.profiles.models import Athlete, Horse
+
+    t = get_object_or_404(Tournament, pk=pk)
+    services.require_judge(request.user, t)
+    q = (request.GET.get("q") or "").strip()
+    if len(q) < 2:
+        return JsonResponse({"items": []})
+    words = q.split()
+    if request.GET.get("kind") == "horse":
+        qs = Horse.objects.filter(archived=False, name__icontains=q)[:10]
+        items = [{"id": h.pk, "title": h.name, "sub": h.summary()} for h in qs]
+    else:
+        qs = Athlete.objects.filter(archived=False)
+        for w in words:
+            qs = qs.filter(Q(last_name__icontains=w) | Q(first_name__icontains=w))
+        items = [{"id": a.pk, "title": a.full_name, "sub": " · ".join(x for x in (str(a.birth_year or ""), a.rank_short, a.club) if x)}
+                 for a in qs.order_by("last_name", "first_name")[:10]]
+    return JsonResponse({"items": items})

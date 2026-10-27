@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Мой клуб — EquiStart{% endblock %}
+{% block title %}Мой клуб — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
@@ -70,8 +70,8 @@
   <form method="post" action="{% url 'clubs:photo_add' %}" enctype="multipart/form-data" class="form">
     {% csrf_token %}
     <div class="grid-2">
-      <div class="field"><label class="field__label" for="ph">Фото</label><input id="ph" type="file" name="file" accept="image/jpeg,image/png" required><p class="field__help">JPEG или PNG до 10 МБ.</p></div>
-      <div class="field"><label class="field__label" for="cap">Подпись <span class="field__optional">необязательно</span></label><input id="cap" name="caption" maxlength="200" placeholder="Например, «Манеж 20×60»"></div>
+      <div class="field"><label class="field__label" for="ph">Фото</label><input id="ph" type="file" name="file" accept="image/jpeg,image/png" required><p class="field__help">JPEG или PNG до 20 МБ.</p></div>
+      <div class="field"><label class="field__label" for="cap">Подпись</label><input id="cap" name="caption" maxlength="200" placeholder="Например, «Манеж 20×60»"></div>
     </div>
     <div class="form__actions"><button type="submit" class="btn btn--dark btn--sm">Добавить фото</button></div>
   </form>

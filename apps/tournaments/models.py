@@ -53,6 +53,8 @@ class Tournament(models.Model):
         CLUB = "club", "Клубные"
         MUNICIPAL = "municipal", "Муниципальные"
         REGIONAL = "regional", "Региональные"
+        NATIONAL = "national", "Всероссийские"
+        INTERNATIONAL = "international", "Международные"
         OTHER = "other", "Иной статус"
 
     class Status(models.TextChoices):
@@ -60,6 +62,7 @@ class Tournament(models.Model):
         REVIEW = "review", "На проверке"
         RETURNED = "returned", "Нужны исправления"
         APPROVED = "approved", "Опубликован без изменений"
+        REJECTED = "rejected", "Отклонён модератором"
 
     class Publication(models.TextChoices):
         NONE = "none", "Не опубликован"
@@ -77,9 +80,10 @@ class Tournament(models.Model):
     timezone = models.CharField("часовой пояс", max_length=64, blank=True)
     contact_name = models.CharField("контакт для участников: имя", max_length=120, blank=True)
     contact = models.CharField("контакт для участников: телефон", max_length=200, blank=True, help_text="Виден всем на странице турнира (TRN-02)")
-    level = models.CharField("статус соревнований", max_length=12, choices=Level.choices, default=Level.CLUB)
+    level = models.CharField("статус соревнований", max_length=16, choices=Level.choices, default=Level.CLUB)
     classification = models.BooleanField("классификационные (присвоение разрядов)", default=False)
     entry_deadline = models.DateField("последний день подачи заявок", null=True, blank=True)
+    entry_deadline_time = models.TimeField("заявки до (время)", null=True, blank=True)
     cancel_terms = models.TextField("условия отмены", blank=True)
     regulation = models.FileField("положение (PDF)", upload_to="regulations/%Y/%m/", blank=True)
 
@@ -102,6 +106,7 @@ class Tournament(models.Model):
     pub_region = models.CharField(max_length=16, blank=True)
     pub_disciplines = ArrayField(models.CharField(max_length=32), default=list, blank=True)
     pub_deadline = models.DateField(null=True, blank=True)
+    pub_deadline_time = models.TimeField(null=True, blank=True)
     pub_timezone = models.CharField(max_length=64, blank=True)
     cancelled_reason = models.TextField(blank=True)
     min_gap_starts = models.PositiveSmallIntegerField(
@@ -142,7 +147,7 @@ class Tournament(models.Model):
     @property
     def is_official(self):
         """Официальные соревнования (не клубные) — для подсказок по ограничениям Правил."""
-        return self.level in (self.Level.MUNICIPAL, self.Level.REGIONAL)
+        return self.level in (self.Level.MUNICIPAL, self.Level.REGIONAL, self.Level.NATIONAL, self.Level.INTERNATIONAL)
 
     @property
     def is_published(self):
@@ -151,15 +156,17 @@ class Tournament(models.Model):
     @property
     def is_locked(self):
         """Во время проверки рабочую копию менять нельзя."""
-        return self.status == self.Status.REVIEW
+        return self.status in (self.Status.REVIEW, self.Status.REJECTED)
 
     def public_entries_open(self, now=None) -> bool:
         """Открыт ли приём заявок по опубликованной версии (по времени места проведения)."""
         if self.publication != self.Publication.PUBLISHED or not self.pub_deadline or not self.pub_timezone:
             return False
         now = now or timezone.now()
-        local_today = now.astimezone(zoneinfo.ZoneInfo(self.pub_timezone)).date()
-        return local_today <= self.pub_deadline
+        local = now.astimezone(zoneinfo.ZoneInfo(self.pub_timezone))
+        if local.date() != self.pub_deadline:
+            return local.date() < self.pub_deadline
+        return self.pub_deadline_time is None or local.time().replace(second=0, microsecond=0) <= self.pub_deadline_time
 
     def mark_changed(self):
         """Правка опубликованного или возвращённого турнира делает рабочую копию черновиком."""
@@ -356,7 +363,7 @@ class TeamMember(models.Model):
         REVOKED = "revoked", "Отозвано"
 
     tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name="team")
-    phone = models.CharField("телефон", max_length=13)
+    phone = models.CharField("телефон", max_length=16)
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.CASCADE, related_name="team_roles")
     role = models.CharField("роль", max_length=16, choices=Role.choices)
     title = models.CharField("должность", max_length=80, blank=True, help_text="Главный судья, главный секретарь, курс-дизайнер… Прав не меняет.")

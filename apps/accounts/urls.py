@@ -12,4 +12,7 @@ urlpatterns = [
     path("verify-phone/", views.verify_phone, name="verify_phone"),
     path("cabinet/password/", views.change_password, name="password"),
     path("cabinet/add-role/", views.add_role, name="add_role"),
+    path("profile/", views.profile, name="profile"),
+    path("profile/phone/", views.change_phone, name="phone"),
+    path("profile/remove-role/", views.remove_role, name="remove_role"),
 ]

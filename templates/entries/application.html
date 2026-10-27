@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Заявка №{{ app.pk }} — EquiStart{% endblock %}
+{% block title %}Заявка №{{ app.pk }} — СтартЛист{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
@@ -24,7 +24,7 @@
         <div class="list-cards">
           {% for e in entries %}
             <article class="entry-row{% if not e.is_active %} is-muted{% endif %}">
-              {% if owner %}<input type="checkbox" name="entry" value="{{ e.pk }}" aria-label="Выбрать {{ e.athlete_snapshot.name }} / {{ e.horse_snapshot.name }}"{% if not e.is_active or e.is_started %} disabled{% endif %}><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}">{% endif %}
+              {% if owner %}<label class="entry-row__pick"><input type="checkbox" name="entry" value="{{ e.pk }}" aria-label="Выбрать {{ e.athlete_snapshot.name }} / {{ e.horse_snapshot.name }}"{% if not e.is_active or e.is_started %} disabled{% endif %}></label><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}">{% endif %}
               <div class="entry-row__main">
                 <strong>{{ e.athlete_snapshot.name }}</strong> на <strong>{{ e.horse_snapshot.name }}</strong>
                 <span class="table__sub">{{ e.program_name }} · {{ e.class_name }} · {{ e.day|date:"j E" }}</span>

@@ -13,7 +13,10 @@ class ClubForm(forms.ModelForm):
         widgets = {"description": forms.Textarea(attrs={"rows": 5}), "logo": forms.FileInput(attrs={"accept": "image/jpeg,image/png"})}
         help_texts = {"name": "Как клуб называют участники: «КСК «Пегас»».", "address": "Улица, дом или ориентир — для навигатора.",
                       "description": "Пара абзацев: площадки, манежи, чем занимаетесь. Видно всем после подтверждения.",
-                      "logo": "JPEG или PNG до 10 МБ."}
+                      "logo": "JPEG или PNG до 20 МБ.",
+                      # тест судьи и клуба: контакты публичны — предупреждаем; без запрещённых в РФ соцсетей в подсказке
+                      "socials": "Ссылки через пробел, например VK и Telegram. Будут видны на странице клуба.",
+                      "phone": "Будет виден всем на странице клуба.", "email": "Будет виден всем на странице клуба."}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -37,13 +40,13 @@ class ClubForm(forms.ModelForm):
 
 class NewsForm(forms.ModelForm):
     photos = forms.FileField(label="Фото", required=False, widget=forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png"}),
-                             help_text="JPEG или PNG до 10 МБ. Можно добавить ещё после сохранения.")
+                             help_text="JPEG или PNG до 20 МБ. Можно добавить ещё после сохранения.")
 
     class Meta:
         model = ClubNews
         fields = ["title", "text", "tournament"]
         widgets = {"text": forms.Textarea(attrs={"rows": 6})}
-        labels = {"tournament": "Турнир (необязательно)"}
+        labels = {"tournament": "Турнир"}
 
     def __init__(self, club, *args, **kwargs):
         super().__init__(*args, **kwargs)

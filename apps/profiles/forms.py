@@ -8,15 +8,11 @@ from apps.accounts.phone import normalize_phone
 from .models import Athlete, Horse, HorseDocument, normalize_fksr
 
 DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
-DOC_MAX = 10 * 1024 * 1024
+DOC_MAX = 20 * 1024 * 1024
 DOC_SIGNATURES = {b"%PDF-": "application/pdf", b"\x89PNG\r": "image/png", b"\xff\xd8\xff": "image/jpeg"}
 
 
 class AthleteForm(forms.ModelForm):
-    consent = forms.BooleanField(
-        label="Спортсмен (а за несовершеннолетнего — законный представитель) согласен на обработку данных и публикацию в протоколах",
-        required=False,
-    )
 
     class Meta:
         model = Athlete
@@ -34,8 +30,6 @@ class AthleteForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for f in ("rank_jumping", "rank_dressage"):
             self.fields[f].choices = [("", "— не указан —")] + list(self.fields[f].choices)[1:]
-        if self.instance.pk and self.instance.consent_confirmed_at:
-            self.fields["consent"].initial = True
 
     def clean_birth_date(self):
         d = self.cleaned_data.get("birth_date")
@@ -56,13 +50,6 @@ class AthleteForm(forms.ModelForm):
 
     def clean_fei_id(self):
         return self._unique("fei_id", "FEI ID")
-
-    def clean(self):
-        c = super().clean()
-        if not c.get("consent") and not (self.instance.pk and self.instance.consent_confirmed_at):
-            self.add_error("consent", "Без согласия спортсмена его нельзя добавить в заявку и протоколы.")
-        return c
-
 
 class HorseForm(forms.ModelForm):
     class Meta:
@@ -113,12 +100,12 @@ class DocumentForm(forms.ModelForm):
         model = HorseDocument
         fields = ["kind", "title", "file", "valid_until"]
         widgets = {"valid_until": DATE}
-        help_texts = {"file": "PDF, JPEG или PNG до 10 МБ."}
+        help_texts = {"file": "PDF, JPEG или PNG до 20 МБ."}
 
     def clean_file(self):
         f = self.cleaned_data["file"]
         if f.size > DOC_MAX:
-            raise ValidationError("Файл больше 10 МБ.")
+            raise ValidationError("Файл больше 20 МБ.")
         head = f.read(5)
         f.seek(0)
         for sig, ct in DOC_SIGNATURES.items():

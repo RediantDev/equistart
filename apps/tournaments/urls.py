@@ -9,6 +9,7 @@ urlpatterns = [
     path("t/<int:pk>/regulation.pdf", views.public_regulation, name="public_regulation"),
     path("organizer/", views.my_tournaments, name="mine"),
     path("organizer/new/", views.create, name="create"),
+    path("organizer/t/<int:pk>/", views.hub, name="hub"),
     path("organizer/t/<int:pk>/step/<int:step>/", views.step, name="step"),
     path("organizer/t/<int:pk>/programs/add/", views.program_save, name="program_add"),
     path("organizer/t/<int:pk>/programs/<int:item_id>/", views.program_edit, name="program_edit"),
@@ -36,13 +37,24 @@ def _club_mod(name):
     return view
 
 
+def _support_mod(name):
+    def view(request, *a, **kw):
+        from apps.support import views as sv
+
+        return getattr(sv, name)(request, *a, **kw)
+    return view
+
+
 moderation_patterns = (
     [
         path("", moderation.queue, name="queue"),
+        path("panel/", moderation.panel, name="panel"),
         path("t/<int:pk>/", moderation.detail, name="detail"),
         path("t/<int:pk>/decide/", moderation.decide, name="decide"),
         path("clubs/", _club_mod("mod_queue"), name="clubs"),
         path("clubs/<int:pk>/", _club_mod("mod_detail"), name="club"),
+        path("support/", _support_mod("mod_queue"), name="support"),
+        path("support/<int:pk>/", _support_mod("mod_detail"), name="support_detail"),
     ],
     "moderation",
 )

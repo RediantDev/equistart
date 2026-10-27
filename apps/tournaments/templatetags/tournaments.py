@@ -63,9 +63,14 @@ def daterange(start, end):
 
 @register.filter
 def phone(value):
-    from apps.accounts.phone import format_phone
+    from apps.accounts.phone import format_phone, normalize_phone
 
-    return format_phone(value) if value else ""
+    if not value:
+        return ""
+    try:
+        return format_phone(normalize_phone(str(value)))
+    except Exception:
+        return value
 
 
 @register.filter
@@ -108,3 +113,27 @@ def rub_input(kopecks):
 def split(value, sep=","):
     """«0,1,2» → ["0", "1", "2"] — для кнопок в шаблоне."""
     return str(value).split(sep)
+
+
+@register.filter
+def heights_extra(p):
+    """Подпись высоты для второй строки — только если её ещё нет в названии (тест 4: не дублировать высоту)."""
+    get_ = (lambda k: p.get(k)) if isinstance(p, dict) else (lambda k: getattr(p, k, None))
+    label, name = get_("heights_label") or "", get_("name") or ""
+    if not label:
+        return ""
+    digits = label.replace(" см", "").replace(", ", "-").replace(",", "-")
+    return "" if digits in name or label in name else label
+
+
+@register.filter
+def ph(bound):
+    """Поле формы с подсказкой внутри: «Обязательно» / «Необязательно», если своей подсказки нет (тест 4.2, п. 19)."""
+    w = bound.field.widget
+    attrs = {}
+    input_type = getattr(w, "input_type", None)
+    if input_type not in ("checkbox", "radio", "file", "hidden") and not getattr(w, "allow_multiple_selected", False) \
+            and not w.attrs.get("placeholder") and w.__class__.__name__ not in ("Select", "RadioSelect", "NullBooleanSelect"):
+        required = bound.field.required or getattr(bound.field, "show_required", False)
+        attrs["placeholder"] = "Обязательно" if required else "Необязательно"
+    return bound.as_widget(attrs=attrs) if attrs else bound

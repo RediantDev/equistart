@@ -64,4 +64,6 @@ class EndToEndTests(Base):
         self.assertEqual(t.publication, Tournament.Publication.FINISHED)
         self.client.logout()
         self.assertEqual(self.client.get(reverse("tournaments:public", args=[t.pk]) + "?tab=results").status_code, 200)
+        self.assertEqual(self.client.get(reverse("conduct:results_xlsx", args=[t.pk, self.c_kids.pk])).status_code, 404)
+        self.client.force_login(self.org)
         self.assertEqual(self.client.get(reverse("conduct:results_xlsx", args=[t.pk, self.c_kids.pk])).status_code, 200)

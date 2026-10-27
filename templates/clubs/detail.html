@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}{{ club.public_name }} — EquiStart{% endblock %}
+{% block title %}{{ club.public_name }} — СтартЛист{% endblock %}
 {% block content %}
 <a class="back" href="{% url 'clubs:list' %}">← Все клубы</a>
 {% if not club.is_public %}<div class="alert alert--warning" role="status">Профиль ещё не опубликован — его видите только вы{% if user.is_moderator %} и модераторы{% endif %}.</div>
@@ -14,12 +14,12 @@
         <div class="table__sub">{{ club.public_region_name }}, {{ club.public_settlement }}{% if club.public_address %}, {{ club.public_address }}{% endif %}</div>
       </div>
     </div>
-    {% if club.description %}<p style="white-space: pre-line; margin-top: var(--space-4);">{{ club.description }}</p>{% endif %}
+    {% if club.description %}<p class="break" style="white-space: pre-line; margin-top: var(--space-4);">{{ club.description }}</p>{% endif %}
   </div>
   <div class="hero-card__side">
     <div class="caption muted">КОНТАКТЫ</div>
     <ul class="list">
-      {% if club.phone %}<li><a href="tel:{{ club.phone }}">{{ club.phone }}</a></li>{% endif %}
+      {% if club.phone %}<li><a href="tel:{{ club.phone|cut:' '|cut:'-'|cut:'('|cut:')' }}">{{ club.phone }}</a></li>{% endif %}
       {% if club.email %}<li><a href="mailto:{{ club.email }}">{{ club.email }}</a></li>{% endif %}
       {% if club.site %}<li><a href="{{ club.site }}" rel="noopener nofollow" target="_blank" class="break">{{ club.site }}</a></li>{% endif %}
       {% for s in club.social_links %}<li><a href="{{ s }}" rel="noopener nofollow" target="_blank" class="break">{{ s }}</a></li>{% endfor %}
@@ -61,8 +61,8 @@
     <article class="card news">
       <h3 class="h3">{{ n.title }}</h3>
       <div class="table__sub">{{ n.published_at|date:"j E Y" }}{% if n.tournament %} · <a href="{% url 'tournaments:public' n.tournament.pk %}">{{ n.tournament.pub_title|default:n.tournament.title }}</a>{% endif %}</div>
-      <p style="white-space: pre-line;">{{ n.text }}</p>
-      {% if n.photos.all %}<div class="photo-grid">{% for p in n.photos.all %}<img src="{% url 'clubs:file' 'news' p.pk %}" alt="" loading="lazy">{% endfor %}</div>{% endif %}
+      <p class="break" style="white-space: pre-line;">{{ n.text }}</p>
+      {% if n.photos.all %}<div class="photo-grid">{% for p in n.photos.all %}<img src="{% url 'clubs:file' 'news' p.pk %}" alt="Фото к новости «{{ n.title }}»" loading="lazy">{% endfor %}</div>{% endif %}
     </article>
   {% endfor %}
 </section>

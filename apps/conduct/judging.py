@@ -1,4 +1,4 @@
-"""Экраны судейства: конкур у поля (JMP-03…05, SCR-02) и выездка — судьи на буквах, судья на C, судья-подсчёт (DRS-02…10)."""
+"""Экраны судейства: конкур у поля (JMP-03…05, SCR-02) и выездка — судьи на буквах, судья на C, судья по итогам (DRS-02…10)."""
 
 import uuid
 from decimal import Decimal
@@ -9,6 +9,7 @@ from django.core.exceptions import PermissionDenied
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from apps.entries.models import Entry
@@ -55,7 +56,7 @@ def course_save(request, pk, program_id):
         messages.success(request, "Параметры маршрута сохранены. Результаты пересчитаны.")
     except ValueError as e:
         messages.error(request, str(e))
-    return redirect(reverse("conduct:program", args=[pk, p.pk]) + "#course")
+    return redirect(reverse("conduct:program", args=[pk, p.pk]) + "?tab=course")
 
 
 def _stage_list(p):
@@ -67,6 +68,7 @@ def _stage_list(p):
     return out
 
 
+@never_cache  # «Назад» после сохранения не показывает устаревшую форму
 @login_required
 def jump_live(request, pk, program_id):
     """Экран судьи у поля для маршрута с автоматическим подсчётом."""
@@ -92,7 +94,28 @@ def jump_live(request, pk, program_id):
     last = None
     if request.GET.get("saved"):
         last = places.get(int(request.GET["saved"])) if request.GET["saved"].isdigit() else None
+    from .models import StartSlot
+
+    current_no = next((i for i, (sl, _) in enumerate(queue, start=1) if current and sl.pk == current[0].pk), None)
+    skipped = list(StartSlot.objects.filter(program=p, status__in=[StartSlot.Status.WITHDRAWN, StartSlot.Status.NO_SHOW]).select_related("entry"))
+    last_change = None
+    if current and current[1] is not None:
+        from apps.core.models import AuditLog
+
+        last_change = (AuditLog.objects.filter(action="round.save", target_type="entry", target_id=current[0].entry_id)
+                       .select_related("actor").first())
+        if last_change:
+            import zoneinfo
+
+            from django.utils import timezone as dj_tz
+
+            tz = zoneinfo.ZoneInfo(p.tournament.timezone or "Europe/Moscow")  # время — в поясе места проведения
+            from apps.tournaments.forms import MONTHS_GEN
+
+            d = dj_tz.localtime(last_change.created_at, tz)
+            last_change.local_str = f"{d.day} {MONTHS_GEN[d.month - 1]} {d:%H:%M}"
     return render(request, "conduct/jump_live.html", {
+        "current_no": current_no, "skipped": skipped, "last_change": last_change,
         "t": p.tournament, "p": p, "stages": stages, "stage": st, "queue": queue, "current": current,
         "counts": counts, "places": places, "last": last, "reasons": EXCLUSION_REASONS,
         "client_key": uuid.uuid4().hex, "course": scoring.course(p),
@@ -153,7 +176,7 @@ def panel(request, pk, program_id):
         try:
             scoring.save_panel(request.user, p, rows)
             messages.success(request, "Бригада сохранена. Каждый судья увидит свой лист в разделе «Проведение».")
-            return redirect(reverse("conduct:program", args=[pk, p.pk]) + "#panel")
+            return redirect(reverse("conduct:program", args=[pk, p.pk]) + "?tab=panel")
         except ValueError as e:
             messages.error(request, str(e))
             posted = rows
@@ -213,6 +236,9 @@ def judge_sheet(request, pk, program_id, letter):
     sheet = sheets.get(entry.pk) or scoring.sheet_for(entry, pos)
     flags = DressageFlags.objects.filter(entry=entry).first()
     rows = _sheet_rows(test, pos, sheet)
+    err_items = set(flags.error_items or []) if flags else set()
+    for r in rows:
+        r["err"] = f"{r['part']}:{r['i']}" in err_items
     js = None
     if sheet.signed:
         try:
@@ -258,8 +284,9 @@ def judge_sign(request, pk, program_id, letter):
                 _, part, i = key.split("_", 2)
                 scoring.save_mark(request.user, int(entry_id), letter, part, int(i), val, request.POST.get(f"c_{part}_{i}"))
         scoring.sign(request.user, int(entry_id), letter, request.POST.get("remark", ""))
-        messages.success(request, "Лист подписан и передан судье-подсчёту.")
-        return redirect("conduct:judge_sheet", pk=pk, program_id=p.pk, letter=letter)
+        messages.success(request, "Лист подписан и передан судье по итогам. Если результат уже утверждён, судья по итогам утвердит его заново, а организатор опубликует новую версию протокола.")
+        # тест судьи: остаёмся на листе этой же пары, а не прыгаем к первой
+        return redirect(reverse("conduct:judge_sheet", args=[pk, p.pk, letter]) + f"?entry={entry_id}")
     except (ValueError, TypeError) as e:
         messages.error(request, str(e))
     return redirect(reverse("conduct:judge_sheet", args=[pk, p.pk, letter]) + f"?entry={entry_id}")
@@ -271,12 +298,18 @@ def flags_save(request, pk, program_id):
     p = _program(request, pk, program_id)
     entry_id = request.POST.get("entry")
     back = request.POST.get("next") or reverse("conduct:judge_sheet", args=[pk, p.pk, "C"])
+    if request.POST.get("toggle_error"):
+        try:
+            f = scoring.toggle_error_item(request.user, int(entry_id), request.POST["toggle_error"][:20])
+            return JsonResponse({"ok": True, "items": f.error_items, "errors": f.errors})
+        except (ValueError, TypeError) as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=422)
     try:
         elim = request.POST.get("eliminated") == "1"
         reason = request.POST.get("reason", "")
         if reason == "прочее (указать)":
             reason = request.POST.get("reason_other", "") or reason
-        scoring.set_flags(request.user, int(entry_id), errors=request.POST.get("errors", 0) or 0,
+        scoring.set_flags(request.user, int(entry_id), errors=request.POST.get("errors") if request.POST.get("errors") not in (None, "") else None,
                           technical=request.POST.get("technical", 0) or 0, eliminated=elim, reason=reason)
         messages.success(request, "Отметки сохранены.")
     except (ValueError, TypeError) as e:
@@ -286,7 +319,7 @@ def flags_save(request, pk, program_id):
 
 @login_required
 def scorer(request, pk, program_id):
-    """Судья-подсчёт (DRS-09): статусы листов, проценты по судьям, расхождения, возврат, утверждение, публикация."""
+    """Судья по итогам (DRS-09): статусы листов, проценты по судьям, расхождения, возврат, утверждение, публикация."""
     p = _program(request, pk, program_id)
     if not scoring.is_scorer(request.user, p) and not (can_judge(request.user, p.tournament) and request.user.pk == p.tournament.owner_id):
         raise PermissionDenied
@@ -374,3 +407,27 @@ def my_sheets(request, entry_id):
         sheets.append({"pos": sh.position, "rows": _sheet_rows(test, sh.position, sh), "remark": sh.remark})
     return render(request, "conduct/my_sheets.html", {"e": e, "p": p, "t": p.tournament, "test": test, "sheets": sheets,
                                                       "result": getattr(e, "result", None), "flags": getattr(e, "dressage_flags", None)})
+
+
+@login_required
+@require_POST
+def judge_ask_return(request, pk, program_id, letter):
+    """Тест судьи и клуба: судья на букве просит судью по итогам вернуть подписанный лист для исправления."""
+    from apps.core.models import audit, notify
+
+    p = _program(request, pk, program_id)
+    pos = scoring.my_position(request.user, p, letter)
+    if not pos:
+        raise PermissionDenied
+    entry = get_object_or_404(Entry, pk=request.POST.get("entry"), program=p)
+    reason = (request.POST.get("reason") or "").strip()[:300]
+    if not reason:
+        messages.error(request, "Напишите, что нужно исправить.")
+        return redirect(reverse("conduct:judge_sheet", args=[pk, p.pk, letter]) + f"?entry={entry.pk}")
+    scorers = [x.user for x in scoring.panel(p) if x.is_scorer and x.user_id]
+    url = reverse("conduct:scorer", args=[pk, p.pk]) + f"?entry={entry.pk}"
+    notify(scorers or [p.tournament.owner],
+           f"Судья {letter} просит вернуть лист: {entry.athlete_snapshot.get('name', '')} — {reason}", url, kind="dressage.ask_return")
+    audit(request.user, "dressage.ask_return", entry, position=letter, reason=reason)
+    messages.success(request, "Запрос отправлен судье по итогам. Когда он вернёт лист, придёт уведомление.")
+    return redirect(reverse("conduct:judge_sheet", args=[pk, p.pk, letter]) + f"?entry={entry.pk}")

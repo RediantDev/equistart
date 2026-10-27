@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}{{ s.title }} — EquiStart{% endblock %}
+{% block title %}{{ s.title }} — СтартЛист{% endblock %}
 {% block content %}
 <a class="back" href="{% url 'core:calendar' %}">← Календарь</a>
 
@@ -16,36 +16,36 @@
     <h1 class="h1" style="margin: var(--space-2) 0 0;">{{ s.title }}</h1>
     {% if t.publication == "cancelled" and t.cancelled_reason %}<div class="alert alert--error" style="margin-top: var(--space-3);">Причина отмены: {{ t.cancelled_reason }}</div>{% endif %}
     <div class="summary__grid" style="margin-top: var(--space-4);">
-      <div><div class="caption muted">ДАТЫ</div><div class="label lg">{% daterange s.starts_on s.ends_on %}</div><div class="table__sub">{{ s.timezone_label }}</div></div>
+      <div><div class="caption muted">ДАТЫ</div><div class="label lg">{% daterange s.starts_on s.ends_on %}</div></div>
       <div><div class="caption muted">МЕСТО</div><div class="label lg">{% if club %}<a href="{% url 'clubs:detail' club.pk %}">{{ s.venue.name }}</a>{% else %}{{ s.venue.name }}{% endif %}</div><div class="table__sub">{{ s.venue.region_name }}, {{ s.venue.settlement }}{% if s.venue.address %}, {{ s.venue.address }}{% endif %}</div></div>
-      <div><div class="caption muted">ЗАЯВКИ ДО</div><div class="label lg">{{ deadline|isodate|default:"—" }}, 23:59</div><div class="table__sub">{% if open and days_left is not None %}{% if days_left == 0 %}последний день{% else %}осталось дней: {{ days_left }}{% endif %}{% elif t.publication == "published" %}приём завершён{% endif %}</div></div>
+      {% if t.publication == "published" %}<div><div class="caption muted">ЗАЯВКИ ДО</div><div class="label lg">{{ deadline|isodate|default:"—" }}{% if s.entry_deadline_time %}, {{ s.entry_deadline_time }}{% elif deadline %}, 23:59{% endif %}</div><div class="table__sub">{% if open and days_left is not None %}{% if days_left == 0 %}последний день{% else %}осталось дней: {{ days_left }}{% endif %}{% else %}приём завершён{% endif %}</div></div>{% endif %}
     </div>
   </div>
   <div class="hero-card__side">
     {% if open %}
       {% if user.is_authenticated %}<a class="btn btn--primary btn--block" href="{% url 'entries:apply' t.pk %}">Подать заявку</a>
-      {% else %}<a class="btn btn--primary btn--block" href="{% url 'accounts:login' %}?next={% url 'entries:apply' t.pk %}">Войти и подать заявку</a>{% endif %}
+      {% else %}<a class="btn btn--primary btn--block" href="{% url 'accounts:login' %}?next={% url 'entries:apply' t.pk %}">Войти и подать заявку</a>
+      <p class="field__help" style="text-align: center;">Нет аккаунта? <a href="{% url 'accounts:register' %}?next={% url 'entries:apply' t.pk %}">Зарегистрироваться</a> — займёт минуту.</p>{% endif %}
     {% endif %}
-    {% if s.has_regulation %}<a class="btn btn--dark btn--block" href="{% url 'tournaments:public_regulation' t.pk %}" target="_blank" rel="noopener">Положение (PDF)</a>{% endif %}
-    {% if can_manage %}<a class="btn btn--ghost btn--block" href="{% url 'tournaments:step' t.pk 4 %}">Управление турниром</a>{% endif %}
-    {% if can_judge %}<a class="btn btn--ghost btn--block" href="{% url 'entries:manage' t.pk %}">Заявки турнира</a><a class="btn btn--ghost btn--block" href="{% url 'conduct:overview' t.pk %}">Проведение</a>{% endif %}
-    {% if can_stable %}<a class="btn btn--ghost btn--block" href="{% url 'stables:manage' t.pk %}">Конюшня и услуги</a>{% endif %}
-    {% if has_stables %}<a class="btn btn--ghost btn--block" href="{% url 'stables:book' t.pk %}">Денники и услуги</a>{% endif %}
-    <p class="table__sub" style="margin: 0;">Контакт: {{ s.contact_name }}{% if s.contact %}, {{ s.contact }}{% endif %}.</p>
+    {% if s.has_regulation %}<a class="btn btn--ghost btn--block" href="{% url 'tournaments:public_regulation' t.pk %}" target="_blank" rel="noopener">Положение (PDF)</a>{% endif %}
+    {% if has_stables and t.publication == "published" %}<a class="btn btn--ghost btn--block" href="{% url 'stables:book' t.pk %}">Заказать денник и услуги</a>{% endif %}
+    <button type="button" class="btn btn--ghost btn--block" data-share="{{ request.scheme }}://{{ request.get_host }}{% url 'tournaments:public' t.pk %}" data-share-title="{{ s.title }}">Поделиться</button>
+    {% if can_manage or can_judge or can_stable %}<a class="btn btn--dark btn--block hero-card__staff" href="{% url 'tournaments:hub' t.pk %}">Панель турнира</a><p class="table__sub" style="margin: -4px 0 0; text-align: center;">заявки, проведение, денники — для команды турнира</p>{% endif %}
+    <div class="hero-card__contact"><span class="caption muted">КОНТАКТ</span><span>{{ s.contact_name }}</span>{% if s.contact %}{% if user.is_authenticated %}<a href="tel:{{ s.contact|phone|cut:' '|cut:'-' }}">{{ s.contact|phone }}</a>{% else %}<a href="{% url 'accounts:login' %}?next={{ request.get_full_path|urlencode }}">Войдите, чтобы увидеть телефон</a>{% endif %}{% endif %}</div>
   </div>
 </section>
 
-<nav class="tabs no-print" aria-label="Разделы турнира">
-  <a class="tabs__item{% if not tab %} is-active{% endif %}" href="?">Программа</a>
-  <a class="tabs__item{% if tab == 'starts' %} is-active{% endif %}" href="?tab=starts">Стартовые</a>
-  <a class="tabs__item{% if tab == 'results' %} is-active{% endif %}" href="?tab=results">Результаты</a>
+<nav class="tabs no-print" aria-label="Разделы турнира" id="tabs">
+  <a class="tabs__item{% if not tab %} is-active{% endif %}" href="?#tabs">Программа</a>
+  <a class="tabs__item{% if tab == 'starts' %} is-active{% endif %}" href="?tab=starts#tabs">Стартовые</a>
+  <a class="tabs__item{% if tab == 'results' %} is-active{% endif %}" href="?tab=results#tabs">Результаты</a>
 </nav>
 
 {% if tab == "starts" or tab == "results" %}
 {% if days_nav|length > 1 %}
 <nav class="day-nav no-print" aria-label="Дни турнира">
-  {% for d in days_nav %}<a class="chip-link{% if day == d|date:'Y-m-d' %} is-active{% endif %}" href="?tab={{ tab }}&day={{ d|date:'Y-m-d' }}">{{ d|date:"j E" }}</a>{% endfor %}
-  <a class="chip-link{% if day == 'all' %} is-active{% endif %}" href="?tab={{ tab }}&day=all">Все дни</a>
+  {% for d in days_nav %}<a class="chip-link{% if day == d|date:'Y-m-d' %} is-active{% endif %}" href="?tab={{ tab }}&day={{ d|date:'Y-m-d' }}#tabs">{{ d|date:"j E" }}</a>{% endfor %}
+  <a class="chip-link{% if day == 'all' %} is-active{% endif %}" href="?tab={{ tab }}&day=all#tabs">Все дни</a>
 </nav>
 {% endif %}
 {% endif %}
@@ -53,21 +53,27 @@
 {% if starts|length > 1 %}<nav class="route-nav no-print" aria-label="Маршруты и езды">{% for b in starts %}<a href="#prog-{{ b.p.pk }}">{% if b.p.start_time %}{{ b.p.start_time|time:"H:i" }} · {% endif %}{{ b.p.name }}</a>{% endfor %}</nav>{% endif %}
 <section class="stack">
   {% for b in starts %}
-    <div class="section-head" id="prog-{{ b.p.pk }}"><h2 class="h3">{{ b.p.name }}<span class="table__sub">{{ b.p.day|date:"j E" }}{% if b.p.start_time %} · начало {{ b.p.start_time|time:"H:i" }}{% endif %} · {{ b.rows|length }} пар · версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}</span></h2><div class="chips no-print"><a class="btn btn--ghost btn--sm" href="{% url 'conduct:startlist_xlsx' t.pk b.p.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button></div></div>
-    <div class="table-wrap only-wide"><table class="table">
+    <article class="result-route" id="prog-{{ b.p.pk }}">
+    <div class="section-head"><h2 class="h3">{{ b.p.name }}<span class="table__sub">{{ b.p.day|date:"j E" }}{% if b.p.start_time %} · начало {{ b.p.start_time|time:"H:i" }}{% endif %}{% if b.pub %} · {{ b.rows|length }} пар · версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}{% endif %}</span></h2>
+      {% if b.pub %}<div class="row-actions no-print">{% if staff %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:startlist_xlsx' t.pk b.p.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button>{% endif %}<button type="button" class="btn btn--ghost btn--sm" data-share="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}?tab=starts#prog-{{ b.p.pk }}" data-share-title="{{ s.title }} — {{ b.p.name }}">Поделиться</button></div>{% endif %}</div>
+    {% if not b.pub %}<div class="card empty empty--sm"><p class="muted" style="margin: 0;">Стартовый протокол ещё не опубликован — судья публикует порядок перед началом.</p></div>{% else %}
+    <div class="table-wrap only-wide"><table class="table table--pub">
+      <colgroup><col class="c-no">{% if b.timed %}<col class="c-time">{% endif %}<col class="c-rider"><col class="c-horse"><col class="c-class"></colgroup>
       <thead><tr><th class="num">№</th>{% if b.timed %}<th class="num">Время</th>{% endif %}<th>Всадник</th><th>Лошадь</th><th>Зачёт</th></tr></thead>
       <tbody>{% for r in b.rows %}<tr{% if r.mark %} class="is-muted"{% endif %}>
-        <td class="num">{{ r.position }}</td>{% if b.timed %}<td class="num">{{ r.time|default:"—" }}</td>{% endif %}
-        <td><strong>{{ r.athlete.name }}</strong><span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.rank %} · {{ r.athlete.rank }}{% endif %}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>{% if r.athlete.coach %}<span class="table__sub">тренер {{ r.athlete.coach }}</span>{% endif %}{% if r.mark %}<span class="chip chip--danger">{{ r.mark }}</span>{% endif %}</td>
-        <td>{{ r.horse.name }}<span class="table__sub">{{ r.horse.birth_year|default:"" }} {{ r.horse.sex|default:"" }} {{ r.horse.color|default:"" }}{% if r.horse.breed %} · {{ r.horse.breed }}{% endif %}</span></td>
-        <td>{{ r.class }}{% if r.height %} · {{ r.height }} см{% endif %}</td></tr>{% endfor %}</tbody>
+        <td class="num"><strong>{{ r.position }}</strong></td>{% if b.timed %}<td class="num">{{ r.time|default:"—" }}</td>{% endif %}
+        <td>{% include "tournaments/_rider.html" with a=r.athlete %}{% if r.mark %} <span class="chip chip--danger">{{ r.mark }}</span>{% endif %}</td>
+        <td><span class="cell-main">{{ r.horse.name }}</span><span class="cell-sub" title="{{ r.horse.birth_year|default:'' }} {{ r.horse.sex|default:'' }} {{ r.horse.color|default:'' }} {{ r.horse.breed|default:'' }}">{{ r.horse.birth_year|default:"" }} {{ r.horse.sex|default:"" }} {{ r.horse.color|default:"" }}{% if r.horse.breed %} · {{ r.horse.breed }}{% endif %}</span></td>
+        <td>{{ r.class }}{% if r.height and b.p.heights|length > 1 %} · {{ r.height }} см{% endif %}</td></tr>{% endfor %}</tbody>
     </table></div>
     <ol class="pcards only-narrow">{% for r in b.rows %}
       <li class="pcard{% if r.mark %} is-muted{% endif %}"><span class="pcard__no">{{ r.position }}</span>
         <div class="pcard__body"><strong>{{ r.athlete.name }}</strong> <span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.rank %} · {{ r.athlete.rank }}{% endif %}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>
-          <span class="pcard__horse">{{ r.horse.name }}</span><span class="table__sub">{{ r.class }}{% if r.height %} · {{ r.height }} см{% endif %}</span>{% if r.mark %} <span class="chip chip--danger">{{ r.mark }}</span>{% endif %}</div>
+          <span class="pcard__horse">{{ r.horse.name }}</span><span class="table__sub">{{ r.class }}{% if r.height and b.p.heights|length > 1 %} · {{ r.height }} см{% endif %}</span>{% if r.mark %} <span class="chip chip--danger">{{ r.mark }}</span>{% endif %}</div>
         {% if b.timed and r.time %}<span class="pcard__side">{{ r.time }}</span>{% endif %}</li>{% endfor %}</ol>
-  {% empty %}<div class="card empty"><h2 class="h3">Стартовые протоколы ещё не опубликованы</h2><p class="muted">Судья публикует порядок перед началом программы.</p></div>{% endfor %}
+    {% endif %}
+    </article>
+  {% empty %}<div class="card empty"><h2 class="h3">В программе пока нет маршрутов</h2></div>{% endfor %}
 </section>
 {% elif tab == "results" %}
 {% if results|length > 1 %}<nav class="route-nav no-print" aria-label="Маршруты и езды">{% for b in results %}<a href="#prog-{{ b.p.pk }}">{{ b.p.name }}</a>{% endfor %}</nav>{% endif %}
@@ -75,17 +81,19 @@
   {% for b in results %}
     <article class="result-route" id="prog-{{ b.p.pk }}">
       <h2 class="h2">{{ b.p.name }}</h2>
-      <p class="table__sub">{{ b.p.day|date:"j E" }} · {{ b.p.program_type_name }}{% if b.p.heights %} · {{ b.p.heights_label }}{% endif %}{% if b.p.article_label %} · {{ b.p.article_label }}{% endif %}</p>
+      <p class="table__sub">{{ b.p.day|date:"j E" }} · {{ b.p.program_type_name }}{% if b.p|heights_extra %} · {{ b.p|heights_extra }}{% endif %}{% if b.p.article_label %} · {{ b.p.article_label }}{% endif %}</p>
       {% for cb in b.classes %}
-        <div class="section-head" id="class-{{ cb.c.pk }}"><h3 class="h3">{{ cb.c.label }}<span class="table__sub">версия {{ cb.pub.version }} от {{ cb.pub.published_at|date:"j E H:i" }}{% if cb.pub.version > 1 %} · исправлено{% endif %}</span></h3><div class="chips no-print"><a class="btn btn--ghost btn--sm" href="{% url 'conduct:results_xlsx' t.pk cb.c.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button></div></div>
+        <div class="section-head" id="class-{{ cb.c.pk }}"><h3 class="h3">{{ cb.c.label }}<span class="table__sub">версия {{ cb.pub.version }} от {{ cb.pub.published_at|date:"j E H:i" }}{% if cb.pub.version > 1 %} · исправлено{% endif %}</span></h3>
+          <div class="row-actions no-print">{% if staff %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:results_xlsx' t.pk cb.c.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button>{% endif %}<button type="button" class="btn btn--ghost btn--sm" data-share="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}?tab=results#class-{{ cb.c.pk }}" data-share-title="{{ s.title }} — {{ b.p.name }}, {{ cb.c.label }}">Поделиться</button></div></div>
         {% for g in cb.groups %}
           {% if g.height %}<h4 class="label lg result-height">Высота {{ g.height }} см</h4>{% endif %}
-          <div class="table-wrap only-wide"><table class="table">
+          <div class="table-wrap only-wide"><table class="table table--pub{% if cb.pub.fields|length > 4 %} table--wide{% endif %}">
+            <colgroup><col class="c-place"><col class="c-rider"><col class="c-horse">{% for f in cb.pub.fields %}<col class="c-val">{% endfor %}</colgroup>
             <thead><tr><th class="num">Место</th><th>Всадник</th><th>Лошадь</th>{% for f in cb.pub.fields %}<th class="num">{{ f }}</th>{% endfor %}</tr></thead>
             <tbody>{% for r in g.rows %}<tr{% if r.place and r.place <= 3 %} class="medal-{{ r.place }}"{% endif %}>
               <td class="num"><strong>{{ r.place|default:"—" }}</strong></td>
-              <td><strong>{{ r.athlete.name }}</strong><span class="table__sub">{{ r.athlete.birth_year|default:"" }}{% if r.athlete.club %} · {{ r.athlete.club }}{% endif %}</span>{% if r.athlete.coach %}<span class="table__sub">тренер {{ r.athlete.coach }}</span>{% endif %}{% if r.status %}<span class="chip">{{ r.status }}</span>{% endif %}</td>
-              <td>{{ r.horse.name }}</td>
+              <td>{% include "tournaments/_rider.html" with a=r.athlete %}{% if r.status %} <span class="chip">{{ r.status }}</span>{% endif %}</td>
+              <td><span class="cell-main">{{ r.horse.name }}</span></td>
               {% for v in r.cells %}<td class="num">{{ v|num }}</td>{% endfor %}</tr>{% endfor %}</tbody>
           </table></div>
           <ol class="pcards only-narrow">{% for r in g.rows %}
@@ -94,45 +102,22 @@
                 <span class="pcard__horse">{{ r.horse.name }}</span>{% if r.summary.1 %}<span class="table__sub">{{ r.summary.1 }}</span>{% endif %}{% if r.status %} <span class="chip">{{ r.status }}</span>{% endif %}</div>
               <span class="pcard__side">{{ r.summary.0 }}</span></li>{% endfor %}</ol>
         {% endfor %}
+      {% empty %}<div class="card empty empty--sm"><p class="muted" style="margin: 0;">Результаты ещё не опубликованы.</p></div>
       {% endfor %}
     </article>
-  {% empty %}<div class="card empty"><h2 class="h3">Результаты ещё не опубликованы</h2></div>{% endfor %}
+  {% empty %}<div class="card empty"><h2 class="h3">В программе пока нет маршрутов</h2></div>{% endfor %}
 </section>
 {% else %}
 <section class="stack">
   <h2 class="h2">Программа</h2>
   {% for d in days %}
     <h3 class="h3" style="margin-top: var(--space-3);">{{ d.weekday }}, {{ d.date|isodate:False }}</h3>
-    <div class="prog-cards only-narrow">
-      {% for p in d.programs %}
-        <article class="prog-card">
-          <div class="prog-card__head"><span class="prog-row__time">{{ p.start_time|default:"—" }}</span><span><strong>{{ p.name }}</strong><span class="table__sub">{{ p.program_type_name }}{% if p.heights %} · {{ p.heights_label }}{% endif %}{% if p.article_label %} · {{ p.article_label }}{% endif %}</span></span></div>
-          {% for c in p.classes %}
-            <div class="prog-card__class"><span>{{ c.label }}<span class="table__sub">{{ c.conditions|default:"без ограничений" }}{% if c.note %} · {{ c.note }}{% endif %}</span></span></div>
-          {% endfor %}
-        </article>
-      {% endfor %}
-    </div>
-    <div class="table-wrap only-wide">
-      <table class="table">
-        <thead><tr><th class="num">Начало</th><th>Программа</th><th>Зачёт</th><th>Условия участия</th></tr></thead>
-        <tbody>
-          {% for p in d.programs %}
-            {% for c in p.classes %}
-              <tr>
-                <td class="num">{% if forloop.first %}{{ p.start_time|default:"—" }}{% endif %}</td>
-                <td>{% if forloop.first %}<strong>{{ p.name }}</strong><span class="table__sub">{{ p.program_type_name }}{% if p.heights %} · {{ p.heights_label }}{% endif %}{% if p.article_label %} · {{ p.article_label }}{% endif %}</span>{% endif %}</td>
-                <td>{{ c.label }}{% if c.note %}<span class="table__sub">{{ c.note }}</span>{% endif %}</td>
-                <td>{{ c.conditions|default:"—" }}</td>
-              </tr>
-            {% endfor %}
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="prog-list">
+      {% for p in d.programs %}{% include "tournaments/_prog_row.html" %}{% endfor %}
     </div>
   {% endfor %}
   {% if s.cancel_terms %}<div class="alert"><strong>Условия отмены:</strong> {{ s.cancel_terms|linebreaksbr }} <span class="muted">Условия задаёт организатор.</span></div>{% endif %}
-  <p class="muted" style="font-size: 14px;">Опубликовано {{ t.published_at|date:"j E Y" }}. Сведения проверены модератором EquiStart. Проверка сервиса не является утверждением федерацией.</p>
+  <p class="muted" style="font-size: 14px;">Опубликовано {{ t.published_at|date:"j E Y" }}. Сведения проверены модератором СтартЛист. Проверка сервиса не является утверждением федерацией.</p>
 </section>
 {% endif %}
 {% endblock %}

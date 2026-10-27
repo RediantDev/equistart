@@ -43,7 +43,7 @@ def send_code(user) -> None:
     PhoneCode.objects.filter(user=user, used_at__isnull=True).update(used_at=timezone.now())
     PhoneCode.objects.create(user=user, code_hash=_hash(code))
     try:
-        sms.send(user.phone, f"EquiStart: код {code}. Никому его не сообщайте.")
+        sms.send(user.phone, f"СтартЛист: код {code}. Никому его не сообщайте.")
     except sms.SmsError:
         raise ValueError("Не удалось отправить СМС. Попробуйте позже.")
     audit(user, "phone.code_sent", user)

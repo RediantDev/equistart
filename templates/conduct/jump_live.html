@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Судья у поля · {{ p.name }} — EquiStart{% endblock %}
+{% block title %}Судья у поля · {{ p.name }} — СтартЛист{% endblock %}
 {% block content %}
 <div class="live" id="jump-live" data-queue-key="eq-queue-{{ p.pk }}">
   <div class="live__head">
-    <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← Порядок и результаты</a>
+    <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← {{ p.name }}: порядок и результаты</a>
     <h1 class="h3" style="margin: 0;">{{ p.name }}</h1>
     <div class="table__sub">{{ p.program_type_name }} · {{ p.article_label }}</div>
   </div>
@@ -15,7 +15,7 @@
     </nav>
   {% endif %}
   <p class="table__sub" style="margin: var(--space-2) 0 0;">Табл. {{ stage.table }}{% if stage.timed %} · на время{% else %} · без учёта времени{% endif %}{% if stage.time_allowed %} · норма {{ stage.time_allowed|num }} с{% endif %}{% if stage.limit %} · лимит {{ stage.limit|num }} с{% endif %}{% if course.indoor %} · в помещении{% endif %}
-    {% if not stage.time_allowed and stage.table != "C" %}<br><a href="{% url 'conduct:program' t.pk p.pk %}#course" style="color: var(--danger); font-weight: 600;">Внесите норму времени маршрута</a> — без неё штраф за время не посчитать.{% endif %}</p>
+    {% if not stage.time_allowed and stage.table != "C" %}<br><a href="{% url 'conduct:program' t.pk p.pk %}?tab=course" style="color: var(--danger); font-weight: 600;">Внесите норму времени маршрута</a> — без неё штраф за время не посчитать.{% endif %}</p>
 
   <div class="offline-bar" id="offline-bar" hidden role="status"></div>
 
@@ -28,10 +28,11 @@
   {% if current %}
     {% with s=current.0 jr=current.1 %}
     <section class="live__current">
-      <div class="live__meta"><span class="caption" style="color: var(--accent);">{{ stage.title|upper }} · № {{ s.position }}{% if s.start_time and stage.key == stages.0.key %} · {{ s.start_time|time:"H:i" }}{% endif %}{% if jr %} · ИСПРАВЛЕНИЕ{% endif %}</span></div>
+      <div class="live__meta"><span class="caption" style="color: var(--accent);">{{ stage.title|upper }} · № {{ current_no }} из {{ queue|length }}{% if s.start_time and stage.key == stages.0.key %} · {{ s.start_time|time:"H:i" }}{% endif %}{% if jr %} · ИСПРАВЛЕНИЕ{% endif %}</span></div>
       <div class="live__name">{{ s.entry.athlete_snapshot.name }}</div>
       <div class="live__horse">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}{% if s.entry.height %} · {{ s.entry.height }} см{% endif %}</div>
 
+      {% if jr %}<div class="alert alert--warning" role="status" style="margin-bottom: var(--space-3);">Результат пары уже внесён{% if last_change %} — {{ last_change.actor.full_name|default:"—" }}, {{ last_change.local_str }}{% endif %}. Сохранение заменит его; прежнее значение останется в истории турнира.</div>{% endif %}
       <form method="post" action="{% url 'conduct:jump_save' t.pk p.pk %}" class="live__form" id="jump-form" data-pair="{{ s.entry.athlete_snapshot.name }} / {{ s.entry.horse_snapshot.name }}">
         {% csrf_token %}
         <input type="hidden" name="entry" value="{{ s.entry_id }}"><input type="hidden" name="stage" value="{{ stage.key }}">
@@ -47,7 +48,7 @@
           <label class="field"><span class="field__label">Время, с <span class="field__optional">для протокола</span></span><input name="time" type="text" class="live__input" inputmode="decimal" autocomplete="off" value="{% if jr.time is not None %}{{ jr.time|num }}{% endif %}"></label>
         {% endif %}
         <input type="hidden" name="status" value="ok">
-        <button class="btn btn--primary btn--block btn--lg">Сохранить{% if not jr %} и следующий{% endif %}</button>
+        <button class="btn btn--primary btn--block btn--lg"{% if jr %} data-confirm="Изменить уже внесённый результат этой пары?" data-confirm-ok="Изменить"{% endif %}>{% if jr %}Сохранить исправление{% else %}Сохранить и следующий{% endif %}</button>
         <details class="live__more"{% if jr and jr.status != "ok" %} open{% endif %}>
           <summary>Исключён или сошёл</summary>
           <div class="inline-row">
@@ -70,13 +71,14 @@
     <div class="list-cards" style="margin-top: var(--space-2);">{% for s, jr in queue %}
       {% with st=places|get:s.entry_id %}
       <a class="row-card row-card--link{% if current and current.0.pk == s.pk %} is-current{% endif %}" style="padding: 10px 14px;" href="?stage={{ stage.key }}&entry={{ s.entry_id }}">
-        <span class="numeric">{{ s.position }}</span>
+        <span class="numeric">{{ forloop.counter }}</span>
         <span style="flex: 1 1 180px; min-width: 0;">{{ s.entry.athlete_snapshot.name }}<span class="table__sub">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}{% if s.entry.height and p.heights|length > 1 %} · {{ s.entry.height }} см{% endif %}</span></span>
         {% if jr %}<span class="table__sub" style="text-align: right;">{% if jr.status != "ok" %}{{ jr.get_status_display }}{% else %}{{ jr.knockdowns }} пов. · {{ jr.refusals }} неп.{% if jr.time %} · {{ jr.time|num }} с{% endif %}{% endif %}{% if st.place %}<br><strong>{{ st.place }} место</strong> <span class="table__sub" style="display:inline">в зачёте</span>{% endif %}</span>{% else %}<span class="chip">ждёт</span>{% endif %}
       </a>
       {% endwith %}
     {% endfor %}</div>
   {% endif %}
+  {% if skipped %}<p class="table__sub" style="margin-top: var(--space-3);">Не стартуют: {% for x in skipped %}{{ x.entry.athlete_snapshot.name }}{% if not forloop.last %}, {% endif %}{% endfor %}. Если пара всё-таки выступает — верните её в порядок: <a href="{% url 'conduct:program' t.pk p.pk %}">«Порядок» → «Стартует»</a>.</p>{% endif %}
 </div>
 <script>
 (function () {

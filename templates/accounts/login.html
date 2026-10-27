@@ -1,8 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Вход — EquiStart{% endblock %}
+{% load static %}
+{% block title %}Вход — СтартЛист{% endblock %}
 {% block content %}
 <section class="auth">
   <div class="card auth__card">
+    <div class="auth__logo"><img src="{% static 'brand/startlist-logo.svg' %}" width="200" alt="СтартЛист"></div>
     <h1 class="h1">Вход</h1>
     <p class="muted">По номеру телефона и паролю.</p>
     <form method="post" novalidate class="form">
@@ -13,7 +15,7 @@
       {% include "partials/field.html" with field=form.password %}
       <button type="submit" class="btn btn--primary btn--block">Войти</button>
     </form>
-    <p class="auth__switch">Нет аккаунта? <a href="{% url 'accounts:register' %}">Зарегистрироваться</a></p>
+    <p class="auth__switch">Нет аккаунта? <a href="{% url 'accounts:register' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Зарегистрироваться</a></p>
   </div>
 </section>
 {% endblock %}

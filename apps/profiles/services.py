@@ -13,7 +13,7 @@ def athletes_for_entry(user):
     if not user.is_authenticated:
         return Athlete.objects.none()
     return (
-        Athlete.objects.filter(Q(manager=user) | Q(delegates__user=user) | Q(linked_user=user), archived=False)
+        Athlete.objects.filter(Q(manager=user, added_by_judge=False) | Q(delegates__user=user) | Q(linked_user=user), archived=False)
         .distinct()
         .order_by("last_name", "first_name")
     )
