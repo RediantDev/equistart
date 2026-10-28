@@ -8,13 +8,13 @@
 
 <section class="club-hero">
   <div class="club-hero__cover">
-    {% if cover %}<img src="{% url 'clubs:file' 'photo' cover.pk %}" alt="{{ cover.caption|default:club.public_name }}">{% endif %}
+    {% if cover %}<img src="{% url 'clubs:file' 'photo' cover.pk %}?w=1200" alt="{{ cover.caption|default:club.public_name }}">{% endif %}
     <a class="club-hero__back" href="{% url 'clubs:list' %}" aria-label="Все клубы"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></a>
     {% if manage %}<a class="btn btn--ghost btn--sm club-hero__edit" href="{% url 'clubs:mine' %}">Управлять</a>{% endif %}
   </div>
   <div class="club-hero__body">
     <div class="club-hero__row">
-      {% if club.logo %}<img class="club-hero__logo" src="{% url 'clubs:file' 'logo' club.pk %}" alt="Логотип {{ club.public_name }}">
+      {% if club.logo %}<img class="club-hero__logo" src="{% url 'clubs:file' 'logo' club.pk %}?w=320" alt="Логотип {{ club.public_name }}">
       {% else %}<span class="club-hero__logo club-hero__logo--empty" aria-hidden="true">{{ club.public_name|slice:":1" }}</span>{% endif %}
       {% if club.is_public %}<span class="chip chip--success">Проверен модератором</span>{% endif %}
     </div>
@@ -42,7 +42,7 @@
     <div class="stack">{% for n in news %}
       <article class="card news-card">
         {% with ph=n.photos.all %}{% if ph %}
-          <div class="news-card__photos{% if ph|length > 1 %} news-card__photos--2{% endif %}">{% for p in ph|slice:":2" %}<img src="{% url 'clubs:file' 'news' p.pk %}" alt="Фото к новости «{{ n.title }}»" loading="lazy">{% endfor %}</div>
+          <div class="news-card__photos{% if ph|length > 1 %} news-card__photos--2{% endif %}">{% for p in ph|slice:":2" %}<img src="{% url 'clubs:file' 'news' p.pk %}?w=640" alt="Фото к новости «{{ n.title }}»" loading="lazy">{% endfor %}</div>
         {% endif %}{% endwith %}
         <div class="news-card__body">
           <span class="table__sub">{{ n.published_at|date:"j E Y" }}</span>
@@ -54,12 +54,12 @@
         </div>
       </article>
     {% endfor %}</div>
-  {% else %}<div class="card empty-friendly"><div class="empty-friendly__ico" aria-hidden="true">📰</div><h2 class="h3">Новостей пока нет</h2><p class="muted">Здесь клуб рассказывает о турнирах, сборах и жизни конюшни.</p></div>{% endif %}
+  {% else %}<div class="card empty-friendly"><div class="empty-friendly__ico" aria-hidden="true">{% include "partials/icon.html" with name="news" %}</div><h2 class="h3">Новостей пока нет</h2><p class="muted">Здесь клуб рассказывает о турнирах, сборах и жизни конюшни.</p></div>{% endif %}
 
 {% elif tab == "photos" %}
   {% if photos %}
-    <div class="club-gallery">{% for p in photos %}<figure><a href="{% url 'clubs:file' 'photo' p.pk %}" target="_blank" rel="noopener"><img src="{% url 'clubs:file' 'photo' p.pk %}" alt="{{ p.caption|default:club.public_name }}" loading="lazy"></a>{% if p.caption %}<figcaption class="table__sub">{{ p.caption }}</figcaption>{% endif %}</figure>{% endfor %}</div>
-  {% else %}<div class="card empty-friendly"><div class="empty-friendly__ico" aria-hidden="true">📷</div><h2 class="h3">Фото пока нет</h2></div>{% endif %}
+    <div class="club-gallery">{% for p in photos %}<figure><a href="{% url 'clubs:file' 'photo' p.pk %}?w=1200"><img src="{% url 'clubs:file' 'photo' p.pk %}?w=640" alt="{{ p.caption|default:club.public_name }}" loading="lazy"></a>{% if p.caption %}<figcaption class="table__sub">{{ p.caption }}</figcaption>{% endif %}</figure>{% endfor %}</div>
+  {% else %}<div class="card empty-friendly"><div class="empty-friendly__ico" aria-hidden="true">{% include "partials/icon.html" with name="camera" %}</div><h2 class="h3">Фото пока нет</h2></div>{% endif %}
 
 {% elif tab == "about" %}
   <div class="stack">
@@ -92,7 +92,7 @@
         </div>
       </article>
     {% endwith %}{% endfor %}</div>
-  {% else %}<div class="card empty-friendly"><div class="empty-friendly__ico" aria-hidden="true">🏇</div><h2 class="h3">Ближайших турниров нет</h2><p class="muted">Когда клуб опубликует турнир, он появится здесь и в календаре.</p></div>{% endif %}
+  {% else %}<div class="card empty-friendly"><div class="empty-friendly__ico" aria-hidden="true">{% include "partials/icon.html" with name="calendar" %}</div><h2 class="h3">Ближайших турниров нет</h2><p class="muted">Когда клуб опубликует турнир, он появится здесь и в календаре.</p></div>{% endif %}
   {% if past %}
     <details class="card" style="margin-top: var(--space-4);"><summary class="label" style="cursor: pointer;">Прошедшие турниры и результаты · {{ past|length }}</summary>
       <ul class="list" style="margin-top: var(--space-2);">{% for t in past %}<li class="list__row"><a href="{% url 'tournaments:public' t.pk %}?tab=results">{{ t.pub_title }}</a><span class="table__sub">{% daterange t.pub_starts_on t.pub_ends_on %}</span></li>{% endfor %}</ul>
@@ -100,7 +100,7 @@
   {% endif %}
   {% if photos %}
     <div class="section-head" style="margin: var(--space-5) 0 var(--space-2);"><h2 class="h3" style="margin: 0;">Фото</h2><a href="?tab=photos" class="table__sub">Все фото →</a></div>
-    <div class="club-strip">{% for p in photos|slice:":3" %}<img src="{% url 'clubs:file' 'photo' p.pk %}" alt="{{ p.caption|default:club.public_name }}" loading="lazy">{% endfor %}{% if photos|length > 3 %}<a href="?tab=photos" class="club-strip__more">+{{ photos|length|add:"-3" }}</a>{% endif %}</div>
+    <div class="club-strip">{% for p in photos|slice:":3" %}<img src="{% url 'clubs:file' 'photo' p.pk %}?w=640" alt="{{ p.caption|default:club.public_name }}" loading="lazy">{% endfor %}{% if photos|length > 3 %}<a href="?tab=photos" class="club-strip__more">+{{ photos|length|add:"-3" }}</a>{% endif %}</div>
   {% endif %}
 {% endif %}
 </div>

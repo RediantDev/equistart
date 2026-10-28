@@ -2,11 +2,11 @@
 {% load tournaments %}
 {% block title %}Заявка — {{ s.title }} — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
+<div class="page-head apply-head">
   <div>
     <a class="back" href="{% url 'tournaments:public' t.pk %}">← {{ s.title }}</a>
-    <h1 class="h1">{% if late %}Добавить участников (судья){% else %}Заявка на соревнование{% endif %}</h1>
-    <p class="muted">{% daterange s.starts_on s.ends_on %} · {{ s.venue.name }}. {% if late %}Позиции сразу считаются принятыми.{% else %}Добавьте пары «всадник + лошадь» и выберите для каждой маршруты и езды. Несколько пар — групповая заявка.{% endif %}</p>
+    <h1 class="h1">{% if late %}Добавить участников (судья){% else %}Подача заявки{% endif %}</h1>
+    <p class="table__sub">{% daterange s.starts_on s.ends_on %} · {{ s.venue.name }}{% if late %}. Позиции сразу считаются принятыми.{% endif %}</p>
   </div>
 </div>
 
@@ -26,25 +26,24 @@
 {% endif %}
 </div>
 
-<div class="wizard-grid">
+{# Макет 28.10.2026 (S09B, «одной страницей»): карточки пар со списком выступлений, «Добавить пару», итог и отправка внизу #}
+<div class="wizard-grid ap-grid">
   <div class="wizard-main">
     <div id="pairs" class="pairs">
     {% for pair in pairs %}
-      <section class="card pair{% if not pair.open %} pair--closed{% endif %}" id="pair-{{ pair.a.pk }}-{{ pair.h.pk }}">
-        <div class="section-head">
-          <div style="min-width: 0;">
-            <h2 class="h3" style="margin: 0;">{{ pair.a.public_name }} / {{ pair.h.name }}</h2>
+      <section class="card pair ap-pair{% if not pair.open %} pair--closed{% else %} is-open{% endif %}" id="pair-{{ pair.a.pk }}-{{ pair.h.pk }}">
+        <div class="ap-pair__head">
+          <div class="ap-pair__title">
+            <h2 class="ap-pair__name">{{ pair.a.public_name }} — {{ pair.h.name }}</h2>
             <span class="table__sub">{{ pair.a.summary|default:"разряд и год рождения не указаны" }} · {{ pair.h.summary }}{% if pair.h.is_pony %} · пони{% if pair.h.height_cm %} {{ pair.h.height_cm }} см{% endif %}{% endif %}</span>
           </div>
-          <div class="chips">
-            {% if not pair.open %}<a class="btn btn--dark btn--sm" href="?{% if late %}late=1&amp;{% endif %}open={{ pair.a.pk }}-{{ pair.h.pk }}#pair-{{ pair.a.pk }}-{{ pair.h.pk }}"
-               hx-get="{{ apply_url }}{% if late %}&amp;{% else %}?{% endif %}open={{ pair.a.pk }}-{{ pair.h.pk }}" hx-target="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-select="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-swap="outerHTML transition:true show:top" hx-push-url="false">{% if pair.count %}Изменить{% else %}Выбрать маршруты{% endif %}</a>{% endif %}
-            <form method="post" action="{{ apply_url }}" hx-post="{{ apply_url }}" hx-target="#pairs" hx-select="#pairs" hx-select-oob="#apply-count,#apply-submit,#apply-warnings" hx-swap="outerHTML transition:true" hx-push-url="false">{% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="a" value="{{ pair.a.pk }}"><input type="hidden" name="h" value="{{ pair.h.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="pair_remove">Убрать пару</button></form>
-          </div>
+          <form method="post" action="{{ apply_url }}" hx-post="{{ apply_url }}" hx-target="#pairs" hx-select="#pairs" hx-select-oob="#apply-count,#apply-submit,#apply-warnings" hx-swap="outerHTML transition:true" hx-push-url="false">{% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="a" value="{{ pair.a.pk }}"><input type="hidden" name="h" value="{{ pair.h.pk }}"><button class="ap-x" name="action" value="pair_remove" aria-label="Убрать пару {{ pair.a.public_name }} — {{ pair.h.name }}" title="Убрать пару"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></form>
         </div>
         {% if not pair.open %}
-          {% if pair.summary %}<ul class="pair-summary pair-summary--routes">{% for g in pair.summary %}<li><span class="pair-summary__route">{{ g.p.name }}</span><span class="pair-summary__classes">{% for l in g.lines %}<span class="chip chip--success">✓ {{ l.tclass.label }}{% if l.height and not l.tclass.height %} · {{ l.height }} см{% endif %}</span>{% endfor %}</span></li>{% endfor %}</ul>
-          {% else %}<p class="table__sub">Маршруты ещё не выбраны.</p>{% endif %}
+          {% if pair.summary %}<ul class="ap-lines">{% for g in pair.summary %}{% for l in g.lines %}<li class="ap-line"><span class="ap-line__name">{{ g.p.name }}{% if l.height and not l.tclass.height %} · {{ l.height }} см{% endif %} <span class="ap-line__when num"><span class="ap-dot">· </span>{{ g.p.day|date:"j b" }}{% if g.p.start_time %}, {{ g.p.start_time|time:"H:i" }}{% endif %}</span></span><span class="ap-tag">{{ l.tclass.label }}</span></li>{% endfor %}{% endfor %}</ul>
+          {% else %}<p class="ap-lines ap-lines--empty table__sub">Маршруты ещё не выбраны.</p>{% endif %}
+          <a class="ap-ed" href="?{% if late %}late=1&amp;{% endif %}open={{ pair.a.pk }}-{{ pair.h.pk }}#pair-{{ pair.a.pk }}-{{ pair.h.pk }}"
+             hx-get="{{ apply_url }}{% if late %}&amp;{% else %}?{% endif %}open={{ pair.a.pk }}-{{ pair.h.pk }}" hx-target="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-select="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-swap="outerHTML transition:true show:top" hx-push-url="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>{% if pair.count %}Маршруты и зачёты{% else %}Выбрать маршруты и зачёты{% endif %}</a>
         {% else %}
           <form method="post" action="{{ apply_url }}" class="pair-form" hx-post="{{ apply_url }}" hx-target="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-select="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-select-oob="#apply-count,#apply-submit,#apply-warnings" hx-swap="outerHTML transition:true show:top" hx-push-url="false">
             {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="a" value="{{ pair.a.pk }}"><input type="hidden" name="h" value="{{ pair.h.pk }}"><input type="hidden" name="open" value="{{ pair.a.pk }}-{{ pair.h.pk }}">
@@ -91,11 +90,13 @@
         {% endif %}
       </section>
     {% empty %}
-      <section class="card empty"><h2 class="h3">Добавьте первую пару</h2><p class="muted">Всадник и лошадь — затем выберете маршруты и езды для этой пары.</p></section>
+      <section class="card empty ap-empty"><h2 class="h3">Добавьте первую пару</h2><p class="muted">Всадник и лошадь — затем выберете маршруты и езды для этой пары.</p></section>
     {% endfor %}
     </div>
-    <section class="card" id="add">
-      <h2 class="h3">Добавить пару «всадник + лошадь»</h2>
+    <details class="ap-add" id="add"{% if not pairs or errors or request.GET.athlete or request.GET.horse or not athletes %} open{% endif %}>
+      <summary class="btn ap-add__btn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Добавить пару</summary>
+      <section class="card ap-add__card">
+      <h2 class="h3">Пара «всадник + лошадь»</h2>
       {% if not athletes %}
         <div class="alert alert--warning">Сначала <a href="{% url 'profiles:athlete_new' %}?next={{ request.path|urlencode }}">добавьте спортсмена</a>{% if user.is_athlete %} или <a href="{% url 'profiles:athlete_new' %}?me=1&amp;next={{ request.path|urlencode }}">создайте свой профиль спортсмена</a>{% endif %}. После сохранения вы вернётесь сюда.</div>
       {% else %}
@@ -115,19 +116,20 @@
         <div class="form-actions"><button class="btn btn--dark" name="action" value="pair_add">+ Добавить пару</button></div>
       </form>
       {% endif %}
-    </section>
+      </section>
+    </details>
   </div>
 
   <aside class="wizard-aside">
     <section class="card">
       <h2 class="h3">Отправка</h2>
-      <p class="muted" id="apply-count">Выступлений в заявке: <strong>{{ lines|length }}</strong>{% if pairs|length > 1 %} · пар: {{ pairs|length }}{% endif %}</p>
-      <form method="post" action="{{ apply_url }}" class="form" style="margin-top: var(--space-3);">
+      <form method="post" action="{{ apply_url }}" class="form apply-send" id="apply-send">
         {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="key" value="{{ key }}">
         <div class="field"><label class="field__label" for="cn">Контактное лицо</label><input id="cn" name="contact_name" type="text" value="{% if request.POST.contact_name %}{{ request.POST.contact_name }}{% else %}{{ user.full_name }}{% endif %}"></div>
         <div class="field"><label class="field__label" for="cp">Телефон для связи</label><input id="cp" name="contact_phone" type="tel" value="{% if request.POST.contact_phone %}{{ request.POST.contact_phone }}{% else %}{{ user.phone_display }}{% endif %}"><p class="field__help">Виден только организатору и судьям турнира.</p></div>
-        <div class="field"><label class="field__label" for="cm">Комментарий</label><textarea id="cm" name="comment" rows="3" maxlength="1000" placeholder="Необязательно">{{ request.POST.comment }}</textarea></div>
-        <p class="field__help">Публично в протоколах будут: фамилия и имя, год рождения, разряд, клуб, тренер; кличка, год, пол, масть, порода лошади.</p>
+        {# тест 5.1: комментарий — по ссылке, поле то же (comment) #}
+        <button type="button" class="apply-more" data-reveal="cm-field"{% if request.POST.comment %} hidden{% endif %}>+ Добавить комментарий</button>
+        <div class="field" id="cm-field"{% if not request.POST.comment %} hidden{% endif %}><label class="field__label" for="cm">Комментарий</label><textarea id="cm" name="comment" rows="3" maxlength="1000" placeholder="Необязательно">{{ request.POST.comment }}</textarea></div>
         <p class="field__help">Денник и услуги для лошади можно заказать на странице турнира после отправки.</p>
         {# тест 5: условия отмены — при подаче заявки, рядом с отправкой #}
         {% if s.cancel_terms %}<div class="alert apply-cancel-terms" id="cancel-terms"><strong>Условия отмены:</strong> {{ s.cancel_terms|linebreaksbr }} <span class="muted">Условия задаёт организатор.</span></div>{% endif %}
@@ -135,9 +137,11 @@
           Отмечено зачётов: <strong data-pending-count>0</strong> — они ещё не в заявке.
           <button type="button" class="btn btn--dark btn--sm btn--block" style="margin-top: 8px;" data-add-pending>Добавить выбранные</button>
         </div>
-        <div id="apply-submit">
-          <button class="btn btn--primary btn--block" name="action" value="submit" data-submit{% if not lines %} disabled{% endif %}>Отправить заявку</button>
-          {% if not lines %}<p class="field__help" data-submit-hint>Кнопка станет активной, когда в заявке будет хотя бы одно выступление: отметьте зачёт у пары и нажмите «Добавить выбранные».</p>{% endif %}
+        <div class="ap-bar" id="apply-bar">
+          <div class="ap-bar__sum" id="apply-count"><b>{{ count_label }}</b><span class="ap-bar__sub">{% if not lines %}Отметьте зачёт у пары и нажмите «Добавить выбранные»{% elif t.pub_deadline %}приём до {{ t.pub_deadline|date:"j E" }}{% if t.pub_deadline_time %}, {{ t.pub_deadline_time|time:"H:i" }}{% endif %}{% endif %}</span></div>
+          <div id="apply-submit" class="ap-bar__go">
+            <button class="btn btn--primary" name="action" value="submit" data-submit{% if not lines %} disabled{% endif %}>Отправить заявку</button>
+          </div>
         </div>
       </form>
     </section>
@@ -174,12 +178,33 @@
     if (f.requestSubmit) f.requestSubmit(b); else b.click();
   });
   document.addEventListener("submit", function (e) { // отмеченные, но не добавленные зачёты не теряются при отправке
-    if (!e.target.querySelector("[data-submit]") || !total()) return;
+    if (e.target.id !== "apply-send" || !total()) return;
     e.preventDefault(); e.stopPropagation();
     var box = document.querySelector("[data-pending]");
     if (box) box.scrollIntoView({ behavior: "smooth", block: "center" });
   }, true);
   document.addEventListener("htmx:afterSettle", sync);
+  if (!window.__applyInit) {
+    window.__applyInit = true;
+    // Тест 5.1: «+ Добавить комментарий» открывает поле
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("[data-reveal]");
+      if (!b) return;
+      var box = document.getElementById(b.getAttribute("data-reveal"));
+      if (!box) return;
+      box.hidden = false; b.hidden = true;
+      var f = box.querySelector("textarea, input");
+      if (f) f.focus();
+    });
+    // Тест 5.1: после «+ Добавить пару» экран плавно переходит к новой паре со списком зачётов
+    // (форма уходит без перезагрузки, якорь из адреса при этом теряется — берём пару из ?open=).
+    document.addEventListener("htmx:afterSettle", function (e) {
+      if (!e.detail.boosted) return;
+      var m = /[?&]open=(\d+-\d+)/.exec(location.search);
+      var el = m && document.getElementById("pair-" + m[1]);
+      if (el) setTimeout(function () { el.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60);
+    });
+  }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", sync); else sync();
 })();
 </script>

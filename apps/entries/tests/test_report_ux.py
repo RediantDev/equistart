@@ -90,3 +90,18 @@ class DecideByFilterTests(Base):
         # повтор того же подтверждения (двойное нажатие) — понятный отказ по каждой строке, без дублей
         resp = self.client.post(url, {"action": "accept", "confirm": "1", "items": items}, follow=True)
         self.assertContains(resp, "Не выполнено для 2")
+
+
+@override_settings(MEDIA_ROOT=TMP)
+class OneClassPerRouteTests(Base):
+    def test_second_class_in_same_route_added_separately_is_rejected(self):
+        """В одном маршруте пара — в одном зачёте, даже если зачёты добавляют по одному (найдено 28.10.2026)."""
+        extra = self.p1.classes.create(name="Любители", position=9)
+        self.client.force_login(self.coach)
+        url = reverse("entries:apply", args=[self.t.pk])
+        self.client.post(url, {"action": "pair_add", "athlete": self.a2.pk, "horse": self.h1.pk})
+        self.client.post(url, {"action": "add_many", "a": self.a2.pk, "h": self.h1.pk, f"sel_{self.p1.pk}": str(self.c_open.pk)})
+        resp = self.client.post(url, {"action": "add_many", "a": self.a2.pk, "h": self.h1.pk, f"sel_{self.p1.pk}": str(extra.pk)})
+        self.assertContains(resp, "уже заявлена в другом зачёте")
+        lines = ApplicationDraft.objects.get(user=self.coach).data["lines"]
+        self.assertEqual([r["c"] for r in lines], [self.c_open.pk])

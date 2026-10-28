@@ -190,6 +190,20 @@ class Horse(models.Model):
         }
 
 
+class HorseAccess(models.Model):
+    """Доступ к чужой лошади: подавать заявки с ней, без редактирования и без документов (решение 28.10.2026).
+    Даёт только управляющий (создатель); появляется после согласия получателя (Offer HORSE_ACCESS)."""
+
+    horse = models.ForeignKey(Horse, on_delete=models.CASCADE, related_name="accesses")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="horse_accesses")
+    granted_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [models.UniqueConstraint(fields=["horse", "user"], name="horse_access_unique")]
+
+
 class HorseDocument(models.Model):
     class Kind(models.TextChoices):
         PASSPORT = "passport", "Ветеринарный паспорт"
@@ -224,6 +238,7 @@ class Offer(models.Model):
         ATHLETE_LINK = "athlete_link", "Связать с аккаунтом спортсмена"
         ATHLETE_TRANSFER = "athlete_transfer", "Передать управление спортсменом"
         HORSE_TRANSFER = "horse_transfer", "Передать управление лошадью"
+        HORSE_ACCESS = "horse_access", "Доступ к лошади для заявок"
 
     class State(models.TextChoices):
         PENDING = "pending", "Ожидает"

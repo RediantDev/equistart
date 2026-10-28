@@ -16,6 +16,7 @@ urlpatterns = [
     path("horses/<int:pk>/", views.horse_detail, name="horse"),
     path("horses/<int:pk>/edit/", views.horse_edit, name="horse_edit"),
     path("horses/<int:pk>/documents/<int:doc_id>/", views.horse_document, name="horse_document"),
+    path("horses/<int:pk>/documents/<int:doc_id>/view/", views.horse_document_view, name="horse_document_view"),
     path("horses/<int:pk>/<str:action>/", views.horse_action, name="horse_action"),
     path("cabinet/offers/", views.offers, name="offers"),
     path("cabinet/offers/<int:offer_id>/", views.offer_respond, name="offer_respond"),

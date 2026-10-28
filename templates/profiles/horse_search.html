@@ -1,23 +1,31 @@
 {% extends "base.html" %}
 {% block title %}Поиск лошади — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head"><div>
-  <a class="back" href="{% if next %}{{ next }}{% else %}{% url 'profiles:horses' %}{% endif %}">← Назад</a>
-  <h1 class="h1">Поиск лошади</h1>
-  <p class="muted">Введите кличку или номер ФКСР — что именно вы ввели, сервис поймёт сам. Выбор лошади не даёт права редактировать её профиль и смотреть документы.</p>
+<div class="page-head pf-head"><div>
+  <a class="back" href="{{ next }}">← Вернуться к заявке</a>
+  <h1 class="h1">Найти лошадь</h1>
 </div></div>
-<form method="get" class="search" role="search" data-require-input>
+<form method="get" class="search pf-search" role="search" data-require-input>
   <input type="hidden" name="next" value="{{ next }}">
-  <label class="visually-hidden" for="hq">Поиск</label>
-  <input id="hq" name="q" type="search" value="{{ q }}" placeholder="Кличка или номер ФКСР" enterkeyhint="search">
+  <label class="visually-hidden" for="hq">Кличка или номер ФКСР</label>
+  <input id="hq" name="q" type="search" value="{{ q }}" placeholder="Начало клички или номер ФКСР" autocomplete="off" enterkeyhint="search">
   <button class="btn btn--primary" data-require-btn>Найти</button>
 </form>
 {% if q %}
   {% if results %}
-    <div class="list-cards">{% for h in results %}
-      <article class="row-card"><div style="flex: 1 1 180px; min-width: 0;"><span class="h3">{{ h.name }}</span><div class="table__sub">{{ h.summary }}{% if h.fksr_number %} · ФКСР {{ h.fksr_number }}{% endif %}</div></div>
-      {% if next %}<form method="post" action="{{ next }}">{% csrf_token %}<input type="hidden" name="horse" value="{{ h.pk }}"><button class="btn btn--dark btn--sm" name="pick_horse" value="1">Выбрать</button></form>{% endif %}</article>
+    {# Тест 5.1: вся строка — кнопка выбора лошади в заявку #}
+    <div class="pf-list">{% for h in results %}
+      <form method="post" action="{{ next }}">{% csrf_token %}
+        <input type="hidden" name="horse" value="{{ h.pk }}">
+        <button class="pf-row pf-row--pick" name="pick_horse" value="1">
+          <span class="pf-row__main">
+            <span class="pf-row__title">{{ h.name }}</span>
+            <span class="pf-row__meta">{{ h.summary }}{% if h.fksr_number %} · ФКСР {{ h.fksr_number }}{% endif %}</span>
+          </span>
+          <span class="btn btn--dark btn--sm">Выбрать</span>
+        </button>
+      </form>
     {% endfor %}</div>
-  {% else %}<div class="card empty"><h2 class="h3">Ничего не найдено</h2><p class="muted">Проверьте кличку или номер. Если лошади нет в сервисе — добавьте её.</p></div>{% endif %}
+  {% else %}<div class="card empty pf-empty-card"><h2 class="h3">Ничего не найдено</h2><p class="muted">Ищем по началу клички или по номеру. Нет в сервисе — <a href="{% url 'profiles:horse_new' %}?next={{ next|urlencode }}">добавьте лошадь</a>.</p></div>{% endif %}
 {% endif %}
 {% endblock %}

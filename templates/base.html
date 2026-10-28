@@ -12,6 +12,10 @@
   <meta name="theme-color" content="#ffcf1f">
   <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/screens-tournament.css' %}">
+  <link rel="stylesheet" href="{% static 'css/screens-entries.css' %}">
+  <link rel="stylesheet" href="{% static 'css/screens-profiles.css' %}">
+  <link rel="stylesheet" href="{% static 'css/screens-stables.css' %}">
   <script>document.documentElement.classList.add("js");</script>
   <script src="{% static 'js/htmx.min.js' %}" defer></script>
   <script src="{% static 'js/ui.js' %}" defer></script>
@@ -94,6 +98,24 @@
     {% block content %}{% endblock %}
   </main>
 
+  {# Тест 5.1, п. 12: на телефоне — нижнее меню вместо кнопки ☰ #}
+  {% with rn=request.resolver_match.url_name an=request.resolver_match.app_name %}
+  <nav class="bnav" aria-label="Основное меню">
+    <a class="bnav__item{% if rn == 'calendar' or an == 'tournaments' and rn == 'public' %} is-active{% endif %}" href="{% url 'core:calendar' %}">{% include "partials/icon.html" with name="calendar" size=22 %}<span>Календарь</span></a>
+    <a class="bnav__item{% if an == 'clubs' and rn != 'mine' %} is-active{% endif %}" href="{% url 'clubs:list' %}">{% include "partials/icon.html" with name="pin" size=22 %}<span>Клубы</span></a>
+    {% if user.is_authenticated %}
+      {% if user.can_create_tournament or user.is_judge %}
+        <a class="bnav__item{% if an == 'tournaments' and rn == 'mine' %} is-active{% endif %}" href="{% url 'tournaments:mine' %}">{% include "partials/icon.html" with name="trophy" size=22 %}<span>Мои соревнования</span></a>
+      {% else %}
+        <a class="bnav__item{% if rn == 'competitions' %} is-active{% endif %}" href="{% url 'entries:competitions' %}">{% include "partials/icon.html" with name="trophy" size=22 %}<span>Мои соревнования</span></a>
+      {% endif %}
+      <a class="bnav__item{% if rn == 'cabinet' or rn == 'profile' or an == 'support' or an == 'moderation' %} is-active{% endif %}" href="{% url 'accounts:cabinet' %}">{% include "partials/icon.html" with name="user" size=22 %}<span>Кабинет</span></a>
+    {% else %}
+      <a class="bnav__item" href="{% url 'accounts:login' %}?next={% url 'entries:competitions' %}">{% include "partials/icon.html" with name="trophy" size=22 %}<span>Мои соревнования</span></a>
+      <a class="bnav__item{% if rn == 'login' or rn == 'register' %} is-active{% endif %}" href="{% url 'accounts:login' %}">{% include "partials/icon.html" with name="user" size=22 %}<span>Войти</span></a>
+    {% endif %}
+  </nav>
+  {% endwith %}
   <footer class="footer">
     <div class="footer__inner">
       <span>© СтартЛист</span>

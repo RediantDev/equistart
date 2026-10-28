@@ -1,47 +1,51 @@
 {% load tournaments %}
-{% if cards %}
-  <div class="stack">
-  {% for c in cards %}
-    <article class="card mc-card">
-      <div class="mc-card__head">
-        <div style="min-width: 0;">
-          <a class="h3 row-card__title" href="{% url 'tournaments:public' c.t.pk %}">{{ c.t.pub_title|default:c.t.title }}</a>
-          <div class="table__sub">{% daterange c.t.pub_starts_on c.t.pub_ends_on %}{% if c.t.venue %} · {{ c.t.venue.name }}{% endif %}</div>
-        </div>
-        {% if c.summary %}<div class="chips">{% for label, n, color in c.summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>{% endif %}
-      </div>
-      {% if c.entries %}
-        <ul class="mc-list">
-          {% for e in c.entries %}
-            <li class="mc-row">
-              <div style="min-width: 0; flex: 1;">
-                <strong>{{ e.athlete_snapshot.name }}</strong> на {{ e.horse_snapshot.name }}
-                <div class="table__sub">{{ e.day|date:"j E" }} · {{ e.program_name }} · {{ e.class_name }}{% if e.by_coach %} · заявил тренер{% endif %}</div>
-              </div>
+<div class="mc-cards" data-mc-list>
+{% for c in cards %}
+  <details class="card mc-card" data-mc-card data-title="{{ c.t.pub_title|default:c.t.title }}" data-search="{{ c.search }}" data-statuses="{{ c.statuses }}">
+    <summary class="mc-card__sum">
+      <span class="mc-card__title">{{ c.t.pub_title|default:c.t.title }}</span>
+      <span class="mc-card__meta">{% daterange c.t.pub_starts_on c.t.pub_ends_on %}{% if c.t.venue %} · {{ c.t.venue.name }}{% endif %}</span>
+      <span class="mc-card__counts">Выступлений: {{ c.n_entries }} · Услуг: {{ c.n_orders }}{% if c.n_bookings %} · Денников: {{ c.n_bookings }}{% endif %}</span>
+    </summary>
+    <div class="mc-card__body">
+      {% for d in c.days %}
+        <section class="mc-day" data-mc-day>
+          <h3 class="mc-day__h">{{ d.day|date:"j E, D" }}</h3>
+          <ul class="mc-rows">{% for e in d.entries %}
+            <li class="mc-row" data-mc-row data-status="{{ e.decision }}" data-search="{{ e.search }}">
+              <div class="mc-row__main"><strong>{{ e.athlete_snapshot.name }}</strong> · {{ e.horse_snapshot.name }}
+                <span class="table__sub">{{ e.program_name }} · {{ e.class_name }}{% if e.height %} · {{ e.height }} см{% endif %}{% if e.by_coach %} · заявил тренер{% endif %}</span></div>
               {% include "entries/_entry_chips.html" %}
-            </li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-      {% if c.bookings or c.orders %}
-        <div class="mc-stable">
-          <span aria-hidden="true">🐴</span>
-          <span>{% for b in c.bookings %}{{ b.horse.name }} — {{ b.get_state_display|lower }}{% if not forloop.last %}; {% endif %}{% endfor %}{% if c.bookings and c.orders %}; {% endif %}{% if c.orders %}услуг заказано: {{ c.orders }}{% endif %}</span>
-        </div>
+            </li>{% endfor %}</ul>
+        </section>
+      {% endfor %}
+      {% if c.stable %}
+        <section class="mc-day">
+          <h3 class="mc-day__h">Денники и услуги</h3>
+          <ul class="mc-rows">{% for g in c.stable %}
+            <li class="mc-stab">
+              <strong>{{ g.label }}</strong>
+              {% for b in g.bookings %}<div class="mc-stab__line"><span>Денник · {{ b.category.name }}, {{ b.arrive|date:"j E" }} — {{ b.depart|date:"j E" }}{% if b.box_number %} · №{{ b.box_number }}{% endif %}</span>
+                <span class="chip{% if b.state == 'confirmed' %} chip--success{% elif b.state == 'pending' %} chip--warning{% elif b.state == 'rejected' %} chip--danger{% endif %}">{{ b.get_state_display }}</span></div>{% endfor %}
+              {% for o in g.orders %}<div class="mc-stab__line"><span>{{ o.service.name }} × {{ o.quantity }} {{ o.service.unit }}{% if o.for_date %}, на {{ o.for_date|date:"j E" }}{% endif %}</span>
+                <span class="chip{% if o.delivered == o.quantity %} chip--success{% elif o.delivered %} chip--warning{% else %} chip--info{% endif %}">{% if o.delivered %}{{ o.delivery_state }}{% else %}Заказано{% endif %}</span></div>{% endfor %}
+            </li>{% endfor %}</ul>
+        </section>
       {% endif %}
       <div class="mc-card__actions">
-        {% for a in c.apps %}<a class="btn btn--ghost btn--sm" href="{% url 'entries:application' a %}">Заявка №{{ a }}</a>{% endfor %}
-        {% if c.bookings or c.orders %}<a class="btn btn--ghost btn--sm" href="{% url 'stables:book' c.t.pk %}">Денники и услуги</a>{% endif %}
+        {% for a in c.apps %}<a class="btn btn--ghost btn--sm" href="{% url 'entries:application' a.pk %}">{% if c.apps|length > 1 %}Заявка от {{ a.created_at|date:"d.m" }}{% else %}Заявка{% endif %}</a>{% endfor %}
+        <a class="btn btn--ghost btn--sm" href="{% url 'stables:book' c.t.pk %}">Денники и услуги</a>
         <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:public' c.t.pk %}?tab=starts">Стартовые</a>
       </div>
-    </article>
-  {% endfor %}
-  </div>
+    </div>
+  </details>
+{% endfor %}
+{% if cards %}<p class="muted mc-none" data-mc-none hidden>Ничего не найдено. Измените запрос или фильтр.</p>
 {% else %}
-  <div class="card empty-friendly">
-    <div class="empty-friendly__ico" aria-hidden="true">🏇</div>
-    {% if tab == "past" %}<h2 class="h3">Прошедших стартов пока нет</h2><p class="muted">Здесь будут турниры, в которых вы выступали, и ссылки на результаты.</p>
-    {% else %}<h2 class="h3">Впереди пока ничего</h2><p class="muted">Найдите турнир в календаре и подайте заявку — или попросите тренера заявить вас.</p>
-    <div class="empty-friendly__actions"><a class="btn btn--primary btn--sm" href="{% url 'core:calendar' %}">Найти соревнования</a></div>{% endif %}
+  <div class="card mc-empty">
+    {% if tab == "past" %}<p class="muted">Прошедших стартов пока нет.</p>
+    {% else %}<p class="muted">Впереди пока ничего. Найдите турнир в календаре и подайте заявку — или попросите тренера заявить вас.</p>
+    <a class="btn btn--primary btn--sm" href="{% url 'core:calendar' %}">Найти соревнования</a>{% endif %}
   </div>
 {% endif %}
+</div>

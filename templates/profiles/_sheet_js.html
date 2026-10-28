@@ -1,0 +1,28 @@
+<script>
+(function () {
+  /* Шторки и подтверждения на <details>: без JS открываются и закрываются нажатием; с JS — крестик, Escape, «Оставить», камера. */
+  if (window.__psSheet) return;
+  window.__psSheet = true;
+  document.addEventListener("click", function (e) {
+    var x = e.target.closest("[data-ps-close], [data-ps-keep]");
+    if (x) { var d = x.closest("details"); if (d) { e.preventDefault(); d.removeAttribute("open"); } return; }
+    var cam = e.target.closest("[data-ps-camera]");
+    if (cam) {
+      var inp = cam.closest("form").querySelector('input[type="file"]'), acc = inp.accept;
+      inp.setAttribute("capture", "environment"); inp.accept = "image/*";
+      inp.click();
+      setTimeout(function () { inp.removeAttribute("capture"); inp.accept = acc; }, 800);
+    }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    document.querySelectorAll("details[data-ps-sheet][open], details.ps-acc[open]").forEach(function (d) { d.removeAttribute("open"); });
+  });
+  document.addEventListener("toggle", function (e) {
+    var d = e.target;
+    if (!(d instanceof HTMLDetailsElement) || !d.open || !d.matches("[data-ps-sheet]")) return;
+    var f = d.querySelector(".ps-sheet__panel input:not([type=hidden]):not([type=file])");
+    if (f && !matchMedia("(pointer: coarse)").matches) f.focus();
+  }, true);
+})();
+</script>

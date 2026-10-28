@@ -40,7 +40,7 @@
       <fieldset class="form__group step-pane" data-step="3" style="border-bottom: 0;">
         <legend class="h3">Логотип</legend>
         <p class="muted" style="margin-top: 0;">Фото манежа и обложку добавите в кабинете клуба после сохранения.</p>
-        {% if club.logo %}<div class="club-head"><img class="club-logo club-logo--lg" src="{% url 'clubs:file' 'logo' club.pk %}" alt="Текущий логотип"><label class="check"><input type="checkbox" name="logo_clear" value="1"><span>Убрать логотип</span></label></div>{% endif %}
+        {% if club.logo %}<div class="club-head"><img class="club-logo club-logo--lg" src="{% url 'clubs:file' 'logo' club.pk %}?w=320" alt="Текущий логотип"><label class="check"><input type="checkbox" name="logo_clear" value="1"><span>Убрать логотип</span></label></div>{% endif %}
         {% include "partials/field.html" with field=form.logo %}
         <div class="form-actions step-pane__nav">
           <button type="button" class="btn btn--ghost" data-step-prev>Назад</button>

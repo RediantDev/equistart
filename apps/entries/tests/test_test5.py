@@ -19,7 +19,7 @@ class SingleRankTests(Base):
         self.assertIn('name="rank"', page)
         self.assertNotIn("rank_jumping", page)
         self.assertNotIn("rank_dressage", page)
-        self.client.post(reverse("profiles:athlete_edit", args=[self.a2.pk]), {"last_name": "Орлов", "first_name": "Дима", "rank": "kms"})
+        self.client.post(reverse("profiles:athlete_edit", args=[self.a2.pk]), {"last_name": "Орлов", "first_name": "Дима", "birth_date": "1996-01-01", "rank": "kms"})
         self.a2.refresh_from_db()
         self.assertEqual(self.a2.rank, "kms")
         self.assertEqual(self.a2.rank_short, "КМС")
@@ -113,10 +113,13 @@ class ApplyScreenTests(Base):
         resp = self.add_two()
         self.assertEqual(resp.status_code, 302)
         page = self.client.get(resp["Location"]).content.decode()
-        self.assertIn("pair-summary--routes", page)
+        # макет S09B: свёрнутая пара — строки «маршрут · день, время» с зачётом и кнопка «Маршруты и зачёты»
+        self.assertEqual(page.count('class="ap-line"'), 2)
         self.assertNotIn('value="add_many"', page)  # выбор свёрнут
         self.assertIn("Любители", page)
-        self.assertIn("Изменить", page)
+        self.assertIn("Маршруты и зачёты", page)
+        self.assertIn("1 пара · 2 выступления", page)
+        self.assertIn('value="pair_remove"', page)
 
     def test_remove_one_class_updates_screen(self):
         self.add_two()
@@ -181,8 +184,12 @@ class ApplicationGroupsTests(Base):
         app = self.submit(self.coach, [services.Line(self.a1, self.h1, self.c_kids), services.Line(self.a2, self.h1, self.c_open)])
         self.client.force_login(self.coach)
         page = self.client.get(reverse("entries:application", args=[app.pk])).content.decode()
-        self.assertEqual(page.count('class="rider-group"'), 2)
-        self.assertIn("Отменить выбранные", page)
+        # тест 5.1: по дням соревнований; макет R2_03B: строка «Всадник — Лошадь», отмена — в режиме правки
+        self.assertEqual(page.count('class="app-day"'), 1)
+        self.assertEqual(page.count("data-ae-entry"), 2)
+        self.assertIn("Изменить заявку", page)
+        self.assertEqual(page.count('name="entry"'), 0)
+        page = self.client.get(reverse("entries:application", args=[app.pk]) + "?edit=1").content.decode()
         self.assertEqual(page.count('name="entry"'), 2)
 
     def test_application_closed_for_guest_and_stranger(self):
@@ -195,16 +202,17 @@ class ApplicationGroupsTests(Base):
 
 @override_settings(MEDIA_ROOT=TMP)
 class MyListsTests(Base):
-    def test_find_competitions_and_filters_panel(self):
+    def test_old_lists_lead_to_my_competitions(self):
+        """Тест 5.1: «Мои заявки» и «Мои выступления» — это «Мои соревнования»; старые адреса работают."""
+        comp = reverse("entries:competitions")
+        self.assertIn("login", self.client.get(reverse("entries:mine"))["Location"])  # гость → вход
         self.client.force_login(self.coach)
-        cal = reverse("core:calendar")
-        page = self.client.get(reverse("entries:mine")).content.decode()
-        self.assertIn(f'href="{cal}"', page)
-        self.assertIn("Найти соревнования", page)
-        self.assertIn("<details class=\"filters list-search__filters\">", page)
-        page = self.client.get(reverse("entries:mine") + "?period=past&decision=accepted").content.decode()
-        self.assertIn("активных фильтров: 2", page)
-        page = self.client.get(reverse("entries:my_starts")).content.decode()
+        self.assertRedirects(self.client.get(reverse("entries:mine")), comp, fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(reverse("entries:mine") + "?q=Барон"), comp + "?q=%D0%91%D0%B0%D1%80%D0%BE%D0%BD", fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(reverse("entries:my_starts")), comp, fetch_redirect_response=False)
+        page = self.client.get(comp + "?q=Барон").content.decode()
+        self.assertIn('value="Барон"', page)  # поиск переносится
+        self.assertIn(f'href="{reverse("core:calendar")}"', page)
         self.assertIn("Найти соревнования", page)
 
 

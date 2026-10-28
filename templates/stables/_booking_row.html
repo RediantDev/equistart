@@ -1,0 +1,17 @@
+<li class="sb-row" id="b{{ b.pk }}">
+  <div class="sb-row__main"><span>{% if show_horse %}<strong>{{ b.horse_name }}</strong> · {% endif %}{{ b.category.name }} · {{ b.period }}</span>
+    {% if b.required %}<span class="sb-m">Без денника выступления невозможны{% if b.state == "pending" or b.state == "rejected" %} — выступления лошади ждут подтверждения брони{% endif %}</span>{% endif %}
+    {% if b.reason and b.state != "pending" %}<span class="sb-m">Причина: {{ b.reason }}</span>{% endif %}</div>
+  <div class="chips"><span class="chip{% if b.state == 'confirmed' %} chip--success{% elif b.state == 'pending' %} chip--warning{% elif b.state == 'rejected' %} chip--danger{% endif %}">{{ b.get_state_display }}</span>{% if b.box_number %}<span class="chip chip--info">Денник {{ b.box_number }}</span>{% endif %}</div>
+  {% if b.is_holding and open %}<div class="sb-row__acts">
+    {% if b.state == "pending" %}<details class="inline-details sb-act"><summary class="btn btn--ghost btn--sm">Изменить</summary>
+      <div class="sb-act__body">
+        <div class="field"><label class="field__label" for="e{{ b.pk }}-cat">Категория</label><select id="e{{ b.pk }}-cat" name="category" form="e{{ b.pk }}" required>{% for k in cats %}<option value="{{ k.pk }}"{% if k.pk == b.category_id %} selected{% endif %}>{{ k.name }} ({{ k.available_from|date:"j.m" }}–{{ k.available_to|date:"j.m" }})</option>{% endfor %}</select></div>
+        <div class="form-row"><div class="field"><label class="field__label" for="e{{ b.pk }}-a">Заезд</label><input id="e{{ b.pk }}-a" type="date" name="arrive" form="e{{ b.pk }}" value="{{ b.arrive|date:'Y-m-d' }}" required></div>
+          <div class="field"><label class="field__label" for="e{{ b.pk }}-d">Выезд</label><input id="e{{ b.pk }}-d" type="date" name="depart" form="e{{ b.pk }}" value="{{ b.depart|date:'Y-m-d' }}" required></div></div>
+        <button class="btn btn--dark btn--sm" form="e{{ b.pk }}">Сохранить изменения</button>
+      </div></details>{% endif %}
+    <details class="inline-details sb-act"><summary class="btn btn--ghost btn--sm">Отменить</summary>
+      <div class="sb-act__body inline-row"><input type="text" name="reason" form="x{{ b.pk }}" placeholder="Причина (необязательно)" aria-label="Причина отмены"><button class="btn btn--danger btn--sm" form="x{{ b.pk }}">Отменить бронь</button></div></details>
+  </div>{% endif %}
+</li>

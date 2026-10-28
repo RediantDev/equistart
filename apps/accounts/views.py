@@ -24,6 +24,12 @@ def register(request):
     if request.user.is_authenticated:
         return redirect("accounts:cabinet")
     form = RegistrationForm(request.POST or None)
+    if request.method == "POST" and not form.is_valid() and "phone" in form.errors and any(
+            e.code == "duplicate" for e in form.errors.as_data()["phone"]):
+        # Номер уже есть: показываем окно «Войти?», остальные ошибки (пароли) не мешают (тест 5.1, п. 11)
+        for name in ("password1", "password2", "pd_consent"):
+            form.errors.pop(name, None)
+        return render(request, "accounts/register.html", {"form": form, "dup_phone": True})
     if request.method == "POST" and form.is_valid():
         user = form.save()
         login(request, user, backend="apps.accounts.backends.PhoneBackend")
@@ -91,7 +97,7 @@ def cabinet(request):
         actions.append(("Приглашение управлять клубом", n, "tournaments:invitations"))
     n = Offer.objects.filter(phone=user.phone, state=Offer.State.PENDING).count()
     if n:
-        actions.append(("Предложения: связь с профилем или передача управления", n, "profiles:offers"))
+        actions.append(("Предложения: связь с профилем, передача управления или доступ к лошади", n, "profiles:offers"))
     if judged_ids:
         pending = Entry.objects.filter(tournament__in=judged_ids, tournament__publication=Tournament.Publication.PUBLISHED, decision=Entry.Decision.PENDING)
         for t_id, title in pending.order_by().values_list("tournament_id", "tournament__pub_title").distinct():
@@ -110,8 +116,10 @@ def cabinet(request):
     from apps.entries.models import ApplicationDraft
 
     own = Athlete.objects.filter(linked_user=user, archived=False).first()
-    if own and not own.birth_date:
-        actions.append(("Профиль спортсмена: укажите дату рождения — без неё недоступны зачёты с возрастом", None, ("profiles:athlete_edit", own.pk)))
+    if own and (not own.birth_date or not own.rank):
+        # Решение 28.10.2026: при регистрации дату рождения и разряд не спрашиваем — заполняются в профиле
+        miss = " и ".join(x for x in ("дату рождения" if not own.birth_date else "", "разряд" if not own.rank else "") if x)
+        actions.append((f"Профиль спортсмена: укажите {miss} — они нужны для заявок", None, ("profiles:athlete_edit", own.pk)))
 
     for d in ApplicationDraft.objects.filter(user=user, tournament__publication=Tournament.Publication.PUBLISHED).select_related("tournament"):
         n = len(d.data.get("lines", []))
@@ -346,3 +354,28 @@ def password_reset_confirm(request):
     from .phone import format_phone
 
     return render(request, "accounts/password_reset_confirm.html", {"form": form, "phone": format_phone(phone)})
+
+
+def phone_check(request):
+    """Есть ли аккаунт с таким номером — для окна «Войти?» при регистрации (тест 5.1, п. 11).
+
+    Регистрация и так сообщает «номер уже зарегистрирован»; ограничение частоты — от перебора номеров.
+    """
+    from django.core.cache import cache
+    from django.core.exceptions import ValidationError
+    from django.http import JsonResponse
+
+    from . import throttle
+    from .models import User
+    from .phone import normalize_phone
+
+    key = "phone-check:" + throttle.client_ip(request)
+    n = cache.get(key, 0)
+    if n >= 30:
+        return JsonResponse({"exists": False, "limited": True}, status=429)
+    cache.set(key, n + 1, 600)
+    try:
+        phone = normalize_phone(request.GET.get("phone", ""))
+    except ValidationError:
+        return JsonResponse({"exists": False, "valid": False})
+    return JsonResponse({"exists": User.objects.filter(phone=phone).exists(), "valid": True})

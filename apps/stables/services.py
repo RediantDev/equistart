@@ -164,6 +164,78 @@ def book_many(user, category_id, horses, arrive, depart, key, required=False, co
 
 
 @transaction.atomic
+def submit_cart(user, tournament_id, bookings, lines, key, required=False, contact_phone="", comment="") -> tuple[list, list]:
+    """Экран «Денники и услуги»: брони для нескольких лошадей (у каждой свои ночи и категория) и заказ услуг — одной отправкой.
+    bookings — [{category: id, horse: Horse, arrive, depart}], lines — как в order_many.
+    Всё или ничего; вместимость — под блокировкой категорий (LOD-02/03); повтор с тем же ключом не создаёт дублей."""
+    if not key:
+        raise ValueError("Обновите страницу и отправьте форму ещё раз.")
+    if not bookings and not lines:
+        raise ValueError("Отметьте ночи или укажите количество услуг.")
+    t = Tournament.objects.get(pk=tournament_id)
+    cat_ids = sorted({int(b["category"]) for b in bookings})
+    cats = {c.pk: c for c in StableCategory.objects.select_for_update().filter(pk__in=cat_ids, tournament=t).order_by("pk")}
+    if len(cats) != len(cat_ids):
+        raise ValueError("Категория денника не найдена — обновите страницу.")
+    if bookings:
+        existing = list(Booking.objects.filter(idempotency_key__startswith=_sub_key(key, "")).order_by("pk"))
+        if existing:
+            if any(b.requested_by_id != user.pk for b in existing):
+                raise PermissionDenied
+            orders = list(ServiceOrder.objects.filter(idempotency_key__startswith=_sub_key(key, ""), ordered_by=user).order_by("pk"))
+            return existing, orders
+    if not booking_open(t):
+        raise ValueError("Бронирование закрыто.")
+    staff = can_stable(user, t)
+    seen, need = set(), {}
+    for b in bookings:
+        h, c = b["horse"], cats[int(b["category"])]
+        if h.pk in seen:
+            raise ValueError(f"«{h.name}»: одна бронь на лошадь за отправку.")
+        seen.add(h.pk)
+        if h.manager_id != user.pk and not staff:
+            raise PermissionDenied
+        if not c.is_active:
+            raise ValueError(f"Бронирование в категории «{c.name}» закрыто.")
+        try:
+            check_period(c, b["arrive"], b["depart"])
+        except ValueError as e:
+            raise ValueError(f"«{h.name}»: {e}")
+        for d in _days(b["arrive"], b["depart"]):
+            need[(c.pk, d)] = need.get((c.pk, d), 0) + 1
+    if bookings:
+        busy = []
+        for b in bookings:
+            if Booking.objects.filter(tournament=t, horse=b["horse"], state__in=Booking.HOLDING, arrive__lt=b["depart"], depart__gt=b["arrive"]).exists():
+                busy.append(b["horse"].name)
+        if busy:
+            raise ValueError("Уже есть бронь на эти ночи: " + ", ".join(f"«{n}»" for n in sorted(busy)) + ". Снимите эти ночи с выбора.")
+        occ = {pk: occupancy(c) for pk, c in cats.items()}
+        for (cid, d), n in sorted(need.items(), key=lambda x: (x[0][1], x[0][0])):
+            free = cats[cid].capacity - occ[cid].get(d, 0)
+            if free < n:
+                raise Conflict(f"«{cats[cid].name}»: на ночь {d:%d.%m} свободно денников: {max(free, 0)}, выбрано лошадей: {n}. "
+                               "Ни одна бронь не создана — уберите эту ночь у части лошадей или выберите другую категорию.")
+    made = []
+    for b in sorted(bookings, key=lambda x: x["horse"].pk):
+        h, c = b["horse"], cats[int(b["category"])]
+        bk = Booking.objects.create(
+            tournament=t, category=c, horse=h, horse_name=h.name, requested_by=user, arrive=b["arrive"], depart=b["depart"],
+            required=bool(required), contact_phone=contact_phone or "", comment=(comment or "").strip()[:500], idempotency_key=_sub_key(key, h.pk),
+        )
+        audit(user, "booking.create", bk, category=c.pk, arrive=str(bk.arrive), depart=str(bk.depart), required=bk.required, batch=key)
+        made.append(bk)
+    if made:
+        from apps.core.models import notify_merged
+
+        names = ", ".join(f"{b.horse_name} {b.arrive:%d.%m}–{b.depart:%d.%m}" for b in made)
+        notify_merged(_staff(t), "booking", reverse("stables:manage", args=[t.pk]) + "?tab=bookings&state=pending",
+                      lambda n: f"«{t.pub_title}»: новых броней денников — {n}. Последние: {names}.")
+    orders = order_many(user, t.pk, lines, key) if lines else []
+    return made, orders
+
+
+@transaction.atomic
 def update_booking(user, booking_id, category_id, arrive, depart, revision=None) -> Booking:
     """Представитель меняет категорию и даты своей брони, пока конюшня её не рассмотрела.
     Место в новой категории проверяется под блокировкой категории — как при новой брони."""
@@ -260,7 +332,7 @@ def cancel_booking(user, booking_id, reason="") -> Booking:
     b.save()
     audit(user, "booking.cancel", b, reason=b.reason)
     if b.requested_by_id != user.pk:
-        notify([b.requested_by], f"Бронь денника ({b.horse_name}) отменена: {b.reason}", reverse("stables:book", args=[b.tournament_id]) + "#mine", "booking")
+        notify([b.requested_by], f"Бронь денника ({b.horse_name}) отменена: {b.reason}", reverse("stables:book", args=[b.tournament_id]), "booking")
     else:
         notify(_staff(b.tournament), f"Представитель отменил бронь: {b.horse_name}, {b.arrive:%d.%m}–{b.depart:%d.%m}",
                reverse("stables:manage", args=[b.tournament_id]) + "?tab=bookings", "booking")

@@ -1,15 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Отмена выступлений — СтартЛист{% endblock %}
 {% block content %}
-<section class="auth"><div class="card auth__card auth__card--wide">
-  <h1 class="h1">Отменить выступления?</h1>
-  <p class="muted">Будут отменены только эти позиции заявки №{{ app.pk }} ({{ entries|length }}). Остальные выступления, денники и услуги сохранятся.</p>
-  <form method="post" action="{% url 'entries:cancel' app.pk %}" class="form">
+<section class="cc">
+  <h1 class="h2 cc__title">Отменить выступления?</h1>
+  <p class="table__sub cc__lead">Отменятся только отмеченные ниже ({{ entries|length }}). Остальные выступления заявки сохранятся.</p>
+  <form method="post" action="{% url 'entries:cancel' app.pk %}" class="cc__form">
     {% csrf_token %}<input type="hidden" name="confirm" value="1">
-    <ul class="list">{% for e in entries %}
-      <li class="list__row"><input type="hidden" name="entry" value="{{ e.pk }}"><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}"><span style="flex: 1;"><strong>{{ e.athlete_snapshot.name }}</strong> на {{ e.horse_snapshot.name }}<span class="table__sub">{{ e.program_name }} · {{ e.class_name }}</span></span></li>
+    <ul class="cc__list">{% for e in entries %}
+      <li class="cc__row"><input type="hidden" name="entry" value="{{ e.pk }}"><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}">
+        <strong>{{ e.athlete_snapshot.name }}</strong> · {{ e.horse_snapshot.name }}<span class="table__sub">{{ e.day|date:"j E" }} · {{ e.program_name }} · {{ e.class_name }}</span></li>
     {% endfor %}</ul>
-    <div class="form-actions"><a class="btn btn--ghost" href="{% url 'entries:application' app.pk %}">Не отменять</a><button class="btn btn--danger">Отменить {{ entries|length }}</button></div>
+    {% if bookings or orders %}
+      <fieldset class="cc__extra">
+        <legend class="cc__extra-h">Отменить и это?</legend>
+        <p class="table__sub">У этих лошадей не останется выступлений на турнире.</p>
+        {% for b in bookings %}<label class="check cc__check"><input type="checkbox" name="booking" value="{{ b.pk }}" checked><span>Денник · {{ b.horse_name }}, {{ b.category.name }}, {{ b.arrive|date:"j E" }} — {{ b.depart|date:"j E" }}<span class="table__sub">{{ b.get_state_display }}</span></span></label>{% endfor %}
+        {% for o in orders %}<label class="check cc__check"><input type="checkbox" name="order" value="{{ o.pk }}" checked><span>{{ o.service.name }} × {{ o.quantity }} {{ o.service.unit }} · {{ o.recipient_label }}{% if o.for_date %}<span class="table__sub">на {{ o.for_date|date:"j E" }}</span>{% endif %}</span></label>{% endfor %}
+      </fieldset>
+    {% endif %}
+    <div class="cc__actions">
+      <button class="btn btn--danger-solid btn--block">Отменить</button>
+      <a class="btn btn--ghost btn--block" href="{% url 'entries:application' app.pk %}">Не отменять</a>
+    </div>
   </form>
-</div></section>
+</section>
 {% endblock %}

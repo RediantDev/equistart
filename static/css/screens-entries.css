@@ -1,0 +1,119 @@
+/* Экраны по утверждённому макету (28.10.2026): entries */
+
+/* ---------- Заявка участника: просмотр и режим правки (макет R2_03B) ---------- */
+.ae-head__row { display: flex; align-items: flex-start; gap: var(--space-3); flex-wrap: wrap; }
+.ae-head__text { flex: 1 1 260px; min-width: 0; }
+.ae-head__mode { vertical-align: middle; font-size: 11px; padding: 3px 9px; }
+.ae-head__mode::before { display: none; }
+.ae-head__t { margin: 2px 0 0; font-size: 14px; font-weight: 650; }
+.ae-head__t a { color: var(--text); }
+.ae-head .table__sub { margin: 2px 0 0; }
+.ae-head__btn { flex: none; }
+.ae-lead { margin: 0; }
+.ae-form { display: flex; flex-direction: column; gap: var(--space-3); }
+.ae-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+.ae-card[hidden] { display: none; }
+.ae-card .app-day + .app-day { margin-top: 0; border-top: 1px solid var(--border); }
+.ae-dh { margin: 0; padding: 8px 12px 6px; background: var(--bg); font-size: 11px; line-height: 14px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+.ae-dh__n { font-weight: 600; }
+.ae-row { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; min-height: 60px; border-top: 1px solid var(--border); }
+.ae-dh + .ae-row, .ae-dh + .ae-nojs { border-top: 0; }
+.ae-row[hidden] { display: none; }
+.ae-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ae-row__name { font-weight: 700; overflow-wrap: anywhere; }
+.ae-row__sub { font-size: 12px; line-height: 16px; color: var(--text-muted); }
+.ae-row__note { font-size: 12px; line-height: 16px; color: var(--text-muted); }
+.ae-row__note--bad { color: var(--danger); }
+.ae-row__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.ae-row__chips .chip { padding: 3px 9px; font-size: 11px; }
+.ae-row__side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.ae-row.is-off .ae-row__name { color: var(--text-muted); }
+.ae-row .proposal { margin-top: 4px; }
+/* Строка к отмене: переключатель — скрытая галочка + две подписи-кнопки (работает без JS) */
+.ae-x { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.ae-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 14px; border-radius: var(--radius-pill); border: 1px solid var(--control-border); background: var(--surface); font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; user-select: none; }
+.ae-btn--x { border-color: var(--danger); color: var(--danger); }
+.ae-btn--x:hover { background: var(--danger-soft); }
+.ae-btn--back:hover { background: var(--surface-2); }
+.ae-btn--back, .ae-will { display: none; }
+.ae-x:checked ~ .ae-row__side .ae-btn--x, .ae-x:checked ~ .ae-row__main .ae-row__chips .chips { display: none; }
+.ae-x:checked ~ .ae-row__side .ae-btn--back, .ae-x:checked ~ .ae-row__main .ae-will { display: inline-flex; }
+.ae-x:checked ~ .ae-row__main .ae-row__name { text-decoration: line-through; color: var(--text-muted); }
+.ae-row:has(.ae-x:checked) { background: var(--danger-soft); }
+.ae-x:focus-visible ~ .ae-row__side .ae-btn { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Денник/услуга: «Оставить / Отменить» */
+.ae-row--stable { flex-wrap: wrap; }
+.ae-row--stable .ae-row__main { flex: 1 1 180px; }
+.ae-seg { display: flex; flex: none; gap: 2px; padding: 3px; border-radius: var(--radius-pill); background: var(--surface-2); }
+.ae-seg input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.ae-seg label { display: inline-flex; align-items: center; min-height: 38px; padding: 0 12px; border-radius: var(--radius-pill); font-weight: 600; font-size: 13px; color: var(--text-muted); cursor: pointer; }
+.ae-seg input:checked + label { background: var(--ink); color: var(--surface); }
+.ae-seg input[value="cancel"]:checked + label { background: var(--danger); }
+.ae-seg input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ae-nojs { margin: 0; padding: 4px 12px 8px; }
+.js .ae-nojs { display: none; }
+/* Итог внизу: «Сбросить» и «Отменить N выступлений» */
+.ae-bar .btn { padding: 0 16px; }
+.ae-bar { position: sticky; bottom: 0; z-index: 4; display: flex; align-items: center; gap: 10px; padding: 10px 0; background: var(--bg); border-top: 1px solid var(--border); }
+.ae-bar__go { flex: 1; min-width: 0; padding: 0 14px; white-space: nowrap; background: var(--danger); border-color: var(--danger); color: #fff; }
+.ae-bar__go:hover { background: #a01821; color: #fff; }
+@media (max-width: 640px) {
+  .ae-head__btn:not(.btn--sm) { width: 100%; }
+  .ae-row__side .btn { min-height: 44px; }
+  .ae-row:not(.ae-row--stable) { flex-wrap: wrap; }
+  .ae-row:not(.ae-row--stable):has(.btn) .ae-row__side { width: 100%; flex-direction: row; justify-content: flex-start; }
+}
+@media (max-width: 720px) {
+  /* над нижним меню телефона, во всю ширину экрана (поля страницы — 12px) */
+  .ae-bar { bottom: calc(var(--bnav-h) + env(safe-area-inset-bottom)); margin: 0 -12px; padding: 10px 12px; background: var(--surface); }
+}
+
+/* ---------- Подача заявки одной страницей (макет S09B) ---------- */
+.ap-grid .pairs { display: flex; flex-direction: column; gap: var(--space-2); }
+.ap-pair { padding: 0; overflow: hidden; border-radius: var(--radius-md); }
+.ap-pair.pair--closed { padding: 0; }
+.ap-pair.is-open { border-color: var(--ink); }
+.ap-pair.is-open .pair-form { padding: 0 var(--space-4) var(--space-3); }
+.ap-pair__head { display: flex; align-items: center; gap: 8px; padding: 8px 4px 8px var(--space-4); min-height: 56px; }
+.ap-pair__title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ap-pair__name { margin: 0; font-size: 16px; line-height: 22px; font-weight: 800; overflow-wrap: anywhere; }
+.ap-pair__title .table__sub { font-size: 12px; line-height: 16px; }
+.ap-x { width: 44px; height: 44px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: var(--radius-pill); background: transparent; color: var(--text-muted); cursor: pointer; }
+.ap-x:hover { background: var(--surface-2); color: var(--text); }
+.ap-lines { list-style: none; margin: 0; padding: 0; }
+.ap-lines--empty { padding: 10px var(--space-4); border-top: 1px solid var(--border); margin: 0; }
+.ap-line { display: flex; align-items: center; gap: 8px; padding: 8px var(--space-4); border-top: 1px solid var(--border); font-size: 14px; }
+.ap-line__name { flex: 1; min-width: 0; font-weight: 600; }
+.ap-line__when { font-weight: 500; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.ap-tag { flex: none; display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; border: 1px solid var(--border); border-radius: var(--radius-pill); font-size: 12px; font-weight: 650; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-ed { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; border-top: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 14px; font-weight: 700; text-decoration: none; }
+.ap-ed:hover { background: var(--surface-2); color: var(--text); }
+.ap-add > summary { list-style: none; }
+.ap-add > summary::-webkit-details-marker { display: none; }
+.ap-add__btn { width: 100%; background: var(--surface); border: 1px dashed var(--control-border); color: var(--text); }
+.ap-add__btn:hover { border-color: var(--text); }
+.ap-add[open] > .ap-add__btn { display: none; }
+.ap-add__card { margin: 0; }
+/* Итог и отправка: в колонке «Отправка»; на телефоне — закреплённая панель над нижним меню */
+.ap-bar { display: flex; align-items: center; gap: 12px; margin-top: var(--space-2); }
+.ap-bar__sum { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ap-bar__sum b { font-size: 15px; line-height: 20px; }
+.ap-bar__sub { font-size: 12px; line-height: 16px; color: var(--text-muted); }
+.ap-bar__go { flex: none; }
+@media (min-width: 721px) {
+  .ap-bar { flex-direction: column; align-items: stretch; }
+  .ap-bar__go .btn { width: 100%; }
+}
+@media (max-width: 720px) {
+  .ap-grid { padding-bottom: 76px; }
+  .ap-bar { position: fixed; left: 0; right: 0; bottom: calc(var(--bnav-h) + env(safe-area-inset-bottom)); z-index: 50; margin: 0; padding: 10px 12px; background: var(--surface); border-top: 1px solid var(--border); }
+  /* пока открыт выбор зачётов у пары, внизу — её «Добавить выбранные», а итог возвращается в колонку */
+  .ap-grid:has(.pair-form) .ap-bar { position: static; padding: 0; border: 0; }
+  .ap-grid:has(.pair-form) { padding-bottom: 0; }
+}
+@media (max-width: 720px) {
+  .ap-line__when { display: block; }
+  .ap-dot { display: none; }
+  .ap-bar__go .btn { padding: 0 18px; }
+}
+@media (max-width: 720px) { .ap-bar__sum b { font-size: 14px; line-height: 18px; } }

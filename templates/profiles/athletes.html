@@ -1,36 +1,56 @@
 {% extends "base.html" %}
 {% block title %}Спортсмены — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
-    <h1 class="h1">Спортсмены</h1>
-    <p class="muted">Те, кем вы управляете, кто разрешил вам подавать заявки, и ваш собственный профиль.</p>
+{# Макет S04B (утверждён 28.10.2026): спортсмены по группам «Это я» / «Мои» / «Мне доверили» #}
+<div class="ps-screen">
+  <a class="ps-back" href="{% url 'accounts:cabinet' %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Кабинет</a>
+  <div class="ps-headrow">
+    <h1 class="ps-h1">Спортсмены{% if count %} <span class="ps-count">{{ count }}</span>{% endif %}</h1>
+    <a class="ps-ib ps-ib--y" href="{% url 'profiles:athlete_new' %}" aria-label="Добавить спортсмена" title="Добавить спортсмена"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a>
   </div>
-  <div class="form-actions">
-    {# Тест 5, п. 12.2: свой профиль уже в списке («Это вы») — кнопка нужна, только пока его нет #}
-    {% if user.is_athlete %}{% with own=rows|dictsort:"own"|last %}{% if not own.own %}<a class="btn btn--ghost" href="{% url 'profiles:athlete_new' %}?me=1">Создать мой профиль спортсмена</a>{% endif %}{% endwith %}{% endif %}
-    <a class="btn btn--primary" href="{% url 'profiles:athlete_new' %}">+ Добавить спортсмена</a>
-  </div>
+  {% if count %}
+    {% if count > 3 %}
+    <label class="ps-srch" role="search">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <span class="visually-hidden">Поиск спортсмена</span>
+      <input type="search" placeholder="Фамилия, клуб или год" autocomplete="off" enterkeyhint="search" data-ps-filter="#ps-athletes">
+    </label>
+    {% endif %}
+    <div id="ps-athletes" class="ps-groups">
+      {% if me or user.is_athlete %}
+        <section class="ps-group">
+          <h2 class="ps-cap">Это я</h2>
+          <div class="ps-list">
+            {% for r in me %}{% include "profiles/_athlete_row.html" with r=r dark=1 %}{% endfor %}
+            {# Тест 5, п. 12.2: кнопка своего профиля — только пока его нет #}
+            {% if not me %}<a class="ps-rw ps-rw--add" href="{% url 'profiles:athlete_new' %}?me=1"><span class="ps-ini ps-ini--add" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 5v14M5 12h14"/></svg></span><span class="ps-t"><b>Мой профиль спортсмена</b><span class="ps-s">Создайте, чтобы заявляться самому</span></span></a>{% endif %}
+          </div>
+        </section>
+      {% endif %}
+      {% if mine %}
+        <section class="ps-group">
+          <h2 class="ps-cap">Мои · {{ mine|length }}</h2>
+          <div class="ps-list">{% for r in mine %}{% include "profiles/_athlete_row.html" with r=r %}{% endfor %}</div>
+        </section>
+      {% endif %}
+      {% if trusted %}
+        <section class="ps-group">
+          <h2 class="ps-cap">Мне доверили · {{ trusted|length }}</h2>
+          <div class="ps-list">{% for r in trusted %}{% include "profiles/_athlete_row.html" with r=r %}{% endfor %}</div>
+        </section>
+      {% endif %}
+      <p class="muted ps-nores" hidden>Никого не найдено.</p>
+    </div>
+  {% else %}
+    <div class="ps-empty">
+      <h2 class="ps-h2">Спортсменов пока нет</h2>
+      <p class="muted">Регистрация и телефон спортсмену не нужны.</p>
+      <div class="ps-empty__actions">
+        {% if user.is_athlete %}<a class="btn btn--ghost" href="{% url 'profiles:athlete_new' %}?me=1">Мой профиль спортсмена</a>{% endif %}
+        <a class="btn btn--primary" href="{% url 'profiles:athlete_new' %}">Добавить спортсмена</a>
+      </div>
+    </div>
+  {% endif %}
 </div>
-{% if rows %}
-  <div class="list-cards">
-    {% for r in rows %}
-      <article class="row-card">
-        <div style="flex: 1 1 180px; min-width: 0;">
-          <a class="h3 row-card__title" href="{% url 'profiles:athlete' r.a.pk %}">{{ r.a.full_name }}</a>
-          <div class="table__sub">{{ r.a.summary|default:"Дополнительные сведения не заполнены" }}</div>
-        </div>
-        <div class="chips">
-          {% if r.own %}<span class="tag tag--lemon">Это вы</span>{% endif %}
-          {% if not r.manage %}<span class="tag tag--lilac">Можно подавать заявки</span>{% endif %}
-          {% if r.a.linked_user_id and not r.own %}<span class="tag tag--sky">Связан с аккаунтом</span>{% endif %}
-        </div>
-        {% if r.manage %}{% url 'profiles:athlete_edit' r.a.pk as href %}{% include "partials/edit_icon.html" with label="Изменить спортсмена" %}{% endif %}
-      </article>
-    {% endfor %}
-  </div>
-{% else %}
-  <div class="card empty"><h2 class="h3">Спортсменов пока нет</h2><p class="muted">Добавьте спортсмена — регистрация и телефон ему не нужны.</p></div>
-{% endif %}
+{% include "profiles/_filter_js.html" %}
 {% endblock %}

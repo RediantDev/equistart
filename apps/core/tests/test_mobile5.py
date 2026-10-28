@@ -226,12 +226,14 @@ class MyCompetitionsTests(Base):
         self.assertContains(r, "Смирнова")
         self.assertContains(r, "заявил тренер")
         self.assertNotContains(r, "Орлов")  # чужие позиции заявки не видны
-        self.assertNotContains(r, f"Заявка №{app.pk}")
+        app_url = reverse("entries:application", args=[app.pk])
+        self.assertNotContains(r, f'href="{app_url}"')  # чужая заявка не открывается
         self.client.force_login(self.coach)
         r = self.client.get(url)
         self.assertContains(r, "Орлов")
-        self.assertContains(r, f"Заявка №{app.pk}")
-        self.assertContains(self.client.get(url + "?tab=apps"), f"№{app.pk}")
+        self.assertContains(r, f'href="{app_url}"')
+        self.assertNotContains(r, f"№{app.pk}")  # тест 5.1: без номеров заявок в карточках
+        self.assertNotContains(self.client.get(url + "?tab=apps"), "?tab=apps")  # вкладки «Заявки» больше нет
         self.assertContains(self.client.get(url + "?tab=past"), "Прошедших стартов пока нет")
         self.client.force_login(self.other)
         self.assertNotContains(self.client.get(url), self.t.pub_title)

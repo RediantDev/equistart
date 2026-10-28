@@ -121,13 +121,14 @@ class ServiceTests(StableBase):
 
 class ViewTests(StableBase):
     def test_book_flow_confirm_before_order(self):
+        """Прежняя двухшаговая форма (её использует конюшня) по-прежнему проверяет бронь до создания."""
         self.client.force_login(self.coach)
         data = {"category": self.cat.pk, "horse": self.h1.pk, "arrive": self.d0.isoformat(), "depart": self.d1.isoformat(), "key": "kk"}
         r = self.client.post(reverse("stables:book", args=[self.t.pk]), data)
-        self.assertContains(r, "ПРОВЕРЬТЕ БРОНЬ")
+        self.assertEqual(r.status_code, 200)
         self.assertFalse(Booking.objects.exists())
         r = self.client.post(reverse("stables:book", args=[self.t.pk]), {**data, "confirm": "1"})
-        self.assertRedirects(r, reverse("stables:book", args=[self.t.pk]) + "#mine", fetch_redirect_response=False)
+        self.assertRedirects(r, reverse("stables:book", args=[self.t.pk]), fetch_redirect_response=False)  # тест 5.1: без перехода к якорю
         self.client.post(reverse("stables:book", args=[self.t.pk]), {**data, "confirm": "1"})
         self.assertEqual(Booking.objects.count(), 1)
 
@@ -263,7 +264,8 @@ class MultiHorseBookingTests(StableBase):
         self.client.post(self.url, {**self.data, "horse": [self.h1.pk, self.h3.pk]})  # двойное нажатие
         self.assertEqual(Booking.objects.count(), 2)
         page = self.client.get(self.url).content.decode()
-        self.assertIn('id="mine"', page)
+        for b in Booking.objects.all():
+            self.assertIn(f'id="b{b.pk}"', page)  # брони видны в карточках лошадей
         self.assertIn("Ожидает подтверждения", page)
 
     def test_view_overflow_shows_error_and_creates_nothing(self):
@@ -271,7 +273,7 @@ class MultiHorseBookingTests(StableBase):
         r = self.client.post(self.url, {**self.data, "horse": [self.h1.pk, self.h3.pk, self.h4.pk]})
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "выбрано лошадей: 3")
-        self.assertContains(r, "field--error")
+        self.assertContains(r, "alert--error")
         self.assertEqual(Booking.objects.count(), 0)
 
     def test_view_bad_dates_marked_on_field(self):
@@ -304,7 +306,7 @@ class MultiHorseBookingTests(StableBase):
         self.assertEqual(Horse.objects.filter(name="Новичок").count(), 1)
 
     def test_empty_category_option_label(self):
-        self.client.force_login(self.coach)
+        self.client.force_login(self.groom)  # ручная бронь конюшни — прежняя форма
         self.assertContains(self.client.get(self.url), '<select id="b-cat" name="category" required><option value="">— выберите —</option>')
 
 
@@ -375,7 +377,7 @@ class MultiServiceOrderTests(StableBase):
         self.client.force_login(self.coach)
         r = self.post(**{f"q-{self.sawdust.pk}-{self.h1.pk}": "2", f"q-{self.sawdust.pk}-{self.h3.pk}": "1",
                          f"q-{self.hay.pk}-{self.h1.pk}": "3", f"q-{self.power.pk}": "2", f"trailer-{self.power.pk}": "А123ВС"})
-        self.assertRedirects(r, reverse("stables:book", args=[self.t.pk]) + "#mine", fetch_redirect_response=False)
+        self.assertRedirects(r, reverse("stables:book", args=[self.t.pk]), fetch_redirect_response=False)  # тест 5.1: без перехода к якорю
         self.assertEqual(ServiceOrder.objects.count(), 4)
         self.assertEqual(sorted(ServiceOrder.objects.values_list("recipient_label", flat=True)), ["Барон", "Барон", "Гранит", "Коневоз А123ВС"])
         self.post(**{f"q-{self.sawdust.pk}-{self.h1.pk}": "2"})  # повтор той же формы
@@ -435,3 +437,126 @@ class MyPageTests(StableBase):
         self.assertNotIn("Барон", self.client.get(reverse("stables:my")).content.decode())
         self.client.logout()
         self.assertEqual(self.client.get(reverse("stables:my")).status_code, 302)
+
+    def test_screens_open_at_top(self):
+        """Тест 5.1: экран денников открывается сверху — без якоря «#mine» в ссылках и возвратах."""
+        b = self.book(self.h1, "g1")
+        self.client.force_login(self.coach)
+        my = self.client.get(reverse("stables:my")).content.decode()
+        self.assertNotIn("#mine", my)
+        self.assertIn("Мои денники и услуги", my)
+        self.assertNotIn("Брони и заказы по турнирам", my)
+        page = self.client.get(reverse("stables:book", args=[self.t.pk])).content.decode()
+        self.assertNotIn("#mine", page)
+        r = self.client.post(reverse("stables:my_cancel", args=["booking", b.pk]), {"next": reverse("stables:book", args=[self.t.pk])})
+        self.assertRedirects(r, reverse("stables:book", args=[self.t.pk]), fetch_redirect_response=False)
+
+
+class CartScreenTests(StableBase):
+    """Макет 10B: ночи по каждой лошади, услуги счётчиками, одна кнопка «Заказать»."""
+
+    def setUp(self):
+        super().setUp()
+        self.cat.capacity = 2
+        self.cat.save()
+        self.sawdust = Service.objects.create(tournament=self.t, name="Опилки", unit="мешок", limit=10)
+        self.url = reverse("stables:book", args=[self.t.pk])
+        self.n0, self.n1 = self.d0, self.d0 + datetime.timedelta(days=1)
+
+    def post(self, key="c1", **kw):
+        return self.client.post(self.url, {"mode": "cart", "key": key, **kw})
+
+    def test_page_has_strip_counters_and_bar(self):
+        self.client.force_login(self.coach)
+        page = self.client.get(self.url).content.decode()
+        self.assertIn("Отметьте ночи для каждой лошади", page)
+        self.assertIn("Всем как у первой", page)
+        self.assertIn(f'name="n-{self.h1.pk}" value="{self.n0.isoformat()}"', page)
+        self.assertIn(f'name="q-{self.sawdust.pk}-{self.h3.pk}"', page)
+        self.assertIn("без денника", page)
+        self.assertEqual(page.count("data-order-submit>"), 1)
+        self.assertNotIn("Ладога", page)  # чужая лошадь
+        self.assertNotIn("₽", page)
+
+    def test_several_horses_own_nights_and_services_once(self):
+        self.client.force_login(self.coach)
+        data = {f"n-{self.h1.pk}": [self.n0.isoformat(), self.n1.isoformat()], f"n-{self.h3.pk}": [self.n1.isoformat()],
+                f"q-{self.sawdust.pk}-{self.h1.pk}": "2", f"q-{self.sawdust.pk}-{self.h3.pk}": "1"}
+        r = self.post(**data)
+        self.assertRedirects(r, self.url, fetch_redirect_response=False)
+        b1, b3 = Booking.objects.get(horse=self.h1), Booking.objects.get(horse=self.h3)
+        self.assertEqual((b1.arrive, b1.depart, b1.state), (self.n0, self.n1 + datetime.timedelta(days=1), "pending"))
+        self.assertEqual((b3.arrive, b3.depart), (self.n1, self.n1 + datetime.timedelta(days=1)))
+        self.assertEqual(ServiceOrder.objects.count(), 2)
+        self.post(**data)  # повтор отправки
+        self.assertEqual((Booking.objects.count(), ServiceOrder.objects.count()), (2, 2))
+        page = self.client.get(self.url).content.decode()
+        self.assertIn(f'id="b{b1.pk}"', page)
+        self.assertIn("2 ночи", page)
+
+    def test_capacity_all_or_nothing(self):
+        self.cat.capacity = 1
+        self.cat.save()
+        self.client.force_login(self.coach)
+        r = self.post(**{f"n-{self.h1.pk}": self.n0.isoformat(), f"n-{self.h3.pk}": self.n0.isoformat(), f"q-{self.sawdust.pk}-{self.h1.pk}": "1"})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Ни одна бронь не создана")
+        self.assertContains(r, f'value="{self.n0.isoformat()}" checked')  # выбор не теряется
+        self.assertEqual((Booking.objects.count(), ServiceOrder.objects.count()), (0, 0))
+
+    def test_service_limit_rolls_back_bookings(self):
+        self.client.force_login(self.coach)
+        r = self.post(**{f"n-{self.h1.pk}": self.n0.isoformat(), f"q-{self.sawdust.pk}-{self.h1.pk}": "11"})
+        self.assertContains(r, "осталось только 10")
+        self.assertEqual(Booking.objects.count(), 0)
+
+    def test_gap_in_nights_rejected(self):
+        self.cat.available_to = self.d0 + datetime.timedelta(days=3)
+        self.cat.save()
+        self.client.force_login(self.coach)
+        r = self.post(**{f"n-{self.h1.pk}": [self.n0.isoformat(), (self.n0 + datetime.timedelta(days=2)).isoformat()]})
+        self.assertContains(r, "ночи должны идти подряд")
+        self.assertEqual(Booking.objects.count(), 0)
+
+    def test_overlap_with_existing_booking(self):
+        self.book(self.h1, "old")
+        self.client.force_login(self.coach)
+        r = self.post(**{f"n-{self.h1.pk}": self.n0.isoformat()})
+        self.assertContains(r, "Уже есть бронь")
+        self.assertEqual(Booking.objects.count(), 1)
+
+    def test_foreign_horse_and_guest(self):
+        self.client.force_login(self.coach)
+        self.assertEqual(self.post(**{f"n-{self.h2.pk}": self.n0.isoformat()}).status_code, 403)
+        self.assertEqual(self.post(**{f"q-{self.sawdust.pk}-{self.h2.pk}": "1"}).status_code, 403)
+        self.client.logout()
+        self.assertEqual(self.post(**{f"n-{self.h1.pk}": self.n0.isoformat()}).status_code, 302)
+        self.assertEqual((Booking.objects.count(), ServiceOrder.objects.count()), (0, 0))
+        with self.assertRaises(PermissionDenied):
+            services.submit_cart(self.coach, self.t.pk, [{"category": self.cat.pk, "horse": self.h2, "arrive": self.d0, "depart": self.d1}], [], "z")
+
+    def test_repeat_key_of_other_user_forbidden(self):
+        self.client.force_login(self.coach)
+        self.post(**{f"n-{self.h1.pk}": self.n0.isoformat()})
+        with self.assertRaises(PermissionDenied):
+            services.submit_cart(self.other, self.t.pk, [{"category": self.cat.pk, "horse": self.h2, "arrive": self.d0, "depart": self.d1}], [], "c1")
+
+    def test_cancel_from_card(self):
+        b = self.book(self.h1, "old")
+        services.decide(self.groom, b.pk, True)
+        self.client.force_login(self.coach)
+        page = self.client.get(self.url).content.decode()
+        self.assertIn(f'form="x{b.pk}"', page)
+        self.assertNotIn(f'form="e{b.pk}"', page)  # подтверждённую — только отменить
+        r = self.client.post(reverse("stables:my_cancel", args=["booking", b.pk]), {"next": self.url})
+        self.assertRedirects(r, self.url, fetch_redirect_response=False)
+        b.refresh_from_db()
+        self.assertEqual(b.state, "cancelled")
+
+    def test_closed_tournament_no_order_button(self):
+        self.t.publication = "finished"
+        self.t.save()
+        self.client.force_login(self.coach)
+        page = self.client.get(self.url).content.decode()
+        self.assertIn("Бронирование закрыто", page)
+        self.assertNotIn("data-order-submit", page)

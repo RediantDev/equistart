@@ -25,35 +25,35 @@
 <div class="hub">
   {% if judge and t.is_published %}
   <a class="hub-tile hub-tile--main" href="{% url 'entries:manage' t.pk %}">
-    <span class="hub-tile__icon tag--sky">📋</span>
+    <span class="hub-tile__icon tag--sky">{% include "partials/icon.html" with name="list" %}</span>
     <span class="hub-tile__body"><span class="hub-tile__title">Заявки</span><span class="hub-tile__text">Принять или отклонить, добавить участника вручную.</span></span>
     <span class="hub-tile__meta">{% if counts.pending %}<span class="count-pill">{{ counts.pending }}</span> ждут решения{% else %}принято: {{ counts.accepted|default:0 }}{% endif %}</span>
   </a>
   <a class="hub-tile hub-tile--main" href="{% url 'conduct:overview' t.pk %}">
-    <span class="hub-tile__icon tag--mint">🏁</span>
+    <span class="hub-tile__icon tag--mint">{% include "partials/icon.html" with name="flag" %}</span>
     <span class="hub-tile__body"><span class="hub-tile__title">Проведение</span><span class="hub-tile__text">Стартовый порядок, экран судьи, результаты по каждому маршруту и езде.</span></span>
     <span class="hub-tile__meta">маршрутов и езд: {{ programs|length }}</span>
   </a>
   {% endif %}
   {% if stable and t.is_published %}
   <a class="hub-tile" href="{% url 'stables:manage' t.pk %}">
-    <span class="hub-tile__icon tag--lemon">🐴</span>
+    <span class="hub-tile__icon tag--lemon">{% include "partials/icon.html" with name="stable" %}</span>
     <span class="hub-tile__body"><span class="hub-tile__title">Денники и услуги</span><span class="hub-tile__text">Брони денников, заказы опилок и сена, ручная бронь для участника.</span></span>
     <span class="hub-tile__meta">{% if bookings_pending %}<span class="count-pill">{{ bookings_pending }}</span> брони ждут{% endif %}</span>
   </a>
   {% endif %}
   {% if manage %}
   <a class="hub-tile" href="{% url 'tournaments:step' t.pk edit_step %}">
-    <span class="hub-tile__icon tag--peach">✏️</span>
+    <span class="hub-tile__icon tag--peach">{% include "partials/icon.html" with name="edit" %}</span>
     <span class="hub-tile__body"><span class="hub-tile__title">Сведения и программа</span><span class="hub-tile__text">Даты, место, маршруты и зачёты, положение. Изменения проверяет модератор.</span></span>
     <span class="hub-tile__meta"><span class="hub-tile__go">Изменить</span></span>
   </a>
   <a class="hub-tile" href="{% url 'tournaments:step' t.pk 4 %}">
-    <span class="hub-tile__icon tag--lilac">✅</span>
+    <span class="hub-tile__icon tag--lilac">{% include "partials/icon.html" with name="check" %}</span>
     <span class="hub-tile__body"><span class="hub-tile__title">Проверка и публикация</span><span class="hub-tile__text">Как турнир видят участники, отправка модератору, история, отмена.</span></span>
   </a>
   <a class="hub-tile" href="{% url 'tournaments:team' t.pk %}">
-    <span class="hub-tile__icon tag--pink">👥</span>
+    <span class="hub-tile__icon tag--pink">{% include "partials/icon.html" with name="users" %}</span>
     <span class="hub-tile__body"><span class="hub-tile__title">Команда турнира</span><span class="hub-tile__text">Пригласить судей, организаторов и конюшню по телефону.</span></span>
   </a>
   {% endif %}

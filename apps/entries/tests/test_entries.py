@@ -73,8 +73,8 @@ class Base(TestCase):
 class ProfileTests(Base):
     def test_athlete_requires_only_name_and_consent(self):
         self.client.force_login(self.coach)
-        # тест 4: отдельной галочки согласия в карточке спортсмена нет
-        resp = self.client.post(reverse("profiles:athlete_new"), {"last_name": "Ким", "first_name": "Алина"})
+        # тест 4: отдельной галочки согласия в карточке спортсмена нет; решение 28.10.2026: дата рождения и разряд обязательны
+        resp = self.client.post(reverse("profiles:athlete_new"), {"last_name": "Ким", "first_name": "Алина", "birth_date": "2012-03-04", "rank": "none"})
         a = Athlete.objects.get(last_name="Ким")
         self.assertRedirects(resp, reverse("profiles:athlete", args=[a.pk]))
         self.assertEqual(a.manager, self.coach)
@@ -82,7 +82,7 @@ class ProfileTests(Base):
 
     def test_same_names_not_merged(self):
         self.client.force_login(self.other)
-        self.client.post(reverse("profiles:athlete_new"), {"last_name": "Смирнова", "first_name": "Лиза", "consent": "on"})
+        self.client.post(reverse("profiles:athlete_new"), {"last_name": "Смирнова", "first_name": "Лиза", "birth_date": "2014-05-01", "rank": "none"})
         self.assertEqual(Athlete.objects.filter(last_name="Смирнова").count(), 2)
 
     def test_foreign_athlete_closed(self):
@@ -148,10 +148,11 @@ class ProfileTests(Base):
         self.h2.owner_name = "Секретов С.С."
         self.h2.save()
         self.client.force_login(self.coach)
-        resp = self.client.get(reverse("profiles:horse_search"), {"q": "лад"})
+        nxt = reverse("entries:apply", args=[self.t.pk])  # тест 5.1: поиск по сервису — только из заявки
+        resp = self.client.get(reverse("profiles:horse_search"), {"q": "лад", "next": nxt})
         self.assertContains(resp, "Ладога")
         self.assertNotContains(resp, "Секретов")
-        resp = self.client.get(reverse("profiles:horse_search"), {"q": self.h2.code, "mode": "code"})
+        resp = self.client.get(reverse("profiles:horse_search"), {"q": self.h2.code, "mode": "code", "next": nxt})
         self.assertContains(resp, "Ладога")
 
     def test_horse_documents_access(self):
@@ -375,7 +376,7 @@ class LinkedAthleteTests(Base):
         self.a1.save()
         app = self.submit(self.coach, [services.Line(self.a1, self.h1, self.c_kids), services.Line(self.a2, self.h1, self.c_open)])
         self.client.force_login(self.kid)
-        resp = self.client.get(reverse("entries:my_starts"))
+        resp = self.client.get(reverse("entries:competitions"))
         self.assertContains(resp, "Маршрут №1")
         self.assertContains(resp, "Барон")
         self.assertNotContains(resp, "Орлов")
@@ -395,7 +396,7 @@ class UniqueNumbersTests(Base):
         self.a1.fksr_number, self.a1.fei_id = "rus 001", "10012345"
         self.a1.save()
         self.client.force_login(self.other)
-        base = {"last_name": "Новая", "first_name": "Запись", "consent": "on"}
+        base = {"last_name": "Новая", "first_name": "Запись", "birth_date": "2000-01-01", "rank": "none"}
         r = self.client.post(reverse("profiles:athlete_new"), {**base, "fksr_number": "RUS-001"})
         self.assertContains(r, "уже есть в сервисе")
         r = self.client.post(reverse("profiles:athlete_new"), {**base, "fei_id": "10012345"})

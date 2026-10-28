@@ -1,69 +1,188 @@
 {% extends "base.html" %}
 {% block title %}{{ h.name }} — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <a class="back" href="{% url 'profiles:horses' %}">← Лошади</a>
-    <h1 class="h1">{{ h.name }}</h1>
-    <p class="muted">{{ h.summary }}</p>
+{# Макеты R2_06A, R2_06B, R2_06D, S08A (утверждены 28.10.2026) #}
+{% url 'profiles:horse' h.pk as self_url %}
+<div class="ps-screen">
+  <a class="ps-back" href="{% url 'profiles:horses' %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Мои лошади</a>
+  <div class="ps-headrow">
+    <div class="ps-title">
+      <h1 class="ps-h1 ps-h1--lg">{{ h.name }}{% if my_access %} <span class="ps-chip ps-chip--info ps-chip--lg">Доступ</span>{% endif %}</h1>
+      <div class="ps-sub">{{ h.birth_year }} · {{ h.get_sex_display }} · {{ h.get_color_display }} · {{ h.breed }}</div>
+      {% if my_access %}<div class="ps-m">Управляет {{ manager_name }} · доступ с {{ my_access.created_at|date:"j E" }}</div>{% endif %}
+    </div>
+    {% if manage %}<a class="ps-ib ps-ib--o" href="{% url 'profiles:horse_edit' h.pk %}" aria-label="Изменить лошадь" title="Изменить сведения"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg></a>{% endif %}
   </div>
-  {% if manage %}<a class="btn btn--ghost" href="{% url 'profiles:horse_edit' h.pk %}">Изменить</a>{% endif %}
-</div>
-<div class="wizard-grid">
-  <div class="wizard-main">
-    <section class="card">
-      <h2 class="h3">Сведения</h2>
-      <dl class="facts">
-        <dt>Год рождения</dt><dd>{{ h.birth_year }}</dd>
-        <dt>Масть</dt><dd>{{ h.get_color_display }}</dd>
-        <dt>Пол</dt><dd>{{ h.get_sex_display }}</dd>
-        <dt>Порода</dt><dd>{{ h.breed }}</dd>
+
+  {% if tabs|length > 1 %}
+  <nav class="ps-seg" aria-label="Разделы лошади">
+    <a href="{{ self_url }}" class="{% if tab == 'info' %}is-on{% endif %}"{% if tab == 'info' %} aria-current="page"{% endif %}>Сведения</a>
+    {% if "docs" in tabs %}<a href="{{ self_url }}?tab=docs" class="{% if tab == 'docs' %}is-on{% endif %}"{% if tab == 'docs' %} aria-current="page"{% endif %}>Документы{% if documents %} {{ documents|length }}{% endif %}</a>{% endif %}
+    {% if "access" in tabs %}<a href="{{ self_url }}?tab=access" class="{% if tab == 'access' %}is-on{% endif %}"{% if tab == 'access' %} aria-current="page"{% endif %}>Доступ{% if access_count %} {{ access_count }}{% endif %}</a>{% endif %}
+  </nav>
+  {% endif %}
+
+  {% if tab == "info" %}
+    {% if my_access and apply_url %}<a class="ps-btn ps-btn--y ps-btn--lg ps-btn--block" href="{{ apply_url }}">Подать заявку с лошадью {{ h.name }}</a>{% endif %}
+    <section class="ps-card">
+      <h2 class="ps-card__h">Сведения</h2>
+      <dl class="ps-dl">
+        {% if not manage and not my_access %}
+          <dt>Год рождения</dt><dd>{{ h.birth_year }}</dd>
+          <dt>Масть</dt><dd>{{ h.get_color_display }}</dd>
+          <dt>Пол</dt><dd>{{ h.get_sex_display }}</dd>
+          <dt>Порода</dt><dd>{{ h.breed }}</dd>
+        {% endif %}
         <dt>Номер ФКСР</dt><dd>{{ h.fksr_number|default:"—" }}</dd>
         <dt>FEI ID</dt><dd>{{ h.fei_id|default:"—" }}</dd>
-        <dt>Пони / рост в холке</dt><dd>{% if h.is_pony %}пони{% else %}лошадь{% endif %}{% if h.height_cm %} · {{ h.height_cm }} см{% endif %}</dd>
-        <dt>Внутренний код</dt><dd class="num">{{ h.code }}</dd>
+        <dt>Пони / рост</dt><dd>{% if h.is_pony %}пони{% else %}лошадь{% endif %}{% if h.height_cm %} · {{ h.height_cm }} см{% endif %}</dd>
+        {% if manage or my_access %}<dt>Отец</dt><dd>{{ h.sire|default:"—" }}</dd>{% endif %}
         {% if manage %}
-          <dt>Отец</dt><dd>{{ h.sire|default:"—" }}</dd>
           <dt>Место рождения</dt><dd>{{ h.birthplace|default:"—" }}</dd>
-          <dt>Владелец</dt><dd>{{ h.owner_name|default:"—" }} <span class="muted">· не публикуется</span></dd>
+          <dt>Владелец</dt><dd>{{ h.owner_name|default:"—" }} <span class="ps-m">· не публикуется</span></dd>
         {% endif %}
+        <dt>Внутренний код</dt><dd class="num">{{ h.code }}</dd>
       </dl>
     </section>
-    {% if docs_visible %}
-    <section class="card">
-      <h2 class="h3">Документы</h2>
-      <p class="muted">Видят только управляющий, а также организатор и судьи турнира, куда подана заявка с этой лошадью. Оригиналы проверяются на месте.</p>
-      {% if documents %}
-        <ul class="list">{% for d in documents %}
-          <li class="list__row"><span style="flex: 1;"><a href="{% url 'profiles:horse_document' h.pk d.pk %}" target="_blank" rel="noopener">{{ d.label }}</a><span class="table__sub">{{ d.get_kind_display }} · загружен {{ d.uploaded_at|date:"d.m.Y" }}{% if d.valid_until %} · до {{ d.valid_until|date:"d.m.Y" }}{% endif %}</span></span>
-            {% if d.expired %}<span class="chip chip--danger">Срок истёк</span>{% endif %}
-            {% if manage %}<form method="post" action="{% url 'profiles:horse_action' h.pk 'delete_doc' %}">{% csrf_token %}<input type="hidden" name="document" value="{{ d.pk }}"><button class="btn btn--danger btn--sm">Удалить</button></form>{% endif %}
-          </li>{% endfor %}</ul>
-      {% else %}<p class="muted">Документов нет.</p>{% endif %}
-      {% if manage %}
-        <details class="inline-form"><summary class="btn btn--dark btn--sm">+ Загрузить документ</summary>
-          <form method="post" enctype="multipart/form-data" action="{% url 'profiles:horse_action' h.pk 'upload' %}" class="form">
+    {% if my_access %}
+      <div class="ps-lock"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Документы видят создатель, организатор и судьи турнира</span></div>
+      <form method="post" action="{% url 'profiles:horse_action' h.pk 'leave' %}">{% csrf_token %}<button class="ps-btn ps-btn--lg ps-btn--block ps-btn--danger" data-confirm="Отказаться от доступа к лошади «{{ h.name }}»? Уже поданные заявки сохранятся." data-confirm-ok="Отказаться">Отказаться от доступа</button></form>
+    {% endif %}
+  {% endif %}
+
+  {% if tab == "docs" %}
+    <div class="ps-headrow ps-headrow--sub">
+      <h2 class="ps-h2">Документы{% if documents %} <span class="ps-count">{{ documents|length }}</span>{% endif %}</h2>
+      {# Тест 5.1: вместо длинного абзаца — значок (i), полный текст по нажатию #}
+      <details class="pf-hint ps-hint">
+        <summary class="ps-ib" aria-label="Кто видит документы" title="Кто видит документы"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></summary>
+        <p>Видят только управляющий, а также организатор и судьи турнира, куда подана заявка с этой лошадью. Оригиналы проверяются на месте.</p>
+      </details>
+    </div>
+    {% if documents %}
+      <div class="ps-tiles">
+        {% for d in documents %}
+          <a class="ps-tile" href="{% url 'profiles:horse_document_view' h.pk d.pk %}">
+            <span class="ps-tile__i" aria-hidden="true">{% if d.content_type == "application/pdf" %}<svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg>{% else %}<svg viewBox="0 0 24 24" width="20" height="20"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M20 16l-5-5-9 8"/></svg>{% endif %}</span>
+            <b class="ps-tile__t">{{ d.label }}</b>
+            <span class="ps-m">{% if d.valid_until %}до {{ d.valid_until|date:"d.m.Y" }}{% else %}{{ d.get_kind_display }}{% endif %}</span>
+            {% if d.status == "expired" %}<span class="ps-chip ps-chip--bad">Срок истёк</span>{% elif d.status == "soon" %}<span class="ps-chip ps-chip--wait">Истекает</span>{% elif d.status == "ok" %}<span class="ps-chip ps-chip--ok">Действует</span>{% endif %}
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="ps-empty"><p class="muted">Документов нет.{% if manage %} Загрузите ветеринарный паспорт и прививки — их увидят организатор и судьи турнира, куда вы подадите заявку.{% endif %}</p></div>
+    {% endif %}
+    {% if manage %}
+      <details class="ps-sheet ps-sheet--fab" data-ps-sheet>
+        <summary class="ps-btn ps-btn--y ps-fab"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Загрузить</summary>
+        <div class="ps-sheet__panel" role="dialog" aria-label="Загрузить документ">
+          <div class="ps-sheet__grip" aria-hidden="true"></div>
+          <div class="ps-sheet__head"><h2 class="ps-sheet__title">Новый документ</h2><button class="ps-ib" type="button" aria-label="Закрыть" data-ps-close><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+          <form method="post" enctype="multipart/form-data" action="{% url 'profiles:horse_action' h.pk 'upload' %}" class="ps-form ps-upload">
             {% csrf_token %}
-            <div class="grid-2">{% include "partials/field.html" with field=doc_form.kind %}{% include "partials/field.html" with field=doc_form.title %}</div>
-            <div class="grid-2">
-              <div class="field"><label class="field__label" for="docfile">Файл</label><input id="docfile" type="file" name="file" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,image/heic,.heic,.heif" data-max-mb="20" required><p class="field__help">PDF или фото (JPEG, PNG, WEBP, HEIC) до 20 МБ.</p></div>
-              {% include "partials/field.html" with field=doc_form.valid_until %}
+            <div class="ps-grid2 ps-js">
+              <button class="ps-src" type="button" data-ps-camera><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Сфотографировать</button>
+              <label class="ps-src" for="docfile"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Выбрать файл</label>
             </div>
-            <button class="btn btn--dark">Загрузить</button>
+            <div class="ps-file">
+              <label class="ps-f__l ps-nojs" for="docfile">Файл</label>
+              <input id="docfile" type="file" name="file" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,image/heic,.heic,.heif" data-max-mb="20" required>
+            </div>
+            <div class="ps-grid-32">
+              <div class="ps-f"><label class="ps-f__l" for="{{ doc_form.kind.id_for_label }}">Тип</label>{{ doc_form.kind }}</div>
+              <div class="ps-f"><label class="ps-f__l" for="{{ doc_form.valid_until.id_for_label }}">Действует до</label>{{ doc_form.valid_until }}</div>
+            </div>
+            <div class="ps-f"><label class="ps-f__l" for="{{ doc_form.title.id_for_label }}">Название <span class="field__optional">необязательно</span></label>{{ doc_form.title }}</div>
+            <button class="ps-btn ps-btn--y ps-btn--lg ps-btn--block">Сохранить документ</button>
           </form>
-        </details>
+        </div>
+      </details>
+    {% endif %}
+  {% endif %}
+
+  {% if tab == "access" %}
+    <div class="ps-intro">
+      <p class="ps-m">Могут только подавать заявки с этой лошадью. Документы и изменение — только у вас.</p>
+      <details class="ps-sheet" data-ps-sheet>
+        <summary class="ps-btn ps-btn--d"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Пригласить</summary>
+        <div class="ps-sheet__panel" role="dialog" aria-label="Пригласить к лошади {{ h.name }}">
+          <div class="ps-sheet__grip" aria-hidden="true"></div>
+          <div class="ps-sheet__head"><h2 class="ps-sheet__title">Доступ к лошади {{ h.name }}</h2><button class="ps-ib" type="button" aria-label="Закрыть" data-ps-close><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+          {# Решение 28.10.2026: доступ даёт только управляющий; появляется после согласия получателя #}
+          <form method="post" action="{% url 'profiles:horse_action' h.pk 'grant' %}" class="ps-form">{% csrf_token %}
+            <div class="ps-f"><label class="ps-f__l" for="grant-phone">Телефон</label><input id="grant-phone" name="phone" type="tel" placeholder="+7 900 000-00-00" autocomplete="tel" required></div>
+            <div class="ps-can">
+              <div class="ps-can__row"><span class="ps-can__ic ps-can__ic--ok" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 12l5 5 9-10"/></svg></span><span><b>Сможет</b> подавать заявки с лошадью {{ h.name }}</span></div>
+              <div class="ps-can__row"><span class="ps-can__ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18"/></svg></span><span><b>Не сможет</b> видеть документы, менять сведения, приглашать других</span></div>
+            </div>
+            <p class="ps-m ps-m--13">Доступ начнётся, когда получатель подтвердит приглашение.</p>
+            <button class="ps-btn ps-btn--y ps-btn--lg ps-btn--block">Отправить приглашение</button>
+          </form>
+        </div>
+      </details>
+    </div>
+
+    {% if access_offers or accesses or declined %}
+    <section class="ps-card ps-card--flush">
+      {% if access_offers %}
+        <h3 class="ps-cap2">Ожидает подтверждения · {{ access_offers|length }}</h3>
+        {% for o in access_offers %}
+          <div class="ps-rw ps-rw--static">
+            <span class="ps-ini" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 4 5a2 2 0 0 1 2-2"/></svg></span>
+            <div class="ps-t"><b>{{ o.masked }}</b><div class="ps-m">отправлено {{ o.created_at|date:"j E" }}</div><span class="ps-chip ps-chip--wait ps-chip--mt">Ожидает подтверждения</span></div>
+            <form method="post" action="{% url 'profiles:horse_action' h.pk 'cancel_offer' %}">{% csrf_token %}<input type="hidden" name="offer" value="{{ o.pk }}"><button class="ps-lb" aria-label="Отозвать приглашение на {{ o.masked }}">Отозвать</button></form>
+          </div>
+        {% endfor %}
+      {% endif %}
+      {% if accesses %}
+        <h3 class="ps-cap2">Есть доступ · {{ accesses|length }}</h3>
+        {% for a in accesses %}
+          <details class="ps-acc">
+            <summary class="ps-rw ps-rw--static">
+              <span class="ps-ini" aria-hidden="true">{{ a.ini }}</span>
+              <span class="ps-t"><b>{{ a.name }}</b><span class="ps-m">принято {{ a.created_at|date:"j E" }}</span></span>
+              <span class="ps-chip ps-chip--ok">Принято</span>
+              <span class="ps-ib ps-acc__x" role="button" aria-label="Закрыть доступ: {{ a.name }}"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+            </summary>
+            <div class="ps-confirm">
+              <div class="ps-confirm__row"><span class="ps-ini ps-ini--white" aria-hidden="true">{{ a.ini }}</span><div class="ps-t"><b>Закрыть доступ: {{ a.name }}?</b><div class="ps-ink ps-m">Больше не сможет подавать заявки с лошадью {{ h.name }}. Уже поданные заявки сохранятся.</div></div></div>
+              <form method="post" action="{% url 'profiles:horse_action' h.pk 'revoke' %}" class="ps-grid2">{% csrf_token %}<input type="hidden" name="access" value="{{ a.pk }}">
+                <a class="ps-btn" href="{{ self_url }}?tab=access" data-ps-keep>Оставить</a>
+                <button class="ps-btn ps-btn--red">Закрыть доступ</button>
+              </form>
+            </div>
+          </details>
+        {% endfor %}
+      {% endif %}
+      {% if declined %}
+        <h3 class="ps-cap2">Отклонено · {{ declined|length }}</h3>
+        {% for o in declined %}
+          <div class="ps-rw ps-rw--static">
+            <span class="ps-ini" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></span>
+            <div class="ps-t"><b class="muted">{{ o.masked }}</b><div class="ps-m">отклонено {{ o.responded_at|date:"j E" }}</div></div>
+            <span class="ps-chip ps-chip--bad">Отклонено</span>
+          </div>
+        {% endfor %}
       {% endif %}
     </section>
+    {% else %}
+      <div class="ps-empty"><p class="muted">Пока никому не открыт доступ. Пригласите тренера или всадника по номеру телефона — он сможет подавать заявки с этой лошадью.</p></div>
     {% endif %}
-  </div>
-  {% if manage %}
-  <aside class="wizard-aside">
-    {% if offers %}<section class="card"><h2 class="h3">Ожидает ответа</h2><ul class="list">{% for o in offers %}<li class="list__row"><span style="flex: 1;">Передача на {{ o.phone }}</span><form method="post" action="{% url 'profiles:horse_action' h.pk 'cancel_offer' %}">{% csrf_token %}<input type="hidden" name="offer" value="{{ o.pk }}"><button class="btn btn--ghost btn--sm">Отменить</button></form></li>{% endfor %}</ul></section>{% endif %}
-    <details class="card"><summary class="h3">Передать управление</summary>
-      <p class="muted">После принятия новым управляющим вы потеряете редактирование. Код, заявки и история сохраняются. Это не подтверждение права собственности.</p>
-      <form method="post" action="{% url 'profiles:horse_action' h.pk 'transfer' %}" class="form">{% csrf_token %}<input name="phone" type="tel" placeholder="Телефон нового управляющего" aria-label="Телефон нового управляющего"><button class="btn btn--dark">Предложить передачу</button></form>
+
+    <details class="ps-linkrow"{% if offers %} open{% endif %}>
+      <summary><span class="ps-t"><b>Передать управление</b><span class="ps-m">{% if offers %}ожидает ответа{% else %}сейчас управляете вы{% endif %}</span></span><svg class="ps-chev" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
+      <div class="ps-linkrow__body">
+        {% if offers %}
+          {# Тест 5.1: ожидающая передача — внутри этого блока #}
+          {% for o in offers %}<div class="ps-rw ps-rw--static"><div class="ps-t"><b>Ожидает ответа</b><span class="ps-m">Передача на {{ o.phone }}</span></div><form method="post" action="{% url 'profiles:horse_action' h.pk 'cancel_offer' %}">{% csrf_token %}<input type="hidden" name="offer" value="{{ o.pk }}"><button class="ps-lb">Отменить</button></form></div>{% endfor %}
+        {% else %}
+          <p class="ps-m ps-m--13">После принятия вы потеряете редактирование. Код, заявки и история сохранятся.</p>
+          <form method="post" action="{% url 'profiles:horse_action' h.pk 'transfer' %}" class="ps-inline">{% csrf_token %}<label class="visually-hidden" for="tr-phone">Телефон нового управляющего</label><input id="tr-phone" name="phone" type="tel" placeholder="Телефон нового управляющего"><button class="ps-btn ps-btn--d">Предложить</button></form>
+        {% endif %}
+      </div>
     </details>
-  </aside>
   {% endif %}
 </div>
+{% include "profiles/_sheet_js.html" %}
 {% endblock %}

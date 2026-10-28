@@ -5,6 +5,12 @@
   <div>
     <h1 class="h1">Кабинет</h1>
   </div>
+  <div class="cab-links">
+    {# Тест 5.1: «Где увидеть пульт?» — у модератора первой кнопкой здесь; поддержка и профиль — тоже здесь #}
+    {% if user.is_moderator %}<a class="btn btn--dark btn--sm" href="{% url 'moderation:panel' %}">Пульт модератора</a>{% endif %}
+    <a class="btn btn--ghost btn--sm" href="{% url 'accounts:profile' %}">Профиль</a>
+    <a class="btn btn--ghost btn--sm" href="{% url 'support:my' %}">Поддержка</a>
+  </div>
 </div>
 
 {% if judging_today %}
