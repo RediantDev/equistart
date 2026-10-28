@@ -127,7 +127,7 @@ class ViewTests(StableBase):
         self.assertContains(r, "ПРОВЕРЬТЕ БРОНЬ")
         self.assertFalse(Booking.objects.exists())
         r = self.client.post(reverse("stables:book", args=[self.t.pk]), {**data, "confirm": "1"})
-        self.assertRedirects(r, reverse("stables:book", args=[self.t.pk]) + "#mine", fetch_redirect_response=False)
+        self.assertRedirects(r, reverse("stables:book", args=[self.t.pk]), fetch_redirect_response=False)  # тест 5.1: без перехода к якорю
         self.client.post(reverse("stables:book", args=[self.t.pk]), {**data, "confirm": "1"})
         self.assertEqual(Booking.objects.count(), 1)
 
@@ -375,7 +375,7 @@ class MultiServiceOrderTests(StableBase):
         self.client.force_login(self.coach)
         r = self.post(**{f"q-{self.sawdust.pk}-{self.h1.pk}": "2", f"q-{self.sawdust.pk}-{self.h3.pk}": "1",
                          f"q-{self.hay.pk}-{self.h1.pk}": "3", f"q-{self.power.pk}": "2", f"trailer-{self.power.pk}": "А123ВС"})
-        self.assertRedirects(r, reverse("stables:book", args=[self.t.pk]) + "#mine", fetch_redirect_response=False)
+        self.assertRedirects(r, reverse("stables:book", args=[self.t.pk]), fetch_redirect_response=False)  # тест 5.1: без перехода к якорю
         self.assertEqual(ServiceOrder.objects.count(), 4)
         self.assertEqual(sorted(ServiceOrder.objects.values_list("recipient_label", flat=True)), ["Барон", "Барон", "Гранит", "Коневоз А123ВС"])
         self.post(**{f"q-{self.sawdust.pk}-{self.h1.pk}": "2"})  # повтор той же формы
@@ -435,3 +435,16 @@ class MyPageTests(StableBase):
         self.assertNotIn("Барон", self.client.get(reverse("stables:my")).content.decode())
         self.client.logout()
         self.assertEqual(self.client.get(reverse("stables:my")).status_code, 302)
+
+    def test_screens_open_at_top(self):
+        """Тест 5.1: экран денников открывается сверху — без якоря «#mine» в ссылках и возвратах."""
+        b = self.book(self.h1, "g1")
+        self.client.force_login(self.coach)
+        my = self.client.get(reverse("stables:my")).content.decode()
+        self.assertNotIn("#mine", my)
+        self.assertIn("Мои денники и услуги", my)
+        self.assertNotIn("Брони и заказы по турнирам", my)
+        page = self.client.get(reverse("stables:book", args=[self.t.pk])).content.decode()
+        self.assertNotIn("#mine", page)
+        r = self.client.post(reverse("stables:my_cancel", args=["booking", b.pk]), {"next": reverse("stables:book", args=[self.t.pk])})
+        self.assertRedirects(r, reverse("stables:book", args=[self.t.pk]), fetch_redirect_response=False)

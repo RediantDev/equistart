@@ -2,11 +2,11 @@
 {% load tournaments %}
 {% block title %}Денники и услуги — мои брони — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head"><div><a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a><h1 class="h1">Денники и услуги</h1><p class="muted">Брони и заказы по турнирам. Изменить, отменить или заказать ещё — на экране турнира.</p></div></div>
+<div class="page-head stb-head"><div><a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a><h1 class="h1">Мои денники и услуги</h1></div></div>
 {% for g in groups %}
-  <section class="card stb-group">
+  <section class="card stb-group stb-group--compact">
     <div class="section-head"><div><h2 class="h3">{{ g.t.pub_title|default:g.t.title }}</h2>{% if g.t.pub_starts_on %}<span class="table__sub">{{ g.t.pub_starts_on|date:"j E" }}{% if g.t.pub_ends_on and g.t.pub_ends_on != g.t.pub_starts_on %} — {{ g.t.pub_ends_on|date:"j E" }}{% endif %}</span>{% endif %}</div>
-      <a class="btn btn--dark btn--sm" href="{% url 'stables:book' g.t.pk %}#mine">Денники и услуги</a></div>
+      <a class="btn btn--ghost btn--sm" href="{% url 'stables:book' g.t.pk %}">Изменить или заказать</a></div>
     {% if g.bookings %}<ul class="stb-group__list">{% for b in g.bookings %}
       <li><span><strong>{{ b.horse_name }}</strong> · {{ b.category.name }}<span class="table__sub">{{ b.arrive|date:"j E" }} — {{ b.depart|date:"j E" }}, суток: {{ b.nights }}{% if b.reason and b.state != "pending" %} · {{ b.reason }}{% endif %}</span></span>
         <span class="chips"><span class="chip{% if b.state == 'confirmed' %} chip--success{% elif b.state == 'pending' %} chip--warning{% elif b.state == 'rejected' %} chip--danger{% endif %}">{{ b.get_state_display }}</span>{% if b.box_number %}<span class="chip chip--info">Денник {{ b.box_number }}</span>{% endif %}</span></li>{% endfor %}</ul>{% endif %}

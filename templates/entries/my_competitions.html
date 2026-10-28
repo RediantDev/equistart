@@ -2,40 +2,70 @@
 {% load tournaments %}
 {% block title %}Мои соревнования — СтартЛист{% endblock %}
 {% block content %}
-{# Вариант А (решение 27.10.2026): всё про старты в одном месте — кто бы ни подал заявку #}
-<div class="page-head">
-  <div>
-    <h1 class="h1">Мои соревнования</h1>
-    <p class="muted">Ваши заявки, выступления, куда вас заявил тренер, денники и услуги.</p>
-  </div>
-  <a class="btn btn--primary" href="{% url 'core:calendar' %}">Найти соревнования</a>
+{# Вариант А (решение 27.10.2026), тест 5.1: вкладки «Предстоящие / Прошедшие», поиск и фильтр — на этой же странице #}
+<div class="mc-head">
+  <h1 class="h1">Мои соревнования</h1>
+  <a class="btn btn--ghost btn--sm mc-find" href="{% url 'core:calendar' %}" aria-label="Найти соревнования" title="Найти соревнования">{% include "partials/icon.html" with name="calendar" size=18 %}<span class="mc-find__text">Найти соревнования</span></a>
+</div>
+
+<div class="mc-tools" data-mc-tools>
+  <label class="visually-hidden" for="mc-q">Поиск по турниру, всаднику или лошади</label>
+  <div class="mc-search">{% include "partials/icon.html" with name="search" size=18 %}<input id="mc-q" type="search" value="{{ q }}" placeholder="Турнир, всадник или лошадь" autocomplete="off" enterkeyhint="search" data-mc-q></div>
+  <div class="mc-filters" role="group" aria-label="Решение по выступлению">{% for v, l in status_filters %}<button type="button" class="mc-filter{% if not v %} is-active{% endif %}" data-mc-status="{{ v }}" aria-pressed="{% if v %}false{% else %}true{% endif %}">{{ l }}</button>{% endfor %}</div>
 </div>
 
 <div id="mc-view" style="view-transition-name: swap-area;">
-<nav class="tabs tabs--sticky tabs--wrap3" aria-label="Мои соревнования" data-swap="#mc-view">
+<nav class="tabs tabs--sticky mc-tabs" aria-label="Мои соревнования" data-swap="#mc-view">
   <a class="tabs__item{% if tab == 'upcoming' %} is-active{% endif %}" href="?tab=upcoming">Предстоящие{% if counts.upcoming %} · {{ counts.upcoming }}{% endif %}</a>
-  <a class="tabs__item{% if tab == 'apps' %} is-active{% endif %}" href="?tab=apps">Заявки</a>
-  <a class="tabs__item{% if tab == 'past' %} is-active{% endif %}" href="?tab=past">Прошедшие</a>
+  <a class="tabs__item{% if tab == 'past' %} is-active{% endif %}" href="?tab=past">Прошедшие{% if counts.past %} · {{ counts.past }}{% endif %}</a>
 </nav>
-
-{% if tab == "apps" %}
-  {% if apps %}
-    <div class="list-cards">{% for r in apps %}
-      <a class="row-card row-card--link" href="{% url 'entries:application' r.app.pk %}">
-        <div style="flex: 1 1 180px; min-width: 0;">
-          <span class="h3 row-card__title">№{{ r.app.pk }} · {{ r.app.tournament.pub_title }}</span>
-          <div class="table__sub">{% daterange r.app.tournament.pub_starts_on r.app.tournament.pub_ends_on %} · выступлений: {{ r.count }}</div>
-        </div>
-        <div class="chips">{% for label, n, color in r.summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>
-      </a>
-    {% endfor %}</div>
-    <p style="margin-top: var(--space-3);"><a href="{% url 'entries:mine' %}">Поиск и фильтры по заявкам →</a></p>
-  {% else %}
-    <div class="card empty-friendly"><div class="empty-friendly__ico" aria-hidden="true">📝</div><h2 class="h3">Вы ещё не подавали заявок</h2><p class="muted">Откройте турнир в календаре и нажмите «Подать заявку».</p><div class="empty-friendly__actions"><a class="btn btn--primary btn--sm" href="{% url 'core:calendar' %}">Найти соревнования</a></div></div>
-  {% endif %}
-{% else %}
-  {% if tab == "past" %}{% with cards=past %}{% include "entries/_competition_cards.html" %}{% endwith %}
-  {% else %}{% with cards=upcoming %}{% include "entries/_competition_cards.html" %}{% endwith %}{% endif %}
-{% endif %}
+{% include "entries/_competition_cards.html" %}
 </div>
+<script>
+(function () {
+  // Тест 5.1: поиск и фильтр по решению — на странице, без запросов к серверу. «ё» = «е», регистр не важен.
+  function norm(s) { return String(s || "").toLowerCase().replace(/ё/g, "е").replace(/\s+/g, " ").trim(); }
+  function apply() {
+    var q = document.querySelector("[data-mc-q]"), act = document.querySelector("[data-mc-status].is-active");
+    var list = document.querySelector("[data-mc-list]");
+    if (!q || !list) return;
+    var text = norm(q.value), st = act ? act.getAttribute("data-mc-status") : "", shown = 0;
+    list.querySelectorAll("[data-mc-card]").forEach(function (card) {
+      var titleHit = !text || norm(card.getAttribute("data-title")).indexOf(text) >= 0;
+      var cardHit = !text || norm(card.getAttribute("data-search")).indexOf(text) >= 0;
+      var rows = card.querySelectorAll("[data-mc-row]"), rowsShown = 0;
+      rows.forEach(function (r) {
+        var ok = (!st || r.getAttribute("data-status") === st) && (titleHit || norm(r.getAttribute("data-search")).indexOf(text) >= 0);
+        r.hidden = !ok;
+        if (ok) rowsShown++;
+      });
+      card.querySelectorAll("[data-mc-day]").forEach(function (d) { d.hidden = !d.querySelector("[data-mc-row]:not([hidden])"); });
+      var ok = cardHit && (!st || rowsShown > 0);
+      card.hidden = !ok;
+      if (ok) {
+        shown++;
+        if ((text || st) && rows.length && !titleHit) card.open = true;
+      }
+    });
+    var none = list.querySelector("[data-mc-none]");
+    if (none) none.hidden = shown > 0 || !list.querySelector("[data-mc-card]");
+  }
+  if (!window.__mcInit) {
+    window.__mcInit = true;
+    document.addEventListener("input", function (e) { if (e.target.matches && e.target.matches("[data-mc-q]")) apply(); });
+    document.addEventListener("search", function (e) { if (e.target.matches && e.target.matches("[data-mc-q]")) apply(); }, true);
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("[data-mc-status]");
+      if (!b) return;
+      document.querySelectorAll("[data-mc-status]").forEach(function (x) {
+        x.classList.toggle("is-active", x === b);
+        x.setAttribute("aria-pressed", x === b ? "true" : "false");
+      });
+      apply();
+    });
+    document.addEventListener("htmx:afterSettle", apply);  // переключили вкладку — фильтр остаётся
+  }
+  apply();
+})();
+</script>
 {% endblock %}

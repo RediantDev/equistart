@@ -1515,8 +1515,8 @@ a, button, summary, label, .btn { -webkit-tap-highlight-color: transparent; touc
 .cc__list { list-style: none; margin: 0 0 var(--space-3); padding: 0; border-top: 1px solid var(--border); }
 .cc__row { padding: 8px 0; border-bottom: 1px solid var(--border); }
 .cc__extra { margin: 0 0 var(--space-3); padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
-.cc__extra-h { padding: 0; font-weight: 750; }
-.cc__extra > .table__sub { margin: 0 0 6px; }
+.cc__extra-h { float: left; width: 100%; padding: 0; margin-bottom: 2px; font-weight: 750; }
+.cc__extra > .table__sub { clear: both; margin: 0 0 6px; }
 .cc__check { display: flex; gap: 10px; padding: 6px 0; min-height: 40px; }
 .cc__check input { width: 20px; height: 20px; flex: none; }
 .cc__actions { display: flex; flex-direction: column; gap: 8px; }

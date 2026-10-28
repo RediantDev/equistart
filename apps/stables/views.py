@@ -181,7 +181,7 @@ def book(request, pk):
                 messages.success(request, f"Брони созданы: {names}. Подтвердите их и назначьте номера денников.")
                 return redirect(reverse("stables:manage", args=[t.pk]) + "?tab=bookings")
             messages.success(request, f"Брони отправлены: {names}. Конюшня подтвердит их и назначит номера денников — статус ниже.")
-            return redirect(reverse("stables:book", args=[t.pk]) + "#mine")
+            return redirect(reverse("stables:book", args=[t.pk]))
         preview = {"c": c, "horses": chosen, "arrive": arrive, "depart": depart, "nights": (depart - arrive).days, "free": free}
     except _FieldError as e:
         fe[e.field] = str(e)
@@ -212,7 +212,7 @@ def order(request, pk):
     try:
         made = services.order_many(request.user, t.pk, lines, request.POST.get("key", ""), comment=request.POST.get("comment", ""))
         messages.success(request, "Заказ оформлен: " + ", ".join(f"{o.service.name} × {o.quantity} ({o.recipient_label})" for o in made) + ".")
-        return redirect(reverse("stables:book", args=[t.pk]) + "#mine")
+        return redirect(reverse("stables:book", args=[t.pk]))
     except services.OrderErrors as e:
         errs = {}
         for sid, msg in e.items:
@@ -229,7 +229,7 @@ def my_edit(request, booking_id):
     b = get_object_or_404(Booking, pk=booking_id)
     if b.requested_by_id != request.user.pk:
         raise PermissionDenied
-    back = reverse("stables:book", args=[b.tournament_id]) + f"#b{b.pk}"
+    back = reverse("stables:book", args=[b.tournament_id])  # тест 5.1: экран открывается сверху, итог — в сообщении
     arrive, depart = _date(request.POST.get("arrive")), _date(request.POST.get("depart"))
     try:
         services.update_booking(request.user, b.pk, request.POST.get("category") or 0, arrive, depart, request.POST.get("revision"))

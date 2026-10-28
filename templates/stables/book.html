@@ -2,12 +2,12 @@
 {% load tournaments %}
 {% block title %}Денники и услуги — {{ t.pub_title }} — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head"><div>{% if staff %}{% url 'stables:manage' t.pk as sm %}{% include "partials/crumbs.html" with mid="Денники и услуги" mid_url=sm here="Ручная бронь" %}{% else %}<a class="back" href="{% url 'tournaments:public' t.pk %}">← {{ t.pub_title }}</a>{% endif %}<h1 class="h1">{% if staff %}Бронь и заказ за участника{% else %}Денники и услуги{% endif %}</h1><p class="muted">{% if staff %}Вы в команде турнира: можно выбрать лошадей любой заявки или вписать лошадь вручную.{% else %}Выберите категорию, свой период и лошадей — конкретный денник назначит конюшня после подтверждения.{% endif %}</p></div></div>
+<div class="page-head stb-head"><div>{% if staff %}{% url 'stables:manage' t.pk as sm %}{% include "partials/crumbs.html" with mid="Денники и услуги" mid_url=sm here="Ручная бронь" %}{% else %}<a class="back" href="{% url 'tournaments:public' t.pk %}">← {{ t.pub_title }}</a>{% endif %}<h1 class="h1">{% if staff %}Бронь и заказ за участника{% else %}Денники и услуги{% endif %}</h1>{% if staff %}<p class="table__sub">Можно выбрать лошадей любой заявки или вписать лошадь вручную.</p>{% endif %}</div></div>
 {% if not open %}<div class="alert">Бронирование закрыто: турнир {% if t.publication == "cancelled" %}отменён{% else %}завершён{% endif %}.</div>{% endif %}
 
 {% if my_bookings or my_orders %}
 <section class="stb-mine" id="mine" aria-labelledby="mine-h">
-  <h2 class="h2" id="mine-h">Мои брони и заказы на этом турнире</h2>
+  <h2 class="h3" id="mine-h">Мои брони и заказы</h2>
   {% if my_bookings %}<div class="list-cards">{% for b in my_bookings %}
     <article class="row-card stb-booking" id="b{{ b.pk }}">
       <div class="stb-booking__main"><strong>{{ b.horse_name }}</strong> · {{ b.category.name }}
@@ -24,22 +24,22 @@
             <p class="field__help" data-nights></p>
             <button class="btn btn--primary btn--sm">Сохранить изменения</button>
           </form></details>{% endif %}
-        <details class="inline-details"><summary class="btn btn--ghost btn--sm">Отменить</summary><form method="post" action="{% url 'stables:my_cancel' 'booking' b.pk %}" class="inline-row">{% csrf_token %}<input type="hidden" name="next" value="{{ here }}#mine"><input type="text" name="reason" placeholder="Причина (необязательно)" aria-label="Причина"><button class="btn btn--danger btn--sm">Отменить бронь</button></form></details>
+        <details class="inline-details"><summary class="btn btn--ghost btn--sm">Отменить</summary><form method="post" action="{% url 'stables:my_cancel' 'booking' b.pk %}" class="inline-row">{% csrf_token %}<input type="hidden" name="next" value="{{ here }}"><input type="text" name="reason" placeholder="Причина (необязательно)" aria-label="Причина"><button class="btn btn--danger btn--sm">Отменить бронь</button></form></details>
       </div>{% endif %}
     </article>{% endfor %}</div>{% endif %}
   {% if my_orders %}<h3 class="h3 stb-mine__sub">Услуги</h3><div class="list-cards">{% for o in my_orders %}
     <article class="row-card"><div class="stb-booking__main"><strong>{{ o.service.name }}</strong> × {{ o.quantity }} {{ o.service.unit }} · {{ o.recipient_label }}{% if o.for_date %}<span class="table__sub">на {{ o.for_date|date:"j E" }}</span>{% endif %}</div>
       <span class="chip{% if o.delivered == o.quantity %} chip--success{% elif o.delivered %} chip--warning{% elif o.state == 'cancelled' %} chip--danger{% endif %}">{{ o.delivery_state }}</span>
-      {% if o.state == "ordered" and not o.delivered and open %}<form method="post" action="{% url 'stables:my_cancel' 'order' o.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ here }}#mine"><button class="btn btn--ghost btn--sm">Отменить</button></form>{% endif %}
+      {% if o.state == "ordered" and not o.delivered and open %}<form method="post" action="{% url 'stables:my_cancel' 'order' o.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ here }}"><button class="btn btn--ghost btn--sm">Отменить</button></form>{% endif %}
     </article>{% endfor %}</div>{% endif %}
   {% if contacts %}<div class="card stb-contact"><div class="caption muted">ВОПРОСЫ ПО ДЕННИКАМ И УСЛУГАМ</div>{% for c in contacts %}
     <div class="stb-contact__row"><span><strong>{{ c.name }}</strong><span class="table__sub">{{ c.role }}</span></span>{% if c.phone %}<a class="btn btn--ghost btn--sm" href="tel:{{ c.phone }}">{{ c.phone|phone }}</a>{% endif %}</div>{% endfor %}</div>{% endif %}
 </section>
 {% endif %}
 
-<div class="wizard-grid wizard-grid--aside-first">
+<div class="wizard-grid wizard-grid--aside-first stb-page">
   <div class="wizard-main">
-    <h2 class="h2">Денники</h2>
+    <h2 class="h2 stb-h">Денники</h2>
     {% if cats %}<div class="list-cards">{% for c in cats %}
       <article class="row-card" style="align-items: flex-start;">
         <div style="flex: 1 1 260px; min-width: 0;"><strong class="h3">{{ c.name }}</strong>
@@ -50,7 +50,7 @@
       </article>{% endfor %}</div>
     {% else %}<div class="card empty"><h3 class="h3">Организатор пока не добавил денники</h3></div>{% endif %}
 
-    <h2 class="h2" id="services" style="margin-top: var(--space-5);">Услуги</h2>
+    <h2 class="h2 stb-h" id="services">Услуги</h2>
     {% if svc_rows %}
     <form method="post" action="{% url 'stables:order' t.pk %}" id="order" class="stb-order">{% csrf_token %}<input type="hidden" name="key" value="{{ okey }}">
       {% for e in order_general %}<div class="field field--error"><p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ e }}</p></div>{% endfor %}

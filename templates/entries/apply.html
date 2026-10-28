@@ -2,11 +2,11 @@
 {% load tournaments %}
 {% block title %}Заявка — {{ s.title }} — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
+<div class="page-head apply-head">
   <div>
     <a class="back" href="{% url 'tournaments:public' t.pk %}">← {{ s.title }}</a>
     <h1 class="h1">{% if late %}Добавить участников (судья){% else %}Заявка на соревнование{% endif %}</h1>
-    <p class="muted">{% daterange s.starts_on s.ends_on %} · {{ s.venue.name }}. {% if late %}Позиции сразу считаются принятыми.{% else %}Добавьте пары «всадник + лошадь» и выберите для каждой маршруты и езды. Несколько пар — групповая заявка.{% endif %}</p>
+    <p class="table__sub">{% daterange s.starts_on s.ends_on %} · {{ s.venue.name }}{% if late %}. Позиции сразу считаются принятыми.{% endif %}</p>
   </div>
 </div>
 
@@ -122,12 +122,13 @@
     <section class="card">
       <h2 class="h3">Отправка</h2>
       <p class="muted" id="apply-count">Выступлений в заявке: <strong>{{ lines|length }}</strong>{% if pairs|length > 1 %} · пар: {{ pairs|length }}{% endif %}</p>
-      <form method="post" action="{{ apply_url }}" class="form" style="margin-top: var(--space-3);">
+      <form method="post" action="{{ apply_url }}" class="form apply-send">
         {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="key" value="{{ key }}">
         <div class="field"><label class="field__label" for="cn">Контактное лицо</label><input id="cn" name="contact_name" type="text" value="{% if request.POST.contact_name %}{{ request.POST.contact_name }}{% else %}{{ user.full_name }}{% endif %}"></div>
         <div class="field"><label class="field__label" for="cp">Телефон для связи</label><input id="cp" name="contact_phone" type="tel" value="{% if request.POST.contact_phone %}{{ request.POST.contact_phone }}{% else %}{{ user.phone_display }}{% endif %}"><p class="field__help">Виден только организатору и судьям турнира.</p></div>
-        <div class="field"><label class="field__label" for="cm">Комментарий</label><textarea id="cm" name="comment" rows="3" maxlength="1000" placeholder="Необязательно">{{ request.POST.comment }}</textarea></div>
-        <p class="field__help">Публично в протоколах будут: фамилия и имя, год рождения, разряд, клуб, тренер; кличка, год, пол, масть, порода лошади.</p>
+        {# тест 5.1: комментарий — по ссылке, поле то же (comment) #}
+        <button type="button" class="apply-more" data-reveal="cm-field"{% if request.POST.comment %} hidden{% endif %}>+ Добавить комментарий</button>
+        <div class="field" id="cm-field"{% if not request.POST.comment %} hidden{% endif %}><label class="field__label" for="cm">Комментарий</label><textarea id="cm" name="comment" rows="3" maxlength="1000" placeholder="Необязательно">{{ request.POST.comment }}</textarea></div>
         <p class="field__help">Денник и услуги для лошади можно заказать на странице турнира после отправки.</p>
         {# тест 5: условия отмены — при подаче заявки, рядом с отправкой #}
         {% if s.cancel_terms %}<div class="alert apply-cancel-terms" id="cancel-terms"><strong>Условия отмены:</strong> {{ s.cancel_terms|linebreaksbr }} <span class="muted">Условия задаёт организатор.</span></div>{% endif %}
@@ -180,6 +181,27 @@
     if (box) box.scrollIntoView({ behavior: "smooth", block: "center" });
   }, true);
   document.addEventListener("htmx:afterSettle", sync);
+  if (!window.__applyInit) {
+    window.__applyInit = true;
+    // Тест 5.1: «+ Добавить комментарий» открывает поле
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("[data-reveal]");
+      if (!b) return;
+      var box = document.getElementById(b.getAttribute("data-reveal"));
+      if (!box) return;
+      box.hidden = false; b.hidden = true;
+      var f = box.querySelector("textarea, input");
+      if (f) f.focus();
+    });
+    // Тест 5.1: после «+ Добавить пару» экран плавно переходит к новой паре со списком зачётов
+    // (форма уходит без перезагрузки, якорь из адреса при этом теряется — берём пару из ?open=).
+    document.addEventListener("htmx:afterSettle", function (e) {
+      if (!e.detail.boosted) return;
+      var m = /[?&]open=(\d+-\d+)/.exec(location.search);
+      var el = m && document.getElementById("pair-" + m[1]);
+      if (el) setTimeout(function () { el.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60);
+    });
+  }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", sync); else sync();
 })();
 </script>

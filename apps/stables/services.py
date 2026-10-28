@@ -260,7 +260,7 @@ def cancel_booking(user, booking_id, reason="") -> Booking:
     b.save()
     audit(user, "booking.cancel", b, reason=b.reason)
     if b.requested_by_id != user.pk:
-        notify([b.requested_by], f"Бронь денника ({b.horse_name}) отменена: {b.reason}", reverse("stables:book", args=[b.tournament_id]) + "#mine", "booking")
+        notify([b.requested_by], f"Бронь денника ({b.horse_name}) отменена: {b.reason}", reverse("stables:book", args=[b.tournament_id]), "booking")
     else:
         notify(_staff(b.tournament), f"Представитель отменил бронь: {b.horse_name}, {b.arrive:%d.%m}–{b.depart:%d.%m}",
                reverse("stables:manage", args=[b.tournament_id]) + "?tab=bookings", "booking")

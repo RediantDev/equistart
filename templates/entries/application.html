@@ -2,39 +2,34 @@
 {% load tournaments %}
 {% block title %}Заявка №{{ app.pk }} — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <a class="back" href="{% if owner %}{% url 'entries:mine' %}{% else %}{% url 'entries:manage' t.pk %}{% endif %}">← {% if owner %}Мои заявки{% else %}Заявки турнира{% endif %}</a>
-    <h1 class="h1">Заявка №{{ app.pk }} · {{ t.pub_title }}</h1>
-    <p class="muted">{% if app.is_group %}Групповая{% else %}Индивидуальная{% endif %} · выступлений: {{ entries|length }} · подана {{ app.created_at|date:"j E в H:i" }}{% if app.late %} · внесена судьёй{% endif %}</p>
-    <div class="chips" style="margin-top: 6px;">{% for label, n, color in summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>
-  </div>
-  {% if owner and t.publication == "published" %}<a class="btn btn--ghost" href="{% url 'tournaments:public' t.pk %}">Страница турнира</a>{% endif %}
+<div class="app-head">
+  <a class="back" href="{% if owner %}{% url 'entries:competitions' %}{% else %}{% url 'entries:manage' t.pk %}{% endif %}">← {% if owner %}Мои соревнования{% else %}Заявки турнира{% endif %}</a>
+  <h1 class="h2 app-head__title">{% if owner and t.publication == "published" %}<a href="{% url 'tournaments:public' t.pk %}">{{ t.pub_title }}</a>{% else %}{{ t.pub_title }}{% endif %}</h1>
+  <p class="table__sub">Заявка №{{ app.pk }} · {% if app.is_group %}групповая{% else %}индивидуальная{% endif %} · подана {{ app.created_at|date:"j E в H:i" }}{% if app.late %} · внесена судьёй{% endif %}</p>
+  <div class="chips">{% for label, n, color in summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>
 </div>
 
 <div class="wizard-grid">
   <div class="wizard-main">
     <form method="post" action="{% url 'entries:cancel' app.pk %}" id="entries-form">
       {% csrf_token %}
-      <section class="card">
-        <div class="section-head">
-          <h2 class="h3" style="margin: 0;">Выступления</h2>
+      <section class="card app-card">
+        <div class="section-head app-card__head">
+          <h2 class="h3" style="margin: 0;">Выступления · {{ entries|length }}</h2>
           {% if owner %}<button class="btn btn--danger btn--sm" type="submit">Отменить выбранные…</button>{% endif %}
         </div>
-        <div class="rider-groups">
-          {% for g in groups %}
-            <details class="rider-group"{% if groups|length <= 2 or forloop.first %} open{% endif %}>
-              <summary class="rider-group__head">
-                <span class="rider-group__name"><strong>{{ g.name }}</strong><span class="table__sub">выступлений: {{ g.entries|length }}</span></span>
-                <span class="chips">{% for label, n, color in g.summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</span>
-              </summary>
-              <div class="list-cards rider-group__body">
-              {% for e in g.entries %}
-                <article class="entry-row{% if not e.is_active %} is-muted{% endif %}">
+        {% for g in groups %}
+          <div class="app-day">
+            <h3 class="app-day__h">{{ g.day|date:"j E, D" }}<span class="table__sub"> · выступлений: {{ g.count }}</span></h3>
+            {% for r in g.riders %}
+              <div class="app-rider">
+                <div class="app-rider__name">{{ r.name }}</div>
+                {% for e in r.entries %}
+                <article class="entry-row app-entry{% if not e.is_active %} is-muted{% endif %}">
                   {% if owner %}<label class="entry-row__pick"><input type="checkbox" name="entry" value="{{ e.pk }}" aria-label="Выбрать {{ e.athlete_snapshot.name }} / {{ e.horse_snapshot.name }}"{% if not e.is_active or e.is_started %} disabled{% endif %}></label><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}">{% endif %}
                   <div class="entry-row__main">
                     <strong>{{ e.horse_snapshot.name }}</strong>
-                    <span class="table__sub">{{ e.program_name }} · {{ e.class_name }}{% if e.height %} · {{ e.height }} см{% endif %} · {{ e.day|date:"j E" }}</span>
+                    <span class="table__sub">{{ e.program_name }} · {{ e.class_name }}{% if e.height %} · {{ e.height }} см{% endif %}</span>
                     {% if e.program.is_dressage and e.program.test_snapshot and e.result %}<a class="table__sub" href="{% url 'conduct:my_sheets' e.pk %}">Листы судей</a>{% endif %}
                     {% if e.decision == "rejected" and e.decision_reason and show_contacts %}<span class="table__sub" style="color: var(--danger);">Причина: {{ e.decision_reason }}</span>{% endif %}
                     {% if e.decision == "cancelled" and e.cancel_reason and show_contacts %}<span class="table__sub">Причина отмены: {{ e.cancel_reason }}</span>{% endif %}
@@ -54,11 +49,11 @@
                     {% if owner and e.is_active and not e.is_started and not e.pending_proposal %}<a class="btn btn--ghost btn--sm" href="{% url 'entries:propose' e.pk %}">Предложить замену</a>{% endif %}
                   </div>
                 </article>
-              {% endfor %}
+                {% endfor %}
               </div>
-            </details>
-          {% endfor %}
-        </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
       </section>
     </form>
     {% for e in entries %}{% if e.pending_proposal and judge %}<form id="pp-{{ e.pending_proposal.pk }}" method="post" action="{% url 'entries:proposal_decide' e.pending_proposal.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>{% endif %}{% endfor %}
@@ -70,16 +65,11 @@
       </section>
     {% endif %}
 
-    {% if history %}
-      <details class="card"><summary class="h3">История</summary>
-        <ul class="list">{% for h in history %}<li class="list__row"><span class="num muted" style="min-width: 120px;">{{ h.created_at|date:"d.m.Y H:i" }}</span><span style="flex: 1;">{{ h.label }}{% if h.data.reason %}: «{{ h.data.reason }}»{% endif %}{% if h.data.text %}: {{ h.data.text }}{% endif %}</span><span class="muted">{{ h.actor.short_name|default:"" }}</span></li>{% endfor %}</ul>
-      </details>
-    {% endif %}
   </div>
 
   <aside class="wizard-aside">
     {% if show_contacts %}
-    <section class="card">
+    <section class="card app-card">
       <h2 class="h3">Контакты</h2>
       <p style="margin: 6px 0 0;"><strong>{{ app.contact_name }}</strong><br><span class="num">{{ app.contact_phone|phone }}</span></p>
       {% if app.comment %}<p class="muted" style="margin-top: var(--space-2);">{{ app.comment|linebreaksbr }}</p>{% endif %}

@@ -19,7 +19,7 @@ class SingleRankTests(Base):
         self.assertIn('name="rank"', page)
         self.assertNotIn("rank_jumping", page)
         self.assertNotIn("rank_dressage", page)
-        self.client.post(reverse("profiles:athlete_edit", args=[self.a2.pk]), {"last_name": "Орлов", "first_name": "Дима", "rank": "kms"})
+        self.client.post(reverse("profiles:athlete_edit", args=[self.a2.pk]), {"last_name": "Орлов", "first_name": "Дима", "birth_date": "1996-01-01", "rank": "kms"})
         self.a2.refresh_from_db()
         self.assertEqual(self.a2.rank, "kms")
         self.assertEqual(self.a2.rank_short, "КМС")
@@ -181,7 +181,9 @@ class ApplicationGroupsTests(Base):
         app = self.submit(self.coach, [services.Line(self.a1, self.h1, self.c_kids), services.Line(self.a2, self.h1, self.c_open)])
         self.client.force_login(self.coach)
         page = self.client.get(reverse("entries:application", args=[app.pk])).content.decode()
-        self.assertEqual(page.count('class="rider-group"'), 2)
+        # тест 5.1: сначала день соревнований, внутри — всадники
+        self.assertEqual(page.count('class="app-day"'), 1)
+        self.assertEqual(page.count('class="app-rider"'), 2)
         self.assertIn("Отменить выбранные", page)
         self.assertEqual(page.count('name="entry"'), 2)
 
@@ -195,16 +197,17 @@ class ApplicationGroupsTests(Base):
 
 @override_settings(MEDIA_ROOT=TMP)
 class MyListsTests(Base):
-    def test_find_competitions_and_filters_panel(self):
+    def test_old_lists_lead_to_my_competitions(self):
+        """Тест 5.1: «Мои заявки» и «Мои выступления» — это «Мои соревнования»; старые адреса работают."""
+        comp = reverse("entries:competitions")
+        self.assertIn("login", self.client.get(reverse("entries:mine"))["Location"])  # гость → вход
         self.client.force_login(self.coach)
-        cal = reverse("core:calendar")
-        page = self.client.get(reverse("entries:mine")).content.decode()
-        self.assertIn(f'href="{cal}"', page)
-        self.assertIn("Найти соревнования", page)
-        self.assertIn("<details class=\"filters list-search__filters\">", page)
-        page = self.client.get(reverse("entries:mine") + "?period=past&decision=accepted").content.decode()
-        self.assertIn("активных фильтров: 2", page)
-        page = self.client.get(reverse("entries:my_starts")).content.decode()
+        self.assertRedirects(self.client.get(reverse("entries:mine")), comp, fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(reverse("entries:mine") + "?q=Барон"), comp + "?q=%D0%91%D0%B0%D1%80%D0%BE%D0%BD", fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(reverse("entries:my_starts")), comp, fetch_redirect_response=False)
+        page = self.client.get(comp + "?q=Барон").content.decode()
+        self.assertIn('value="Барон"', page)  # поиск переносится
+        self.assertIn(f'href="{reverse("core:calendar")}"', page)
         self.assertIn("Найти соревнования", page)
 
 
