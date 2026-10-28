@@ -3,7 +3,7 @@
 {% block content %}
 {% url 'profiles:horse_document' h.pk d.pk as file_url %}
 <div class="pf-head pf-head--detail">
-  <a class="back" href="{% url 'profiles:horse' h.pk %}">← {{ h.name }}</a>
+  <a class="back" href="{% url 'profiles:horse' h.pk %}?tab=docs">← {{ h.name }}</a>
   <div class="pf-title">
     <h1 class="h1">{{ d.label }}</h1>
     <a class="btn btn--dark btn--sm" href="{{ file_url }}?download=1" download hx-boost="false">Скачать</a>
@@ -21,4 +21,7 @@
     <p class="muted">Предпросмотр недоступен. <a href="{{ file_url }}?download=1" download hx-boost="false">Скачайте файл</a>.</p>
   {% endif %}
 </div>
+{% if manage %}
+  <form method="post" action="{% url 'profiles:horse_action' h.pk 'delete_doc' %}" class="ps-docdel">{% csrf_token %}<input type="hidden" name="document" value="{{ d.pk }}"><button class="btn btn--danger btn--sm" data-confirm="Удалить документ «{{ d.label }}»?" data-confirm-ok="Удалить">Удалить документ</button></form>
+{% endif %}
 {% endblock %}

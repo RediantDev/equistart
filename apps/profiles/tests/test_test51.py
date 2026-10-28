@@ -140,7 +140,9 @@ class HorseDetailTests(Base):
         self.client.force_login(self.coach)
         page = self.client.get(reverse("profiles:horse", args=[self.h1.pk])).content.decode()
         self.assertIn('aria-label="Изменить лошадь"', page)
-        self.assertIn('class="pf-hint"', page)
+        # макет R2_06A: подсказка — во вкладке «Документы», передача управления — во вкладке «Доступ»
+        self.assertIn('class="pf-hint', self.client.get(reverse("profiles:horse", args=[self.h1.pk]), {"tab": "docs"}).content.decode())
+        page = self.client.get(reverse("profiles:horse", args=[self.h1.pk]), {"tab": "access"}).content.decode()
         transfer = page[page.index("Передать управление"):]
         self.assertIn("Ожидает ответа", transfer)
         self.assertIn("Передача на", transfer)
@@ -149,9 +151,11 @@ class HorseDetailTests(Base):
 
     def test_foreign_has_no_edit(self):
         self.client.force_login(self.other)
-        page = self.client.get(reverse("profiles:horse", args=[self.h1.pk])).content.decode()
-        self.assertNotIn('aria-label="Изменить лошадь"', page)
-        self.assertNotIn("Передать управление", page)
+        for tab in ("", "access", "docs"):
+            page = self.client.get(reverse("profiles:horse", args=[self.h1.pk]), {"tab": tab}).content.decode()
+            self.assertNotIn('aria-label="Изменить лошадь"', page)
+            self.assertNotIn("Передать управление", page)
+            self.assertNotIn("Пригласить", page)
 
 
 @override_settings(MEDIA_ROOT=TMP)
@@ -171,7 +175,8 @@ class DocumentViewerTests(Base):
         self.assertContains(r, "31.01.2030")
         self.assertContains(r, f'<iframe class="pf-doc__frame" src="{self.file_url}"')
         self.assertContains(r, "Скачать")
-        detail = self.client.get(reverse("profiles:horse", args=[self.h1.pk]))
+        # макет S08A: документы — во вкладке «Документы» профиля лошади
+        detail = self.client.get(reverse("profiles:horse", args=[self.h1.pk]), {"tab": "docs"})
         self.assertContains(detail, f'href="{self.view_url}"')
         f = self.client.get(self.file_url)
         self.assertEqual(f.status_code, 200)
