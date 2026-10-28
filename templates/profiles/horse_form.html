@@ -1,47 +1,137 @@
 {% extends "base.html" %}
 {% block title %}{% if horse %}{{ horse.name }}{% else %}Новая лошадь{% endif %} — СтартЛист{% endblock %}
 {% block content %}
-<section class="auth pf-form">
-  <div class="card auth__card auth__card--wide">
-    <a class="back" href="{% if next %}{{ next }}{% elif horse %}{% url 'profiles:horse' horse.pk %}{% else %}{% url 'profiles:horses' %}{% endif %}">{% if next %}← Вернуться к заявке{% else %}← Назад{% endif %}</a>
-    <h1 class="h1">{% if horse %}Изменить лошадь{% else %}Новая лошадь{% endif %}</h1>
-    {% if similar %}
-      <div class="alert alert--warning" role="alert">
-        Уже есть лошадь с такой кличкой и тем же годом рождения. Если это она — выберите её в заявке через поиск, вторую не создавайте.
-        <ul class="list" style="margin-top: var(--space-2);">{% for s in similar %}<li class="list__row"><strong>{{ s.name }}</strong><span class="table__sub">{{ s.summary }}{% if s.fksr_number %} · ФКСР {{ s.fksr_number }}{% endif %}</span></li>{% endfor %}</ul>
-      </div>
-    {% endif %}
-    <form method="post" novalidate class="form">
-      {% csrf_token %}
-      {% if similar %}<input type="hidden" name="confirm_similar" value="1">{% endif %}
-      <div class="grid-2">
-        {% include "partials/field.html" with field=form.name %}
-        {% include "partials/field.html" with field=form.birth_year %}
-      </div>
-      <div class="grid-3">
-        {% include "partials/field.html" with field=form.color %}
-        {% include "partials/field.html" with field=form.sex %}
-        {% include "partials/field.html" with field=form.breed %}
-      </div>
-      <div class="grid-2">
-        {% include "partials/field.html" with field=form.fksr_number %}
-        {% include "partials/field.html" with field=form.fei_id %}
-      </div>
-      {# Тест 5, п. 15.2: «Рост в холке» — только для пони #}
-      {% include "partials/field.html" with field=form.is_pony %}
-      <div data-show-when="is_pony:checked">{% include "partials/field.html" with field=form.height_cm %}</div>
-      <details{% if form.sire.value or form.birthplace.value or form.owner_name.value %} open{% endif %}>
-        <summary class="label" style="cursor: pointer;">Дополнительно: отец, место рождения, владелец</summary>
-        <div class="form pf-more">
-          <div class="grid-2">
-            {% include "partials/field.html" with field=form.sire %}
-            {% include "partials/field.html" with field=form.birthplace %}
-          </div>
-          {% include "partials/field.html" with field=form.owner_name %}
+{# Макеты R2_07A / R2_07B (утверждены 28.10.2026): два шага на клиенте, без JS — одна форма #}
+{% with f=form %}
+<div class="ps-screen ps-hform">
+  <a class="ps-back" href="{% if next %}{{ next }}{% elif horse %}{% url 'profiles:horse' horse.pk %}{% else %}{% url 'profiles:horses' %}{% endif %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>{% if next %}Вернуться к заявке{% elif horse %}{{ horse.name }}{% else %}Мои лошади{% endif %}</a>
+  <h1 class="ps-h1">{% if horse %}Изменить лошадь{% else %}Новая лошадь{% endif %}</h1>
+  {% if not horse %}
+  <ol class="ps-steps ps-js" aria-label="Шаги" data-steps-nav>
+    <li class="ps-st" data-step-dot="1"><span class="ps-sn"><span class="ps-sn__n">1</span><svg class="ps-sn__ok" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Основное</li>
+    <li class="ps-steps__line" aria-hidden="true"></li>
+    <li class="ps-st" data-step-dot="2"><span class="ps-sn"><span class="ps-sn__n">2</span></span>Дополнительно</li>
+  </ol>
+  {% endif %}
+  {% if similar %}
+    <div class="alert alert--warning" role="alert">
+      Уже есть лошадь с такой кличкой и тем же годом рождения. Если это она — выберите её в заявке через поиск, вторую не создавайте.
+      <ul class="list" style="margin-top: var(--space-2);">{% for s in similar %}<li class="list__row"><strong>{{ s.name }}</strong><span class="table__sub">{{ s.summary }}{% if s.fksr_number %} · ФКСР {{ s.fksr_number }}{% endif %}</span></li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  <form method="post" novalidate class="ps-hform__form"{% if not horse %} data-steps{% endif %}>
+    {% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    {% if similar %}<input type="hidden" name="confirm_similar" value="1">{% endif %}
+    <div class="step-pane ps-pane" data-pane="1">
+      <div class="ps-card ps-card--form">
+        {% include "partials/field.html" with field=f.name %}
+        <div class="ps-g2">
+          {% include "partials/field.html" with field=f.birth_year %}
+          {% include "partials/field.html" with field=f.sex %}
         </div>
-      </details>
-      <button type="submit" class="btn btn--primary btn--block">{% if similar %}Это другая лошадь — сохранить{% else %}Сохранить{% endif %}</button>
-    </form>
-  </div>
-</section>
+        <div class="ps-g2">
+          {% include "partials/field.html" with field=f.color %}
+          {% include "partials/field.html" with field=f.breed %}
+        </div>
+        <div class="ps-g2">
+          {% include "partials/field.html" with field=f.fksr_number %}
+          {% include "partials/field.html" with field=f.fei_id %}
+        </div>
+        {# Тест 5, п. 15.2: «Рост в холке» — только для пони. Лошадь / Пони — одним переключателем #}
+        <fieldset class="field ps-type">
+          <legend class="field__label">Тип</legend>
+          <div class="ps-segc">
+            <label><input type="radio" name="is_pony" value="false"{% if not f.is_pony.value %} checked{% endif %}><span>Лошадь</span></label>
+            <label><input type="radio" name="is_pony" value="on"{% if f.is_pony.value %} checked{% endif %}><span>Пони</span></label>
+          </div>
+        </fieldset>
+        <div data-show-when="is_pony:checked">{% include "partials/field.html" with field=f.height_cm %}</div>
+      </div>
+      {% if not horse %}
+      <div class="ps-bar ps-js">
+        <a class="ps-btn" href="{% if next %}{{ next }}{% else %}{% url 'profiles:horses' %}{% endif %}">Отмена</a>
+        <button type="button" class="ps-btn ps-btn--y ps-grow" data-step-next>Далее<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
+      {% endif %}
+    </div>
+    <div class="step-pane ps-pane" data-pane="2">
+      {% if not horse %}
+      <button type="button" class="ps-summary ps-js" data-step-prev aria-label="Вернуться к основному">
+        <span class="ps-t"><b data-sum-name></b><span class="ps-m" data-sum-meta></span></span>
+        <span class="ps-ib" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg></span>
+      </button>
+      {% endif %}
+      <div class="ps-card ps-card--form">
+        {% if horse %}<h2 class="ps-card__h ps-card__h--in">Дополнительно</h2>{% endif %}
+        <div class="ps-extra" data-extra="sire">
+          <div class="ps-extra__row">{% include "partials/field.html" with field=f.sire %}
+            {% if not horse %}<button class="ps-ib ps-extra__x ps-js" type="button" aria-label="Убрать поле «Отец»" data-extra-off="sire"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>{% endif %}</div>
+        </div>
+        <div class="ps-extra" data-extra="birthplace"{% if not horse and not f.birthplace.value and not f.birthplace.errors %} data-off{% endif %}>
+          <div class="ps-extra__row">{% include "partials/field.html" with field=f.birthplace %}
+            {% if not horse %}<button class="ps-ib ps-extra__x ps-js" type="button" aria-label="Убрать поле «Место рождения»" data-extra-off="birthplace"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>{% endif %}</div>
+        </div>
+        <div class="ps-extra" data-extra="owner_name"{% if not horse and not f.owner_name.value and not f.owner_name.errors %} data-off{% endif %}>
+          <div class="ps-extra__row">{% include "partials/field.html" with field=f.owner_name %}
+            {% if not horse %}<button class="ps-ib ps-extra__x ps-js" type="button" aria-label="Убрать поле «Владелец»" data-extra-off="owner_name"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>{% endif %}</div>
+        </div>
+        {% if not horse %}
+        <div class="ps-adds ps-js">
+          <button class="ps-add" type="button" data-extra-on="sire"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Отец</button>
+          <button class="ps-add" type="button" data-extra-on="birthplace"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Место рождения</button>
+          <button class="ps-add" type="button" data-extra-on="owner_name"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Владелец</button>
+        </div>
+        {% endif %}
+      </div>
+      <div class="ps-bar">
+        {% if not horse %}<button type="submit" class="ps-btn ps-grow ps-js" name="skip_extra" value="1" data-skip>Пропустить</button>{% endif %}
+        <button type="submit" class="ps-btn ps-btn--y ps-grow">{% if similar %}Это другая лошадь — сохранить{% else %}Сохранить{% endif %}</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% if not horse %}
+<script>
+(function () {
+  var form = document.querySelector(".ps-hform__form[data-steps]");
+  if (!form || form.dataset.psBound) return;
+  form.dataset.psBound = "1";
+  function txt(name) {
+    var el = form.elements[name];
+    if (!el) return "";
+    if (el.tagName === "SELECT") return el.value ? el.options[el.selectedIndex].text : "";
+    return (el.value || "").trim();
+  }
+  function summary() {
+    form.querySelector("[data-sum-name]").textContent = txt("name") || "Без клички";
+    var pony = form.querySelector('input[name="is_pony"]:checked');
+    form.querySelector("[data-sum-meta]").textContent = [txt("birth_year"), txt("sex"), txt("color"), txt("breed"), pony && pony.value === "on" ? "пони" : ""]
+      .filter(Boolean).join(" · ");
+  }
+  function extra(name, on) {
+    var box = form.querySelector('[data-extra="' + name + '"]'), add = form.querySelector('[data-extra-on="' + name + '"]');
+    if (on) box.removeAttribute("data-off"); else { box.setAttribute("data-off", ""); box.querySelector("input").value = ""; }
+    if (add) add.hidden = on;
+    if (on) box.querySelector("input").focus();
+  }
+  ["sire", "birthplace", "owner_name"].forEach(function (n) {
+    var box = form.querySelector('[data-extra="' + n + '"]'), add = form.querySelector('[data-extra-on="' + n + '"]');
+    if (add) add.hidden = !box.hasAttribute("data-off");
+  });
+  form.addEventListener("click", function (e) {
+    var on = e.target.closest("[data-extra-on]"), off = e.target.closest("[data-extra-off]");
+    if (on) extra(on.dataset.extraOn, true);
+    if (off) extra(off.dataset.extraOff, false);
+    if (e.target.closest("[data-step-next]")) summary();
+    // «Пропустить» — сохранить без дополнительных сведений
+    if (e.target.closest("[data-skip]")) ["sire", "birthplace", "owner_name"].forEach(function (n) { form.elements[n].value = ""; });
+  });
+  form.addEventListener("input", summary);
+  form.addEventListener("change", summary);
+  summary();
+})();
+</script>
+{% endif %}
+{% endwith %}
 {% endblock %}

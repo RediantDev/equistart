@@ -77,11 +77,16 @@ class HorseForm(forms.ModelForm):
         self.fields["owner_name"].help_text = "Не публикуется."
         lo, hi = self.year_bounds()
         self.fields["birth_year"].widget.attrs.update({"min": lo, "max": hi, "inputmode": "numeric", "placeholder": str(hi - 8)})
-        self.fields["color"].choices = [("", "— выберите —")] + list(self.fields["color"].choices)[1:]
-        self.fields["sex"].choices = [("", "— выберите —")] + list(self.fields["sex"].choices)[1:]
+        # Макет R2_07A: короткие поля парами — короткие подписи и подсказки
+        self.fields["color"].choices = [("", "выберите")] + list(self.fields["color"].choices)[1:]
+        self.fields["sex"].choices = [("", "выберите")] + list(self.fields["sex"].choices)[1:]
+        self.fields["fei_id"].label = "FEI ID"
+        for name in ("fksr_number", "fei_id"):
+            self.fields[name].widget.attrs["placeholder"] = "если есть"
+        self.fields["sire"].widget.attrs["placeholder"] = "Кличка отца"
         from .catalogs import breeds_json
 
-        self.fields["breed"].widget.attrs.update({"data-suggest": breeds_json(), "placeholder": "Начните вводить или выберите"})
+        self.fields["breed"].widget.attrs.update({"data-suggest": breeds_json(), "placeholder": "Введите"})
 
     def clean_birth_year(self):
         y = self.cleaned_data["birth_year"]
@@ -123,6 +128,10 @@ class DocumentForm(forms.ModelForm):
         fields = ["kind", "title", "file", "valid_until"]
         widgets = {"valid_until": DATE}
         help_texts = {"file": "PDF, фото (JPEG, PNG, WEBP, HEIC) до 20 МБ."}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["kind"].choices = [("", "выберите")] + list(self.fields["kind"].choices)[1:]
 
     def clean_file(self):
         f = self.cleaned_data["file"]
