@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from apps.core.models import audit
 
-from .models import Athlete, Horse, Offer
+from .models import Athlete, Horse, HorseAccess, Offer
 
 
 def athletes_for_entry(user):
@@ -29,6 +29,18 @@ def can_enter_athlete(user, athlete) -> bool:
 
 def can_view_athlete(user, athlete) -> bool:
     return can_enter_athlete(user, athlete)
+
+
+def horses_for_entry(user):
+    """Лошади, с которыми пользователь подаёт заявки: свои и те, к которым ему дали доступ."""
+    if not user.is_authenticated:
+        return Horse.objects.none()
+    return (Horse.objects.filter(Q(manager=user, added_by_judge=False) | Q(accesses__user=user), archived=False)
+            .distinct().order_by("name", "birth_year"))
+
+
+def has_horse_access(user, horse) -> bool:
+    return user.is_authenticated and HorseAccess.objects.filter(horse=horse, user=user).exists()
 
 
 def can_manage_horse(user, horse) -> bool:
@@ -91,6 +103,11 @@ def respond_offer(user, offer_id: int, accept: bool) -> Offer:
     offer = Offer.objects.select_for_update().get(pk=offer_id, state=Offer.State.PENDING)
     if offer.phone != user.phone:
         raise PermissionDenied
+    if offer.kind == Offer.Kind.HORSE_ACCESS and offer.horse.manager_id != offer.created_by_id:
+        # управление лошадью уже передано — приглашение прежнего управляющего недействительно
+        offer.state = Offer.State.CANCELLED
+        offer.save(update_fields=["state"])
+        return offer
     offer.state = Offer.State.ACCEPTED if accept else Offer.State.DECLINED
     offer.responded_at = timezone.now()
     offer.save()
@@ -114,7 +131,14 @@ def respond_offer(user, offer_id: int, accept: bool) -> Offer:
             prev = h.manager_id
             h.manager = user
             h.save(update_fields=["manager", "updated_at"])
+            HorseAccess.objects.filter(horse=h, user=user).delete()  # управляющему отдельный доступ не нужен
             audit(user, "horse.transfer", h, previous_manager=prev)
+        elif offer.kind == Offer.Kind.HORSE_ACCESS:
+            h = Horse.objects.select_for_update().get(pk=offer.horse_id)
+            if h.manager_id != user.pk:
+                HorseAccess.objects.get_or_create(horse=h, user=user, defaults={"granted_by": offer.created_by})
+            audit(user, "horse.access_accept", h)
+            return offer
         # Другие ожидающие передачи того же объекта теряют смысл
         Offer.objects.filter(state=Offer.State.PENDING, kind=offer.kind, athlete=offer.athlete, horse=offer.horse).exclude(pk=offer.pk).update(
             state=Offer.State.CANCELLED

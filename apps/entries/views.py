@@ -12,6 +12,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.accounts.phone import normalize_phone
 from apps.profiles.models import Athlete, Horse
+from apps.profiles import services as pservices
 from apps.profiles.services import athletes_for_entry
 from apps.tournaments.models import Tournament, TournamentClass
 from apps.tournaments import services as tservices
@@ -99,7 +100,7 @@ def apply(request, pk):
     cart = _cart(request, t, late)
     athletes = list(athletes_for_entry(request.user))
     by_a = {a.pk: a for a in athletes}
-    horse_ids = set(Horse.objects.filter(manager=request.user, archived=False, added_by_judge=False).values_list("pk", flat=True)) | set(cart["horses"])
+    horse_ids = set(pservices.horses_for_entry(request.user).values_list("pk", flat=True)) | set(cart["horses"])
     horses = list(Horse.objects.filter(pk__in=horse_ids).order_by("name"))
     by_h = {h.pk: h for h in horses}
     programs = _programs(t)
@@ -473,7 +474,7 @@ def propose(request, pk):
     if e.application.submitted_by_id != request.user.pk:
         raise PermissionDenied
     athletes = list(athletes_for_entry(request.user))
-    horse_ids = set(Horse.objects.filter(manager=request.user, archived=False, added_by_judge=False).values_list("pk", flat=True)) | {e.horse_id}
+    horse_ids = set(pservices.horses_for_entry(request.user).values_list("pk", flat=True)) | {e.horse_id}
     horses = list(Horse.objects.filter(pk__in=horse_ids).order_by("name"))
     class_groups, classes = _class_choices(e.tournament)
     if request.method == "POST":

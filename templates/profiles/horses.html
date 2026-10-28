@@ -10,7 +10,7 @@
     <a class="btn btn--primary btn--sm" href="{% url 'profiles:horse_new' %}">+ Добавить</a>
   </div>
 </div>
-{% if horses %}
+{% if horses or shared %}
 {# Тест 5.1: без кнопки «Найти» — список фильтруется по мере ввода (начало клички или слова в кличке, номер ФКСР / FEI / код EQ) #}
 <form class="search pf-search" role="search" onsubmit="return false">
   <label class="visually-hidden" for="hq">Кличка или номер</label>
@@ -24,6 +24,15 @@
         <span class="pf-row__meta">{{ h.summary }}{% if h.fksr_number %} · ФКСР {{ h.fksr_number }}{% endif %}</span>
       </a>
       {% url 'profiles:horse_edit' h.pk as href %}{% include "partials/edit_icon.html" with label="Изменить лошадь" %}
+    </article>
+  {% endfor %}
+  {% for h in shared %}
+    {# Решение 28.10.2026: лошади, к которым дали доступ, — для заявок, без редактирования #}
+    <article class="pf-row" data-name="{{ h.name }}" data-nums="{{ h.fksr_number }} {{ h.fei_id }} {{ h.code }}">
+      <a class="pf-row__main" href="{% url 'profiles:horse' h.pk %}">
+        <span class="pf-row__title">{{ h.name }} <span class="chip">Доступ</span></span>
+        <span class="pf-row__meta">{{ h.summary }} · управляет {{ h.manager.short_name }}</span>
+      </a>
     </article>
   {% endfor %}
   <p class="muted pf-empty" hidden>Среди ваших лошадей не найдено.</p>

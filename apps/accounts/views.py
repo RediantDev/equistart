@@ -97,7 +97,7 @@ def cabinet(request):
         actions.append(("Приглашение управлять клубом", n, "tournaments:invitations"))
     n = Offer.objects.filter(phone=user.phone, state=Offer.State.PENDING).count()
     if n:
-        actions.append(("Предложения: связь с профилем или передача управления", n, "profiles:offers"))
+        actions.append(("Предложения: связь с профилем, передача управления или доступ к лошади", n, "profiles:offers"))
     if judged_ids:
         pending = Entry.objects.filter(tournament__in=judged_ids, tournament__publication=Tournament.Publication.PUBLISHED, decision=Entry.Decision.PENDING)
         for t_id, title in pending.order_by().values_list("tournament_id", "tournament__pub_title").distinct():
@@ -116,8 +116,10 @@ def cabinet(request):
     from apps.entries.models import ApplicationDraft
 
     own = Athlete.objects.filter(linked_user=user, archived=False).first()
-    if own and not own.birth_date:
-        actions.append(("Профиль спортсмена: укажите дату рождения — без неё недоступны зачёты с возрастом", None, ("profiles:athlete_edit", own.pk)))
+    if own and (not own.birth_date or not own.rank):
+        # Решение 28.10.2026: при регистрации дату рождения и разряд не спрашиваем — заполняются в профиле
+        miss = " и ".join(x for x in ("дату рождения" if not own.birth_date else "", "разряд" if not own.rank else "") if x)
+        actions.append((f"Профиль спортсмена: укажите {miss} — они нужны для заявок", None, ("profiles:athlete_edit", own.pk)))
 
     for d in ApplicationDraft.objects.filter(user=user, tournament__publication=Tournament.Publication.PUBLISHED).select_related("tournament"):
         n = len(d.data.get("lines", []))

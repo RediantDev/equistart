@@ -16,7 +16,7 @@ from apps.core.models import audit
 
 from . import services
 from .forms import AthleteForm, DocumentForm, HorseForm, PhoneForm
-from .models import Athlete, AthleteDelegate, Horse, HorseDocument, Offer
+from .models import Athlete, AthleteDelegate, Horse, HorseAccess, HorseDocument, Offer
 
 
 # ---------------- спортсмены ----------------
@@ -146,7 +146,8 @@ def _with_param(url, key, value):
 def horses(request):
     # Только свои (управляемые) лошади — каждую можно открыть. Фильтр по вводу — на странице, без перезагрузки.
     items = Horse.objects.filter(manager=request.user, archived=False, added_by_judge=False).order_by("name", "birth_year")
-    return render(request, "profiles/horses.html", {"horses": items, "q": request.GET.get("q", "")[:100]})
+    shared = Horse.objects.filter(accesses__user=request.user, archived=False).exclude(manager=request.user).select_related("manager").order_by("name", "birth_year")
+    return render(request, "profiles/horses.html", {"horses": items, "shared": shared, "q": request.GET.get("q", "")[:100]})
 
 
 @login_required
@@ -192,7 +193,10 @@ def horse_detail(request, pk):
             "h": h, "manage": manage, "docs_visible": docs_visible,
             "documents": h.documents.all() if docs_visible else [],
             "doc_form": DocumentForm() if manage else None,
-            "offers": h.offers.filter(state=Offer.State.PENDING) if manage else [],
+            "offers": h.offers.filter(state=Offer.State.PENDING, kind=Offer.Kind.HORSE_TRANSFER) if manage else [],
+            "access_offers": h.offers.filter(state=Offer.State.PENDING, kind=Offer.Kind.HORSE_ACCESS) if manage else [],
+            "accesses": h.accesses.select_related("user") if manage else [],
+            "my_access": not manage and services.has_horse_access(request.user, h),
             "form": PhoneForm(),
         },
     )
@@ -202,9 +206,39 @@ def horse_detail(request, pk):
 @require_POST
 def horse_action(request, pk, action):
     h = get_object_or_404(Horse, pk=pk)
+    if action == "leave":
+        # Получатель доступа сам отказывается от него
+        n, _ = HorseAccess.objects.filter(horse=h, user=request.user).delete()
+        if not n:
+            raise PermissionDenied
+        audit(request.user, "horse.access_leave", h)
+        messages.success(request, f"Вы отказались от доступа к лошади «{h.name}».")
+        return redirect("profiles:horses")
     if not services.can_manage_horse(request.user, h):
         raise PermissionDenied
-    if action == "transfer":
+    if action == "grant":
+        form = PhoneForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, "; ".join(form.errors["phone"]))
+        elif form.cleaned_data["phone"] == request.user.phone:
+            messages.error(request, "Вы управляете этой лошадью — доступ вам не нужен.")
+        elif HorseAccess.objects.filter(horse=h, user__phone=form.cleaned_data["phone"]).exists():
+            messages.error(request, "У этого человека уже есть доступ.")
+        else:
+            try:
+                with transaction.atomic():
+                    Offer.objects.create(kind=Offer.Kind.HORSE_ACCESS, horse=h, phone=form.cleaned_data["phone"], created_by=request.user)
+            except IntegrityError:
+                messages.error(request, "Приглашение на этот номер уже отправлено.")
+            else:
+                audit(request.user, "offer.horse_access", h, phone=form.cleaned_data["phone"])
+                messages.success(request, "Приглашение отправлено. Доступ появится, когда получатель его примет.")
+    elif action == "revoke":
+        n, _ = HorseAccess.objects.filter(horse=h, pk=request.POST.get("access")).delete()
+        if n:
+            audit(request.user, "horse.access_revoke", h)
+            messages.success(request, "Доступ отозван. Уже поданные заявки сохраняются.")
+    elif action == "transfer":
         form = PhoneForm(request.POST)
         if not form.is_valid():
             messages.error(request, "; ".join(form.errors["phone"]))
@@ -306,9 +340,12 @@ def offers(request):
 def offer_respond(request, offer_id):
     accept = request.POST.get("decision") == "accept"
     try:
-        services.respond_offer(request.user, offer_id, accept)
+        offer = services.respond_offer(request.user, offer_id, accept)
     except Offer.DoesNotExist:
         messages.error(request, "Предложение уже неактуально.")
     else:
+        if offer.state == Offer.State.CANCELLED:
+            messages.error(request, "Предложение уже неактуально.")
+            return redirect("profiles:offers")
         messages.success(request, "Принято." if accept else "Отклонено.")
     return redirect("profiles:offers")

@@ -8,6 +8,7 @@
     {% if manage %}{% url 'profiles:horse_edit' h.pk as href %}{% include "partials/edit_icon.html" with label="Изменить лошадь" %}{% endif %}
   </div>
   <p class="muted pf-sub">{{ h.summary }}</p>
+  {% if my_access %}<p class="pf-sub"><span class="chip">Доступ</span> <span class="muted">Можно подавать заявки с этой лошадью. Управляет {{ h.manager.short_name }}.</span></p>{% endif %}
 </div>
 <div class="wizard-grid pf-detail">
   <div class="wizard-main">
@@ -60,8 +61,28 @@
     </section>
     {% endif %}
   </div>
+  {% if my_access %}
+  <aside class="wizard-aside">
+    <section class="card">
+      <h2 class="h3">Ваш доступ</h2>
+      <p class="muted">Вы подаёте заявки с этой лошадью. Редактировать профиль и смотреть документы может только управляющий.</p>
+      <form method="post" action="{% url 'profiles:horse_action' h.pk 'leave' %}">{% csrf_token %}<button class="btn btn--ghost btn--sm" data-confirm="Отказаться от доступа к лошади «{{ h.name }}»? Уже поданные заявки сохранятся." data-confirm-ok="Отказаться">Отказаться от доступа</button></form>
+    </section>
+  </aside>
+  {% endif %}
   {% if manage %}
   <aside class="wizard-aside">
+    {# Решение 28.10.2026: доступ даёт только управляющий; появляется после согласия получателя #}
+    <details class="card"{% if accesses or access_offers %} open{% endif %}><summary class="h3">Доступ для заявок</summary>
+      <p class="muted">Человек сможет подавать заявки с этой лошадью — без редактирования и без документов. Доступ появится, когда он примет приглашение.</p>
+      {% if accesses or access_offers %}
+        <ul class="list pf-offers">
+          {% for a in accesses %}<li class="list__row"><span style="flex: 1;">{{ a.user.short_name }}<span class="table__sub">Доступ с {{ a.created_at|date:"d.m.Y" }}</span></span><form method="post" action="{% url 'profiles:horse_action' h.pk 'revoke' %}">{% csrf_token %}<input type="hidden" name="access" value="{{ a.pk }}"><button class="btn btn--ghost btn--sm" data-confirm="Отозвать доступ у {{ a.user.short_name }}? Уже поданные заявки сохранятся." data-confirm-ok="Отозвать">Отозвать</button></form></li>{% endfor %}
+          {% for o in access_offers %}<li class="list__row"><span style="flex: 1;">Ожидает подтверждения<span class="table__sub">Приглашение на {{ o.phone }}</span></span><form method="post" action="{% url 'profiles:horse_action' h.pk 'cancel_offer' %}">{% csrf_token %}<input type="hidden" name="offer" value="{{ o.pk }}"><button class="btn btn--ghost btn--sm">Отменить</button></form></li>{% endfor %}
+        </ul>
+      {% endif %}
+      <form method="post" action="{% url 'profiles:horse_action' h.pk 'grant' %}" class="form">{% csrf_token %}<input name="phone" type="tel" placeholder="Телефон получателя" aria-label="Телефон получателя доступа"><button class="btn btn--dark">Пригласить</button></form>
+    </details>
     <details class="card"{% if offers %} open{% endif %}><summary class="h3">Передать управление</summary>
       {% if offers %}
         {# Тест 5.1: ожидающая передача — внутри этого блока #}
