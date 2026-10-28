@@ -121,10 +121,18 @@ def file(request, kind, pk):
         raise Http404
     if not f or not services.can_view(request.user, club) or not default_storage.exists(f.name):
         raise Http404
-    ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
-    resp = FileResponse(default_storage.open(f.name, "rb"), content_type=ctype)
+    # Тест 5.1: для списков и миниатюр — уменьшенная копия (?w=320|640|1200), а не исходник с телефона
+    from apps.core import images
+
+    name = f.name
+    w = request.GET.get("w", "")
+    if w.isdigit():
+        name = images.thumbnail(f.name, int(w)) or f.name
+    ctype = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    resp = FileResponse(default_storage.open(name, "rb"), content_type=ctype)
     resp["X-Content-Type-Options"] = "nosniff"
-    resp["Cache-Control"] = "public, max-age=3600" if club.is_public else "private, no-store"
+    # имена загруженных файлов уникальны — подтверждённому клубу можно кэшировать надолго
+    resp["Cache-Control"] = "public, max-age=2592000" if club.is_public else "private, no-store"
     return resp
 
 
@@ -145,6 +153,10 @@ def mine(request):
     form.submitting = "submit" in request.POST
     if request.method == "POST" and form.is_valid():
         obj = form.save(commit=False)
+        if "logo" in request.FILES:
+            from apps.core import images
+
+            obj.logo = images.optimize(request.FILES["logo"], 600)
         if request.POST.get("logo_clear") and "logo" not in request.FILES:
             obj.logo = None
         try:
@@ -212,7 +224,9 @@ def photo_add(request):
     with transaction.atomic():
         start = club.photos.count()
         for i, f in enumerate(files):
-            p = ClubPhoto.objects.create(club=club, file=f, caption=request.POST.get("caption", "")[:200], position=start + i)
+            from apps.core import images
+
+            p = ClubPhoto.objects.create(club=club, file=images.optimize(f), caption=request.POST.get("caption", "")[:200], position=start + i)
             audit(request.user, "club.photo.add", club, photo=p.pk)
     messages.success(request, "Фото добавлены." if len(files) > 1 else "Фото добавлено.")
     return redirect(reverse("clubs:mine") + "#photos")
@@ -268,7 +282,9 @@ def news_edit(request, pk=None):
             n.save()
             photo = form.cleaned_data.get("photos")
             if photo:
-                NewsPhoto.objects.create(news=n, file=photo, position=n.photos.count())
+                from apps.core import images
+
+                NewsPhoto.objects.create(news=n, file=images.optimize(photo), position=n.photos.count())
             audit(request.user, "club.news.save", club, news=n.pk)
         messages.success(request, "Новость опубликована." if not pk else "Новость сохранена.")
         return redirect(reverse("clubs:mine") + "#news")

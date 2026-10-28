@@ -11,7 +11,7 @@
       {% include "partials/field.html" with field=form.title %}
       {% include "partials/field.html" with field=form.text %}
       {% include "partials/field.html" with field=form.tournament %}
-      {% if item.photos.all %}<div class="photo-grid">{% for p in item.photos.all %}<img src="{% url 'clubs:file' 'news' p.pk %}" alt="" loading="lazy">{% endfor %}</div>{% endif %}
+      {% if item.photos.all %}<div class="photo-grid">{% for p in item.photos.all %}<img src="{% url 'clubs:file' 'news' p.pk %}?w=640" alt="" loading="lazy">{% endfor %}</div>{% endif %}
       {% include "partials/field.html" with field=form.photos %}
       <div class="form__actions"><button type="submit" class="btn btn--primary">{% if item %}Сохранить{% else %}Опубликовать{% endif %}</button></div>
     </form>

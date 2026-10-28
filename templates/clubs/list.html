@@ -19,7 +19,7 @@
   {% if region %}<input type="hidden" name="region" value="{{ region }}">{% endif %}{% if with_t %}<input type="hidden" name="with_t" value="1">{% endif %}
 </form>
 <div class="club-chips">
-  <a class="club-chip{% if not with_t and not region %} is-on{% endif %}" href="{% url 'clubs:list' %}{% if q %}?q={{ q|urlencode }}{% endif %}">Все</a>
+  <a class="club-chip{% if not with_t and not region and not q %} is-on{% endif %}" href="{% url 'clubs:list' %}">Все</a>
   <a class="club-chip{% if with_t %} is-on{% endif %}" href="?{% if q %}q={{ q|urlencode }}&{% endif %}{% if region %}region={{ region }}&{% endif %}{% if not with_t %}with_t=1{% endif %}">С турнирами</a>
   <details class="club-chip-drop">
     <summary class="club-chip{% if region %} is-on{% endif %}">{% if region %}{{ region_name }}{% else %}Регион{% endif %}</summary>
@@ -35,9 +35,9 @@
   <div class="club-cards">
     {% for c in clubs %}
       <a class="club-card" href="{% url 'clubs:detail' c.pk %}">
-        {% if c.cover %}<img class="club-card__cover" src="{% url 'clubs:file' 'photo' c.cover.pk %}" alt="" loading="lazy">{% endif %}
+        {% if c.cover %}<img class="club-card__cover" src="{% url 'clubs:file' 'photo' c.cover.pk %}?w=640" alt="" loading="lazy">{% endif %}
         <div class="club-card__body{% if c.cover %} has-cover{% endif %}">
-          {% if c.logo %}<img class="club-card__logo" src="{% url 'clubs:file' 'logo' c.pk %}" alt="" loading="lazy">{% else %}<span class="club-card__logo club-card__logo--empty" aria-hidden="true">{{ c.public_name|slice:":1" }}</span>{% endif %}
+          {% if c.logo %}<img class="club-card__logo" src="{% url 'clubs:file' 'logo' c.pk %}?w=320" alt="" loading="lazy">{% else %}<span class="club-card__logo club-card__logo--empty" aria-hidden="true">{{ c.public_name|slice:":1" }}</span>{% endif %}
           <div style="min-width: 0; flex: 1;">
             <span class="club-card__name">{{ c.public_name }}</span>
             <span class="table__sub">{{ c.public_settlement }}, {{ c.public_region_name }}</span>
@@ -50,7 +50,7 @@
 {% elif venues %}
   {# Клуба в каталоге нет, но на площадке есть турниры (тест 5, п. 9.4) #}
   <div class="card empty-friendly">
-    <div class="empty-friendly__ico" aria-hidden="true">🐴</div>
+    <div class="empty-friendly__ico" aria-hidden="true">{% include "partials/icon.html" with name="pin" %}</div>
     <h2 class="h3">Клуб ещё не завёл страницу</h2>
     <p class="muted">Но турниры там проходят — можно посмотреть их в календаре.</p>
   </div>
@@ -66,7 +66,7 @@
 {% else %}
   {# Тест 5, п. 9.3: дружелюбное «ничего не нашли» — вариант на утверждение #}
   <div class="card empty-friendly">
-    <div class="empty-friendly__ico" aria-hidden="true">🔍</div>
+    <div class="empty-friendly__ico" aria-hidden="true">{% include "partials/icon.html" with name="search" %}</div>
     {% if q or region or with_t %}
       <h2 class="h3">{% if q %}По запросу «{{ q }}» клубов пока нет{% else %}По этим условиям клубов пока нет{% endif %}</h2>
       <p class="muted">Проверьте написание или поищите по городу — например, «Москва». Возможно, клуб ещё не зарегистрировался в СтартЛисте.</p>

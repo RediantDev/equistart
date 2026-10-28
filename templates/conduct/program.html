@@ -52,7 +52,7 @@
           <div class="order__who">
             <strong>{{ s.entry.athlete_snapshot.name }}</strong><span class="table__sub">{{ s.entry.athlete_snapshot.birth_year|default:"" }}{% if s.entry.athlete_snapshot.rank %} · {{ s.entry.athlete_snapshot.rank }}{% endif %}{% if s.entry.athlete_snapshot.club %} · {{ s.entry.athlete_snapshot.club }}{% endif %}</span>
             <span class="order__horse">{{ s.entry.horse_snapshot.name }}<span class="table__sub" style="display: inline;"> · {{ s.entry.class_name }}{% if s.entry.height and p.heights|length > 1 %} · {{ s.entry.height }} см{% endif %}</span></span>
-            {% for c in s.conflicts %}<span class="order__warn{% if s.exception_reason %} is-ok{% endif %}">⚠ {{ c }}</span>{% endfor %}
+            {% for c in s.conflicts %}<span class="order__warn{% if s.exception_reason %} is-ok{% endif %}">! {{ c }}</span>{% endfor %}
             {% if s.conflicts %}<details class="order__exc"><summary class="table__sub">{% if s.exception_reason %}Исключение: {{ s.exception_reason }}{% else %}Оставить как исключение…{% endif %}</summary>
               <form method="post" action="{% url 'conduct:action' t.pk p.pk 'exception' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="slot" value="{{ s.pk }}"><input name="reason" value="{{ s.exception_reason }}" placeholder="Причина" aria-label="Причина исключения"><button class="btn btn--ghost btn--sm">Сохранить</button></form></details>{% endif %}
             {% if not s.still_eligible and not s.is_off %}<span class="chip chip--danger">Выступление больше не принято — отметьте «Не стартует»</span>{% endif %}

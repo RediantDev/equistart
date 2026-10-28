@@ -932,10 +932,14 @@ def _public_tabs(request, t):
             except ValueError:
                 d = None
             if d not in days:
+                # Тест 5.1, п. 7: по умолчанию — все дни; идёт турнир — сегодняшний день
                 local_today = timezone.now().astimezone(zoneinfo.ZoneInfo(t.pub_timezone or "Europe/Moscow")).date()
-                d = local_today if local_today in days else (days[-1] if tab == "results" else days[0])
-            day = d.isoformat()
-            have = [p for p in have if p.day == d]
+                d = local_today if local_today in days else None
+            if d is None:
+                day = "all"
+            else:
+                day = d.isoformat()
+                have = [p for p in have if p.day == d]
     out["day"] = day
     if tab == "starts":
         ids = [r["entry"] for p in have if p.pk in pubs for r in pubs[p.pk].rows]

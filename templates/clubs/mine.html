@@ -6,7 +6,7 @@
 
 <section class="club-status">
   <div class="club-status__head">
-    {% if club.logo %}<img class="club-status__logo" src="{% url 'clubs:file' 'logo' club.pk %}" alt="">{% else %}<span class="club-status__logo club-status__logo--empty" aria-hidden="true">{{ club.name|slice:":1" }}</span>{% endif %}
+    {% if club.logo %}<img class="club-status__logo" src="{% url 'clubs:file' 'logo' club.pk %}?w=320" alt="">{% else %}<span class="club-status__logo club-status__logo--empty" aria-hidden="true">{{ club.name|slice:":1" }}</span>{% endif %}
     <div style="min-width: 0;">
       <h1 class="club-status__name">{{ club.name }}</h1>
       <span class="chip{% if club.status == 'confirmed' %} chip--success{% elif club.status == 'returned' %} chip--danger{% elif club.status == 'review' %} chip--warning{% endif %}">{% if club.status == "review" %}На проверке у модератора{% else %}{{ club.get_status_display }}{% endif %}</span>
@@ -38,7 +38,7 @@
   {% if photos %}
     <div class="club-photos">{% for p in photos %}
       <figure class="club-photo">
-        <img src="{% url 'clubs:file' 'photo' p.pk %}" alt="{{ p.caption|default:'Фото клуба' }}" loading="lazy">
+        <img src="{% url 'clubs:file' 'photo' p.pk %}?w=640" alt="{{ p.caption|default:'Фото клуба' }}" loading="lazy">
         {% if forloop.first %}<span class="club-photo__badge">Обложка</span>{% else %}<form method="post" action="{% url 'clubs:photo_cover' p.pk %}" class="club-photo__cover">{% csrf_token %}<button class="club-photo__btn" type="submit">Сделать обложкой</button></form>{% endif %}
         <form method="post" action="{% url 'clubs:photo_delete' p.pk %}" class="club-photo__x">{% csrf_token %}<button type="submit" aria-label="Удалить фото" data-confirm="Удалить это фото?" data-confirm-ok="Удалить">×</button></form>
       </figure>
@@ -56,7 +56,7 @@
   {% if news %}
     <div class="club-news-list">{% for n in news %}
       <a class="club-news-row" href="{% url 'clubs:news_edit' n.pk %}">
-        {% with ph=n.photos.all %}{% if ph %}<img src="{% url 'clubs:file' 'news' ph.0.pk %}" alt="" loading="lazy">{% else %}<span class="club-news-row__ph" aria-hidden="true">📰</span>{% endif %}{% endwith %}
+        {% with ph=n.photos.all %}{% if ph %}<img src="{% url 'clubs:file' 'news' ph.0.pk %}?w=640" alt="" loading="lazy">{% else %}<span class="club-news-row__ph" aria-hidden="true">{% include "partials/icon.html" with name="news" %}</span>{% endif %}{% endwith %}
         <span style="min-width: 0; flex: 1;"><strong class="break">{{ n.title }}</strong><span class="table__sub" style="display: block;">{{ n.published_at|date:"j E Y" }}{% if n.tournament %} · к турниру {{ n.tournament.pub_title|default:n.tournament.title|truncatechars:30 }}{% endif %}</span>
           {% if n.hidden %}<span class="chip chip--danger">Скрыта модератором: {{ n.hidden_reason }}</span>{% endif %}</span>
         <span aria-hidden="true" class="muted">›</span>

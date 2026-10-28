@@ -51,7 +51,11 @@
     if (!err || err.closest(".messages")) return false;
     var name = err.classList.contains("field--error") ? fieldLabel(err) : "";
     var msg = err.querySelector(".field__error");
-    toast(name ? "Проверьте поле «" + name + "»" + (msg ? ": " + msg.textContent.replace(/^!\s*/, "").trim() : "") : (err.textContent.trim().slice(0, 140) || "Проверьте форму"), "error");
+    if (name && name.length > 40) name = name.slice(0, 38) + "…";
+    var isClient = msg && msg.classList.contains("field__error--client");
+    toast(name ? "Проверьте поле «" + name + "»" + (msg && !isClient ? ": " + msg.textContent.replace(/^!\s*/, "").trim() : "") : (err.textContent.trim().slice(0, 140) || "Проверьте форму"), "error");
+    // Тест 5.1, п. 8: общая ошибка формы — только сообщением вверху, без дубля над полями
+    if (err.classList.contains("alert--error")) err.hidden = true;
     setTimeout(function () {
       err.scrollIntoView({ behavior: "smooth", block: "center" });
       var ctl = err.querySelector("input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, .sel__btn");
@@ -73,14 +77,8 @@
       else empty = !String(inp.value || "").trim();
       if (!empty) return;
       var f = inp.closest(".field") || inp.parentNode;
-      if (!f.classList.contains("field--error")) {
-        f.classList.add("field--error");
-        if (!f.querySelector(".field__error")) {
-          var e = el("p", "field__error field__error--client"); e.setAttribute("role", "alert");
-          e.innerHTML = '<span aria-hidden="true">!</span> ' + (inp.type === "file" ? "Выберите файл." : (inp.type === "checkbox" || inp.type === "radio") ? "Выберите вариант." : "Заполните это поле.");
-          f.appendChild(e);
-        }
-      }
+      // Тест 5.1, п. 10: без надписей «Выберите вариант» — поле обводится красным, название — в сообщении вверху
+      f.classList.add("field--error", "field--client-error");
       bad = bad || f;
     });
     if (bad) { goToError(); return false; }
@@ -186,14 +184,24 @@
     var box = document.querySelector(a.getAttribute("hx-target") || "x");
     if (box) {
       afterPage(box);
+      // Вкладки остаются под шапкой: начало раздела — сразу под ними, без прыжков (тест 5.1, п. 4.1)
+      var bar = document.querySelector(".topbar");
+      var off = bar ? bar.getBoundingClientRect().bottom : 60;
       var top = box.getBoundingClientRect().top;
-      var sticky = document.querySelector(".tabs--sticky");
-      var off = 70 + (sticky ? sticky.offsetHeight : 0);
-      if (top < 0) window.scrollTo({ top: window.scrollY + top - off, behavior: "smooth" });
+      if (top < off) window.scrollTo({ top: window.scrollY + top - off, behavior: "auto" });
     }
   });
 
   /* ---------- Поделиться ---------- */
+  // Знаки мессенджеров и соцсетей (тест 5.1, п. 3.2)
+  var LOGOS = {
+    tg: '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path fill="#fff" d="M20.7 4.3 3.4 11c-1.2.5-1.2 1.2-.2 1.5l4.4 1.4 1.7 5.2c.2.6.4.8.8.8.4 0 .6-.2.9-.5l2.1-2 4.4 3.2c.8.4 1.4.2 1.6-.8l2.9-13.6c.3-1.2-.4-1.7-1.3-1.3zM9 13.6l9-5.7c.4-.3.8-.1.5.2l-7.4 6.7-.3 3.2z"/></svg>',
+    wa: '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path fill="none" stroke="#fff" stroke-width="1.8" d="M4.2 19.8l1.1-3.9A8.5 8.5 0 1 1 8.6 19z"/><path fill="#fff" d="M9 7.6c.2-.4.4-.4.7-.4h.5c.2 0 .4 0 .6.5l.8 1.8c.1.2.1.4 0 .6l-.4.6c-.1.2-.2.3 0 .6.5.9 1.6 2 2.6 2.4.3.1.4 0 .6-.1l.6-.7c.2-.2.4-.2.6-.1l1.8.8c.3.2.5.3.5.5 0 .9-.6 1.8-1.5 2-1 .2-2.3 0-4.3-1.3-1.7-1.1-3-3-3.3-4-.3-1-.1-2 .2-2.7z"/></svg>',
+    vk: '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path fill="#fff" d="M12.8 17.5C6.9 17.5 3.5 13.4 3.4 6.6h3c.1 5 2.3 7.1 4 7.5V6.6h2.8v4.3c1.7-.2 3.5-2.2 4.1-4.3h2.8c-.5 2.7-2.4 4.7-3.8 5.5 1.4.7 3.6 2.4 4.4 5.4h-3.1c-.7-2-2.3-3.6-4.4-3.8v3.8z"/></svg>',
+    vb: '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round" d="M12 3c5 0 8 2 8 7.5S17 18 12.5 18H11l-3.5 3v-3.3C5 16.8 4 14.6 4 10.5 4 5 7 3 12 3z"/><path fill="#fff" d="M9.3 7.4c.3-.2.6-.2.8.1l.9 1.3c.2.3.1.6-.1.8l-.4.4c.4 1 1.2 1.8 2.2 2.3l.4-.4c.2-.2.5-.3.8-.1l1.3.9c.3.2.3.6.1.9-.6.8-1.4 1.1-2.4.6a8 8 0 0 1-3.8-3.9c-.4-1-.1-2 .2-2.9z"/></svg>',
+    ok: '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><circle cx="12" cy="7.5" r="3.2" fill="none" stroke="#fff" stroke-width="2.2"/><path fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" d="M8 13.2c2.5 1.6 5.5 1.6 8 0M12 15l-3.6 4.6M12 15l3.6 4.6"/></svg>',
+    mail: '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2" fill="none" stroke="#fff" stroke-width="2"/><path d="M3.5 7l8.5 6 8.5-6" fill="none" stroke="#fff" stroke-width="2"/></svg>'
+  };
   function shareSheet(url, title) {
     var enc = encodeURIComponent(url), txt = encodeURIComponent(title);
     var items = [
@@ -213,7 +221,9 @@
     items.forEach(function (it) {
       var a = el("a", "sheet__app sheet__app--" + it[2]);
       a.href = it[1]; a.target = "_blank"; a.rel = "noopener";
-      a.appendChild(el("span", "sheet__ico", it[0].slice(0, 1)));
+      var ico = el("span", "sheet__ico");
+      ico.innerHTML = LOGOS[it[2]] || "";
+      a.appendChild(ico);
       a.appendChild(el("span", "sheet__lbl", it[0]));
       a.addEventListener("click", function () { setTimeout(close, 300); });
       grid.appendChild(a);
@@ -295,6 +305,16 @@
     });
   }
 
+  /* Стёрли запрос — список сразу обновляется (тест 5.1, п. 16) */
+  document.addEventListener("input", function (e) {
+    var i = e.target;
+    if (!i.matches || !i.matches('form[role=search] input[type=search]') || i.value !== "") return;
+    var params = new URLSearchParams(location.search);
+    if (!params.get(i.name)) return;
+    clearTimeout(i._clr);
+    i._clr = setTimeout(function () { var f = i.form; if (f.requestSubmit) f.requestSubmit(); else f.submit(); }, 350);
+  });
+
   /* ---------- Подсказки при вводе: data-suggest='["…","…"]' или data-suggest-src="id-скрипта" ---------- */
   function norm(s) { return String(s || "").toLowerCase().replace(/ё/g, "е"); }
   function suggest(scope) {
@@ -339,6 +359,48 @@
     });
   }
 
+  /* ---------- Кнопка неяркая, пока не заполнены обязательные поля (тест 5.1, п. 10) ---------- */
+  function filled(inp, form) {
+    if (inp.disabled || inp.closest("[hidden]")) return true;
+    if (inp.type === "checkbox" || inp.type === "radio") {
+      return Array.prototype.some.call(form.querySelectorAll('input[name="' + inp.name + '"]'), function (g) { return g.checked; });
+    }
+    if (inp.type === "file") return !!(inp.files && inp.files.length);
+    return !!String(inp.value || "").trim();
+  }
+  function requireFilled(scope) {
+    scope.querySelectorAll("form[method=post]").forEach(function (f) {
+      if (f.dataset.rfInit || f.hasAttribute("data-no-require")) return;
+      var req = f.querySelectorAll("input[required], select[required], textarea[required]");
+      if (!req.length) return;
+      f.dataset.rfInit = "1";
+      function sync() {
+        var ok = Array.prototype.every.call(req, function (i) { return filled(i, f); });
+        f.querySelectorAll("button[type=submit], button:not([type])").forEach(function (b) {
+          if (b.closest(".step-pane[hidden]")) return;
+          b.classList.toggle("is-inactive", !ok);
+          b.setAttribute("aria-disabled", ok ? "false" : "true");
+        });
+      }
+      f.addEventListener("input", sync); f.addEventListener("change", sync);
+      f.addEventListener("click", function () { setTimeout(sync, 0); });
+      sync();
+    });
+  }
+  /* «Применить» в фильтрах — только когда что-то изменили (тест 5.1, п. 1.1) */
+  function filterApply(scope) {
+    scope.querySelectorAll("details[data-filters]").forEach(function (d) {
+      var btn = d.querySelector("[data-filter-apply]");
+      if (!btn || d.dataset.faInit) return;
+      d.dataset.faInit = "1";
+      var ctls = d.querySelectorAll("select, input");
+      function state() { return Array.prototype.map.call(ctls, function (c) { return c.type === "checkbox" ? c.checked : c.value; }).join("|"); }
+      var initial = state();
+      function sync() { var same = state() === initial; btn.disabled = same; btn.classList.toggle("is-inactive", same); }
+      d.addEventListener("change", sync); d.addEventListener("input", sync); sync();
+    });
+  }
+
   /* ---------- Фильтры: закрыть после «Применить», считать активные ---------- */
   document.addEventListener("submit", function (e) {
     e.target.querySelectorAll("details[data-filters][open]").forEach(function (d) { d.removeAttribute("open"); });
@@ -356,6 +418,8 @@
     boostForms(scope);
     swapLinks(scope);
     requireInput(scope);
+    requireFilled(scope);
+    filterApply(scope);
     suggest(scope);
     if (scope === document || scope === document.body) {
       trackNav();

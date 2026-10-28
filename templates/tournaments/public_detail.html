@@ -56,7 +56,7 @@
 <section class="stack">
   {% for b in starts %}
     <article class="result-route" id="prog-{{ b.p.pk }}">
-    <div class="section-head section-head--route"><h2 class="h3">{{ b.p.name }}<span class="table__sub">{{ b.p.day|date:"j E" }}{% if b.p.start_time %} · начало {{ b.p.start_time|time:"H:i" }}{% endif %}{% if b.pub %} · {{ b.rows|length }} пар · версия {{ b.pub.version }} от {{ b.pub.published_at|date:"j E H:i" }}{% endif %}</span></h2>
+    <div class="section-head section-head--route"><h2 class="h3">{{ b.p.name }}<span class="table__sub">{{ b.p.day|date:"j E" }}{% if b.p.start_time %} · начало {{ b.p.start_time|time:"H:i" }}{% endif %}{% if b.pub %} · {{ b.rows|length }} пар · версия {{ b.pub.version }}{% endif %}</span></h2>
       {% if b.pub %}<div class="row-actions no-print">{% if staff %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:startlist_xlsx' t.pk b.p.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button>{% endif %}<button type="button" class="btn btn--ghost btn--sm btn--share" aria-label="Поделиться" title="Поделиться" data-share="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}?tab=starts#prog-{{ b.p.pk }}" data-share-title="{{ s.title }} — {{ b.p.name }}">{% include "partials/share_icon.html" %}<span class="btn__label">Поделиться</span></button></div>{% endif %}</div>
     {% if not b.pub %}<div class="card empty empty--sm"><p class="muted" style="margin: 0;">Стартовый протокол ещё не опубликован — судья публикует порядок перед началом.</p></div>{% else %}
     <div class="table-wrap only-wide"><table class="table table--pub">
@@ -85,7 +85,7 @@
       <h2 class="h2">{{ b.p.name }}</h2>
       <p class="table__sub">{{ b.p.day|date:"j E" }} · {{ b.p.program_type_name }}{% if b.p|heights_extra %} · {{ b.p|heights_extra }}{% endif %}{% if b.p.article_label %} · {{ b.p.article_label }}{% endif %}</p>
       {% for cb in b.classes %}
-        <div class="section-head section-head--route" id="class-{{ cb.c.pk }}"><h3 class="h3">{{ cb.c.label }}<span class="table__sub">версия {{ cb.pub.version }} от {{ cb.pub.published_at|date:"j E H:i" }}{% if cb.pub.version > 1 %} · исправлено{% endif %}</span></h3>
+        <div class="section-head section-head--route" id="class-{{ cb.c.pk }}"><h3 class="h3">{{ cb.c.label }}<span class="table__sub">версия {{ cb.pub.version }}{% if cb.pub.version > 1 %} · исправлено{% endif %}</span></h3>
           <div class="row-actions no-print">{% if staff %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:results_xlsx' t.pk cb.c.pk %}">Excel</a><button type="button" class="btn btn--ghost btn--sm" onclick="window.print()">Печать</button>{% endif %}<button type="button" class="btn btn--ghost btn--sm btn--share" aria-label="Поделиться" title="Поделиться" data-share="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}?tab=results#class-{{ cb.c.pk }}" data-share-title="{{ s.title }} — {{ b.p.name }}, {{ cb.c.label }}">{% include "partials/share_icon.html" %}<span class="btn__label">Поделиться</span></button></div></div>
         {% for g in cb.groups %}
           {% if g.height %}<h4 class="label lg result-height">Высота {{ g.height }} см</h4>{% endif %}

@@ -214,7 +214,19 @@
       var head = el("div", "dp__head");
       var prev = el("button", "dp__nav", "‹"); prev.type = "button"; prev.setAttribute("aria-label", "Предыдущий месяц");
       var next = el("button", "dp__nav", "›"); next.type = "button"; next.setAttribute("aria-label", "Следующий месяц");
-      var title = el("div", "dp__title", MONTHS[view.getMonth()] + " " + view.getFullYear());
+      // Тест 5.1, п. 22.7: месяц и год выбираются списком (на телефоне — системное колесо), а не листанием
+      var title = el("div", "dp__title");
+      var ms = el("select", "dp__sel"); ms.setAttribute("data-native", ""); ms.setAttribute("aria-label", "Месяц");
+      MONTHS.forEach(function (m, i) { var o = el("option", null, m); o.value = i; if (i === view.getMonth()) o.selected = true; ms.appendChild(o); });
+      var ys = el("select", "dp__sel"); ys.setAttribute("data-native", ""); ys.setAttribute("aria-label", "Год");
+      var yNow = new Date().getFullYear(), yMin = min ? min.getFullYear() : yNow - 90, yMax = max ? max.getFullYear() : yNow + 3;
+      for (var yy = yMax; yy >= yMin; yy--) { var oy = el("option", null, String(yy)); oy.value = yy; if (yy === view.getFullYear()) oy.selected = true; ys.appendChild(oy); }
+      if (view.getFullYear() > yMax || view.getFullYear() < yMin) { var ox = el("option", null, String(view.getFullYear())); ox.value = view.getFullYear(); ox.selected = true; ys.appendChild(ox); }
+      ms.onchange = function () { view = new Date(view.getFullYear(), +ms.value, 1); render(); };
+      ys.onchange = function () { view = new Date(+ys.value, view.getMonth(), 1); render(); };
+      ms.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+      ys.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+      title.appendChild(ms); title.appendChild(ys);
       prev.onclick = function () { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); render(); };
       next.onclick = function () { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); render(); };
       head.appendChild(prev); head.appendChild(title); head.appendChild(next);
@@ -267,6 +279,15 @@
     icon.addEventListener("click", function () { if (pop.hidden) { open(); focusSoft(vis); } else close(); });
     vis.addEventListener("keydown", function (e) { if (e.key === "ArrowDown") { e.preventDefault(); open(); } if (e.key === "Enter") { e.preventDefault(); vis.blur(); } });
     vis.addEventListener("focus", function () { var d = parseIso(input.value); if (d) vis.value = pad(d.getDate()) + "." + pad(d.getMonth() + 1) + "." + d.getFullYear(); });
+    // Тест 5.1, п. 22.6: при вводе с клавиатуры точки ставятся сами — дд.мм.гггг
+    vis.placeholder = vis.placeholder === "Необязательно" || !vis.placeholder ? "дд.мм.гггг" : vis.placeholder;
+    vis.addEventListener("input", function (e) {
+      if (e.inputType && e.inputType.indexOf("delete") === 0) return;
+      var d = vis.value.replace(/\D/g, "").slice(0, 8), out = d.slice(0, 2);
+      if (d.length > 2) out += "." + d.slice(2, 4); else if (d.length === 2) out += ".";
+      if (d.length > 4) out += "." + d.slice(4); else if (d.length === 4) out += ".";
+      vis.value = out;
+    });
     vis.addEventListener("blur", function () {
       var raw = vis.value.trim();
       if (!raw) { set(null); return; }
@@ -502,19 +523,13 @@
           empty = group.length > 1 ? !p.querySelector('input[name="' + inp.name + '"]:checked') : !inp.checked;
         } else empty = !inp.value.trim();
         var f = inp.closest(".field");
-        if (empty && f && !f.querySelector(".field__error--client")) {
-          f.classList.add("field--error");
-          var err = el("p", "field__error field__error--client");
-          err.setAttribute("role", "alert");
-          err.innerHTML = '<span aria-hidden="true">!</span> ' + (inp.type === "checkbox" ? "Выберите хотя бы один вариант." : "Обязательное поле.");
-          f.appendChild(err);
-        }
+        if (empty && f) f.classList.add("field--error", "field--client-error");  // тест 5.1: красная рамка без надписи
         if (empty) ok = false;
       });
       return ok;
     }
     form.addEventListener("click", function (e) {
-      if (e.target.closest("[data-step-next]")) { if (valid(panes[cur])) show(cur + 1); }
+      if (e.target.closest("[data-step-next]")) { if (valid(panes[cur])) show(cur + 1); else if (window.SL && SL.toast) SL.toast("Заполните поля, обведённые красным", "error"); }
       if (e.target.closest("[data-step-prev]")) show(cur - 1);
     });
     form.addEventListener("keydown", function (e) {

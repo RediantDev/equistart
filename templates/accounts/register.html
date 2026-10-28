@@ -47,19 +47,57 @@
     <p class="auth__switch">Уже есть аккаунт? <a href="{% url 'accounts:login' %}">Войти</a></p>
   </div>
 </section>
+{% url 'accounts:phone_check' as check_url %}
+<div class="modal" id="dup-phone" hidden role="dialog" aria-modal="true" aria-labelledby="dup-title">
+  <div class="modal__box">
+    <p class="modal__text" id="dup-title">Этот номер уже зарегистрирован. Войти в аккаунт?</p>
+    <div class="modal__actions">
+      <button type="button" class="btn btn--ghost" data-dup-close>Другой номер</button>
+      <a class="btn btn--ghost" data-dup-reset href="{% url 'accounts:password_reset' %}">Забыли пароль?</a>
+      <a class="btn btn--primary" data-dup-login href="{% url 'accounts:login' %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}">Войти</a>
+    </div>
+  </div>
+</div>
 <script>
-(function () { // тест судьи и клуба: без галочки согласия форма не уходит — пароли не стираются ответом сервера
-  var form = document.querySelector("form[data-steps]"), box = form && form.querySelector('input[name="pd_consent"]');
-  if (!box) return;
-  form.addEventListener("submit", function (e) {
-    if (box.checked) return;
-    e.preventDefault();
-    var field = box.closest(".field"), err = field.querySelector("[data-consent-err]");
-    if (!err) { err = document.createElement("p"); err.className = "field__error"; err.setAttribute("role", "alert"); err.setAttribute("data-consent-err", "");
-      err.textContent = "Отметьте согласие на обработку персональных данных — без него регистрация невозможна."; field.appendChild(err); }
-    field.classList.add("field--error"); box.focus(); field.scrollIntoView({ block: "center" });
+(function () {
+  // Тест 5.1, п. 11: номер уже есть — сразу окно «Войти?», не дожидаясь отправки формы
+  var form = document.querySelector("form[data-steps]"); if (!form) return;
+  var phone = form.querySelector('input[name="phone"]'), modal = document.getElementById("dup-phone");
+  function show() {
+    modal.hidden = false; requestAnimationFrame(function () { modal.classList.add("is-open"); });
+    var v = encodeURIComponent((phone.value || "").replace(/\s|-/g, ""));
+    modal.querySelector("[data-dup-reset]").href = "{% url 'accounts:password_reset' %}?phone=" + v;
+  }
+  function hide() { modal.classList.remove("is-open"); setTimeout(function () { modal.hidden = true; }, 150); if (phone) { phone.value = ""; phone.focus(); } }
+  modal.querySelector("[data-dup-close]").onclick = hide;
+  modal.addEventListener("mousedown", function (e) { if (e.target === modal) hide(); });
+  var last = "";
+  function check() {
+    var v = (phone.value || "").replace(/\D/g, "");
+    if (v.length < 11 || v === last) return;
+    last = v;
+    fetch("{{ check_url }}?phone=" + encodeURIComponent(phone.value), { headers: { "X-Requested-With": "fetch" } })
+      .then(function (r) { return r.ok ? r.json() : {}; }).then(function (d) { if (d.exists) show(); }).catch(function () {});
+  }
+  if (phone) { phone.addEventListener("blur", check); phone.addEventListener("input", function () { if ((phone.value || "").replace(/\D/g, "").length >= 11) check(); }); }
+  {% if dup_phone %}show();{% endif %}
+  // Пароль: показать/скрыть и сразу видно, совпадают ли (п. 11.2)
+  var p1 = form.querySelector('input[name="password1"]'), p2 = form.querySelector('input[name="password2"]');
+  [p1, p2].forEach(function (inp) {
+    if (!inp) return;
+    var b = document.createElement("button"); b.type = "button"; b.className = "pw-eye"; b.setAttribute("aria-label", "Показать пароль");
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+    b.onclick = function () { var t = inp.type === "password" ? "text" : "password"; inp.type = t; b.classList.toggle("is-on", t === "text"); };
+    var wrap = document.createElement("div"); wrap.className = "pw-wrap"; inp.parentNode.insertBefore(wrap, inp); wrap.appendChild(inp); wrap.appendChild(b);
   });
-  box.addEventListener("change", function () { var f = box.closest(".field"), err = f.querySelector("[data-consent-err]"); if (box.checked && err) { err.remove(); f.classList.remove("field--error"); } });
+  if (p1 && p2) {
+    var hint = document.createElement("p"); hint.className = "field__help pw-match"; p2.closest(".field").appendChild(hint);
+    var sync = function () {
+      if (!p2.value) { hint.textContent = ""; return; }
+      var ok = p1.value === p2.value; hint.textContent = ok ? "Пароли совпадают" : "Пароли пока не совпадают"; hint.classList.toggle("is-ok", ok);
+    };
+    p1.addEventListener("input", sync); p2.addEventListener("input", sync);
+  }
 })();
 </script>
 {% endblock %}

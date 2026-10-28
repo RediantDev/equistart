@@ -24,6 +24,12 @@ def register(request):
     if request.user.is_authenticated:
         return redirect("accounts:cabinet")
     form = RegistrationForm(request.POST or None)
+    if request.method == "POST" and not form.is_valid() and "phone" in form.errors and any(
+            e.code == "duplicate" for e in form.errors.as_data()["phone"]):
+        # Номер уже есть: показываем окно «Войти?», остальные ошибки (пароли) не мешают (тест 5.1, п. 11)
+        for name in ("password1", "password2", "pd_consent"):
+            form.errors.pop(name, None)
+        return render(request, "accounts/register.html", {"form": form, "dup_phone": True})
     if request.method == "POST" and form.is_valid():
         user = form.save()
         login(request, user, backend="apps.accounts.backends.PhoneBackend")
@@ -346,3 +352,28 @@ def password_reset_confirm(request):
     from .phone import format_phone
 
     return render(request, "accounts/password_reset_confirm.html", {"form": form, "phone": format_phone(phone)})
+
+
+def phone_check(request):
+    """Есть ли аккаунт с таким номером — для окна «Войти?» при регистрации (тест 5.1, п. 11).
+
+    Регистрация и так сообщает «номер уже зарегистрирован»; ограничение частоты — от перебора номеров.
+    """
+    from django.core.cache import cache
+    from django.core.exceptions import ValidationError
+    from django.http import JsonResponse
+
+    from . import throttle
+    from .models import User
+    from .phone import normalize_phone
+
+    key = "phone-check:" + throttle.client_ip(request)
+    n = cache.get(key, 0)
+    if n >= 30:
+        return JsonResponse({"exists": False, "limited": True}, status=429)
+    cache.set(key, n + 1, 600)
+    try:
+        phone = normalize_phone(request.GET.get("phone", ""))
+    except ValidationError:
+        return JsonResponse({"exists": False, "valid": False})
+    return JsonResponse({"exists": User.objects.filter(phone=phone).exists(), "valid": True})
