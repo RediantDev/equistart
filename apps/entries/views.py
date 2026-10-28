@@ -301,16 +301,26 @@ def apply(request, pk):
         pairs.append({"a": a, "h": h, "programs": progs, "count": len(mine), "open": is_open, "mine": mine, "summary": summary,
                       "errors": pair_errors if is_open else []})
     warnings = rules.entry_warnings(t, lines)
+    # Итог внизу (макет S09B): «2 пары · 3 выступления»
+    count_label = _ru_count(len(lines), "выступление", "выступления", "выступлений")
+    if pairs:
+        count_label = _ru_count(len(pairs), "пара", "пары", "пар") + " · " + count_label
     return render(
         request, "entries/apply.html",
         {
             "t": t, "s": t.snapshot, "late": late, "pairs": pairs, "lines": lines, "errors": errors, "warnings": warnings,
-            "athletes": athletes, "horses": horses, "key": cart["key"], "apply_url": _apply_url(t, late),
+            "athletes": athletes, "horses": horses, "key": cart["key"], "apply_url": _apply_url(t, late), "count_label": count_label,
             # тест первых пользователей: единственный всадник/лошадь и только что созданные выбраны сразу
             "sel_a": _int(request.GET.get("athlete")) or (athletes[0].pk if len(athletes) == 1 else None),
             "sel_h": _int(request.GET.get("horse")) or (horses[0].pk if len(horses) == 1 else None),
         },
     )
+
+
+def _ru_count(n, one, few, many):
+    a, b = n % 10, n % 100
+    word = one if a == 1 and b != 11 else few if 2 <= a <= 4 and not 12 <= b <= 14 else many
+    return f"{n} {word}"
 
 
 def _class_choices(t):

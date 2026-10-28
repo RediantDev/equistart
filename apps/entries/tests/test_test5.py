@@ -113,10 +113,13 @@ class ApplyScreenTests(Base):
         resp = self.add_two()
         self.assertEqual(resp.status_code, 302)
         page = self.client.get(resp["Location"]).content.decode()
-        self.assertIn("pair-summary--routes", page)
+        # макет S09B: свёрнутая пара — строки «маршрут · день, время» с зачётом и кнопка «Маршруты и зачёты»
+        self.assertEqual(page.count('class="ap-line"'), 2)
         self.assertNotIn('value="add_many"', page)  # выбор свёрнут
         self.assertIn("Любители", page)
-        self.assertIn("Изменить", page)
+        self.assertIn("Маршруты и зачёты", page)
+        self.assertIn("1 пара · 2 выступления", page)
+        self.assertIn('value="pair_remove"', page)
 
     def test_remove_one_class_updates_screen(self):
         self.add_two()
