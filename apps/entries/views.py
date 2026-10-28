@@ -197,6 +197,12 @@ def apply(request, pk):
             else:
                 added = []
                 existing = {(r["a"], r["h"], r["c"], r.get("ht")) for r in cart["lines"]}
+                # в одном маршруте пара выступает в одном зачёте — и при добавлении зачётов по одному
+                taken = {}
+                for r in cart["lines"]:
+                    rc = classes.get(r["c"])
+                    if rc and r["a"] == a.pk and r["h"] == h.pk:
+                        taken.setdefault(rc.program_id, set()).add(r["c"])
                 for cid, ht, confirmed in picks:
                     c = classes.get(cid)
                     if not c:
@@ -210,11 +216,14 @@ def apply(request, pk):
                     errs = services.check_line(request.user, t, line, late=late, allowed_athletes=set(by_a))
                     if line.key() in existing:
                         errs.append("уже есть в заявке")
+                    elif not (c.program.heights and len(c.program.heights) > 1) and taken.get(c.program_id, set()) - {c.pk}:
+                        errs.append("в этом маршруте пара уже заявлена в другом зачёте — уберите его, чтобы выбрать этот")
                     if errs:
                         pair_errors.extend(f"{c.program.name}, {c.label}: {e}" for e in errs)
                         continue
                     cart["lines"].append({"a": a.pk, "h": h.pk, "c": c.pk, "ht": ht, "cf": confirmed})
                     existing.add(line.key())
+                    taken.setdefault(c.program_id, set()).add(c.pk)
                     added.append(f"{c.program.name} — {c.label}" + (f" · {ht} см" if ht and not c.height else ""))
                 if added:
                     _save_cart(request, t, late, cart)
