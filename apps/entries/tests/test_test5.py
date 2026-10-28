@@ -113,10 +113,13 @@ class ApplyScreenTests(Base):
         resp = self.add_two()
         self.assertEqual(resp.status_code, 302)
         page = self.client.get(resp["Location"]).content.decode()
-        self.assertIn("pair-summary--routes", page)
+        # макет S09B: свёрнутая пара — строки «маршрут · день, время» с зачётом и кнопка «Маршруты и зачёты»
+        self.assertEqual(page.count('class="ap-line"'), 2)
         self.assertNotIn('value="add_many"', page)  # выбор свёрнут
         self.assertIn("Любители", page)
-        self.assertIn("Изменить", page)
+        self.assertIn("Маршруты и зачёты", page)
+        self.assertIn("1 пара · 2 выступления", page)
+        self.assertIn('value="pair_remove"', page)
 
     def test_remove_one_class_updates_screen(self):
         self.add_two()
@@ -181,10 +184,12 @@ class ApplicationGroupsTests(Base):
         app = self.submit(self.coach, [services.Line(self.a1, self.h1, self.c_kids), services.Line(self.a2, self.h1, self.c_open)])
         self.client.force_login(self.coach)
         page = self.client.get(reverse("entries:application", args=[app.pk])).content.decode()
-        # тест 5.1: сначала день соревнований, внутри — всадники
+        # тест 5.1: по дням соревнований; макет R2_03B: строка «Всадник — Лошадь», отмена — в режиме правки
         self.assertEqual(page.count('class="app-day"'), 1)
-        self.assertEqual(page.count('class="app-rider"'), 2)
-        self.assertIn("Отменить выбранные", page)
+        self.assertEqual(page.count("data-ae-entry"), 2)
+        self.assertIn("Изменить заявку", page)
+        self.assertEqual(page.count('name="entry"'), 0)
+        page = self.client.get(reverse("entries:application", args=[app.pk]) + "?edit=1").content.decode()
         self.assertEqual(page.count('name="entry"'), 2)
 
     def test_application_closed_for_guest_and_stranger(self):

@@ -301,16 +301,26 @@ def apply(request, pk):
         pairs.append({"a": a, "h": h, "programs": progs, "count": len(mine), "open": is_open, "mine": mine, "summary": summary,
                       "errors": pair_errors if is_open else []})
     warnings = rules.entry_warnings(t, lines)
+    # Итог внизу (макет S09B): «2 пары · 3 выступления»
+    count_label = _ru_count(len(lines), "выступление", "выступления", "выступлений")
+    if pairs:
+        count_label = _ru_count(len(pairs), "пара", "пары", "пар") + " · " + count_label
     return render(
         request, "entries/apply.html",
         {
             "t": t, "s": t.snapshot, "late": late, "pairs": pairs, "lines": lines, "errors": errors, "warnings": warnings,
-            "athletes": athletes, "horses": horses, "key": cart["key"], "apply_url": _apply_url(t, late),
+            "athletes": athletes, "horses": horses, "key": cart["key"], "apply_url": _apply_url(t, late), "count_label": count_label,
             # тест первых пользователей: единственный всадник/лошадь и только что созданные выбраны сразу
             "sel_a": _int(request.GET.get("athlete")) or (athletes[0].pk if len(athletes) == 1 else None),
             "sel_h": _int(request.GET.get("horse")) or (horses[0].pk if len(horses) == 1 else None),
         },
     )
+
+
+def _ru_count(n, one, few, many):
+    a, b = n % 10, n % 100
+    word = one if a == 1 and b != 11 else few if 2 <= a <= 4 and not 12 <= b <= 14 else many
+    return f"{n} {word}"
 
 
 def _class_choices(t):
@@ -358,33 +368,61 @@ def application(request, pk):
                    .order_by("day", "program__start_time", "program__position", "program_id", "athlete_snapshot__name", "pk"))
     for e in entries:
         e.pending_proposal = next((p for p in e.proposals.all() if p.state == ChangeProposal.State.PENDING), None)
-    # Тест 5.1: выступления по дням соревнований, внутри дня — по всаднику; «История» убрана
+        e.cancellable = owner and e.is_active and not e.is_started
+    # Тест 5.1: выступления по дням соревнований; макет 28.10 (R2_03B): строка «Всадник — Лошадь», внутри дня — по времени
     days = {}
     for e in entries:
-        riders = days.setdefault(e.day, {})
-        riders.setdefault(e.athlete_id or e.athlete_snapshot.get("name"), {"name": e.athlete_snapshot.get("name") or "", "entries": []})["entries"].append(e)
-    groups = [{"day": d, "riders": list(r.values()), "count": sum(len(x["entries"]) for x in r.values())} for d, r in days.items()]
+        days.setdefault(e.day, []).append(e)
+    groups = [{"day": d, "entries": items, "count": len(items)} for d, items in days.items()]
+    can_edit = any(e.cancellable for e in entries)
+    # Режим правки (макет R2_03B): отметить выступления к отмене и решить судьбу денников/услуг — одной формой.
+    # Работает и без JS: «Изменить заявку» — ссылка на ?edit=1, переключатели — label + checkbox/radio.
+    edit = can_edit and request.GET.get("edit") == "1"
+    bookings, orders = (_edit_stables(request.user, app, entries) if edit else ([], []))
     return render(request, "entries/application.html", {
         "app": app, "t": app.tournament, "entries": entries, "groups": groups, "owner": owner, "judge": judge,
         "summary": services.summarize(entries), "show_contacts": owner or judge,
+        "can_edit": can_edit, "edit": edit, "bookings": bookings, "orders": orders,
     })
+
+
+def _stables_for_horses(user, app, horses):
+    """Действующие брони денников и заказы услуг пользователя на этом турнире для указанных лошадей."""
+    from apps.stables.models import Booking, ServiceOrder
+
+    bookings = list(Booking.objects.filter(tournament=app.tournament_id, horse_id__in=horses, requested_by=user, state__in=Booking.HOLDING)
+                    .select_related("category").order_by("arrive", "pk"))
+    orders = list(ServiceOrder.objects.filter(tournament=app.tournament_id, horse_id__in=horses, ordered_by=user,
+                                              state=ServiceOrder.State.ORDERED, delivered=0).select_related("service").order_by("for_date", "pk"))
+    return bookings, orders
+
+
+def _edit_stables(user, app, entries):
+    """Режим правки: денники и услуги лошадей, у которых на турнире не останется выступлений, если отменить
+    их выступления в этой заявке. У каждой записи — `need`: какие выступления должны быть отмечены, чтобы
+    строка показалась (пусто — у лошади выступлений уже нет). Окончательно проверяет `_cancel_stables`."""
+    cancellable = {e.pk for e in entries if e.cancellable}
+    horses = {e.horse_id for e in entries}
+    blocked = set(Entry.objects.filter(tournament=app.tournament_id, horse_id__in=horses, decision__in=Entry.ACTIVE)
+                  .exclude(pk__in=cancellable).values_list("horse_id", flat=True))
+    bookings, orders = _stables_for_horses(user, app, horses - blocked)
+    need = {}
+    for e in entries:
+        if e.pk in cancellable:
+            need.setdefault(e.horse_id, []).append(e.pk)
+    for x in bookings + orders:
+        x.need = ",".join(str(i) for i in need.get(x.horse_id, []))
+    return bookings, orders
 
 
 def _related_stables(user, app, entries):
     """Брони денников и заказы услуг пользователя на лошадей, у которых после отмены не останется
     действующих выступлений на этом турнире (тест 5.1): их предлагаем отменить вместе с выступлениями."""
-    from apps.stables.models import Booking, ServiceOrder
-
     cancelling = {e.pk for e in entries}
     horses = {e.horse_id for e in entries}
     still = set(Entry.objects.filter(tournament=app.tournament_id, horse_id__in=horses, decision__in=Entry.ACTIVE)
                 .exclude(pk__in=cancelling).values_list("horse_id", flat=True))
-    free = horses - still
-    bookings = list(Booking.objects.filter(tournament=app.tournament_id, horse_id__in=free, requested_by=user, state__in=Booking.HOLDING)
-                    .select_related("category").order_by("arrive", "pk"))
-    orders = list(ServiceOrder.objects.filter(tournament=app.tournament_id, horse_id__in=free, ordered_by=user,
-                                              state=ServiceOrder.State.ORDERED, delivered=0).select_related("service").order_by("for_date", "pk"))
-    return bookings, orders
+    return _stables_for_horses(user, app, horses - still)
 
 
 def _cancel_stables(request, app, booking_ids, order_ids):
@@ -430,6 +468,8 @@ def application_cancel(request, pk):
     if app.submitted_by_id != request.user.pk:
         raise PermissionDenied
     ids = [i for i in request.POST.getlist("entry") if i.isdigit()]
+    if request.POST.get("edit") == "1":
+        return _cancel_from_edit(request, app, ids)
     if request.POST.get("confirm") != "1":
         entries = list(app.entries.filter(pk__in=ids, decision__in=Entry.ACTIVE).order_by("day", "athlete_snapshot__name", "pk"))
         if not entries:
@@ -442,6 +482,26 @@ def application_cancel(request, pk):
     _report(request, results)
     _cancel_stables(request, app, [int(i) for i in request.POST.getlist("booking") if i.isdigit()],
                     [int(i) for i in request.POST.getlist("order") if i.isdigit()])
+    return redirect("entries:application", pk=app.pk)
+
+
+def _cancel_from_edit(request, app, ids):
+    """Отправка режима правки (макет R2_03B): отмеченные выступления и выбранные «Отменить» денники/услуги —
+    одним запросом. Позиции берутся только из этой заявки; уже отменённые пропускаются молча, поэтому
+    повтор запроса ничего не меняет и не пугает ошибкой. Денник/услуга отменяются, только если выбрано
+    «Отменить» и у лошади не осталось выступлений (проверяет `_cancel_stables`)."""
+    active = dict(app.entries.filter(pk__in=ids, decision__in=Entry.ACTIVE).values_list("pk", "revision"))
+    items = [(pk, request.POST.get(f"rev-{pk}") or rev) for pk, rev in active.items()]
+    booking_ids = [int(k[8:]) for k, v in request.POST.items() if k.startswith("booking-") and k[8:].isdigit() and v == "cancel"]
+    order_ids = [int(k[6:]) for k, v in request.POST.items() if k.startswith("order-") and k[6:].isdigit() and v == "cancel"]
+    if not items and not booking_ids and not order_ids:
+        if not ids:
+            messages.error(request, "Отметьте выступления, которые нужно отменить.")
+            return redirect(reverse("entries:application", args=[app.pk]) + "?edit=1")
+        return redirect("entries:application", pk=app.pk)
+    if items:
+        _report(request, services.cancel_by_representative(request.user, app.pk, items))
+    _cancel_stables(request, app, booking_ids, order_ids)
     return redirect("entries:application", pk=app.pk)
 
 
