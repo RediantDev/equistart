@@ -251,7 +251,8 @@ def _book_cart(request, t):
                 parts.append("брони отправлены: " + ", ".join(f"«{b.horse_name}»" for b in made) + " — конюшня подтвердит их и назначит номера денников")
             if orders:
                 parts.append("услуги заказаны: " + ", ".join(f"{o.service.name} × {o.quantity} ({o.recipient_label})" for o in orders))
-            messages.success(request, ("; ".join(parts) or "Готово").capitalize() + ".")
+            text = "; ".join(parts) or "готово"
+            messages.success(request, text[:1].upper() + text[1:] + ".")
             return redirect(reverse("stables:book", args=[t.pk]))
         except services.OrderErrors as e:
             errors += [m for _, m in e.items]

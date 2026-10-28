@@ -1,5 +1,5 @@
 <li class="sb-row">
   <div class="sb-row__main"><span>{{ o.service.name }} × {{ o.quantity }} {{ o.service.unit }}{% if show_horse or not o.horse_id %} · {{ o.recipient_label }}{% endif %}{% if o.for_date %} · на {{ o.for_date|date:"j E" }}{% endif %}</span></div>
   <div class="chips"><span class="chip{% if o.delivered == o.quantity %} chip--success{% elif o.delivered %} chip--warning{% elif o.state == 'cancelled' %} chip--danger{% endif %}">{{ o.delivery_state }}</span></div>
-  {% if o.state == "ordered" and not o.delivered and open %}<div class="sb-row__acts"><button class="btn btn--ghost btn--sm" form="o{{ o.pk }}">Отменить</button></div>{% endif %}
+  {% if o.state == "ordered" and not o.delivered and open %}<div class="sb-row__acts sb-row__acts--inline"><button class="btn btn--ghost btn--sm" form="o{{ o.pk }}">Отменить</button></div>{% endif %}
 </li>

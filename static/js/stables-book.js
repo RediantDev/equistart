@@ -107,7 +107,7 @@
       first.querySelectorAll("[data-counter]").forEach(function (c) { qty[c.dataset.svc] = c.querySelector("input").value; });
       cards.slice(1).forEach(function (card) {
         var sel = card.querySelector("[data-cat]");
-        if (cat && sel) { sel.value = cat.value; applyCategory(card); }
+        if (cat && sel && sel.value !== cat.value) { sel.value = cat.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
         tiles(card).forEach(function (i) { if (free(i)) i.checked = nights.indexOf(i.value) >= 0; });
         card.querySelectorAll("[data-counter]").forEach(function (c) {
           var inp = c.querySelector("input");
