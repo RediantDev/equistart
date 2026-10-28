@@ -160,3 +160,97 @@ class ApplyScreenTests(T51Base):
         self.assertIn("+ Добавить комментарий", page)
         self.assertIn('name="comment"', page)
         self.assertNotIn("Публично в протоколах", page)
+
+
+class EditModeCancelTests(T51Base):
+    """Макет R2_03B: режим правки заявки — отмена нескольких выступлений и денников одной формой."""
+
+    def page(self, edit=True):
+        return self.client.get(reverse("entries:application", args=[self.app.pk]) + ("?edit=1" if edit else "")).content.decode()
+
+    def post(self, entries, **extra):
+        data = {"edit": "1", "entry": [e.pk for e in entries]}
+        for e in entries:
+            data[f"rev-{e.pk}"] = e.revision
+        data.update(extra)
+        return self.client.post(reverse("entries:cancel", args=[self.app.pk]), data)
+
+    def test_edit_page_lists_rows_and_stables(self):
+        self.client.force_login(self.coach)
+        page = self.page()
+        self.assertEqual(page.count('name="entry"'), 3)
+        self.assertIn("Будет отменено", page)
+        self.assertIn(f'name="booking-{self.b_baron.pk}" value="keep" checked', page)
+        self.assertIn(f'name="order-{self.o_granit.pk}" value="cancel"', page)
+        e1, e2 = self.app.entries.filter(horse=self.h3).order_by("pk")
+        self.assertIn(f'data-need="{e1.pk},{e2.pk}"', page)  # денник «Гранита» — только если сняты оба его старта
+        self.assertNotIn("data-ae-form", self.page(edit=False))
+
+    def test_mass_cancel_with_chosen_stables(self):
+        self.client.force_login(self.coach)
+        granit = list(self.app.entries.filter(horse=self.h3))
+        r = self.post([self.e_baron] + granit, **{f"booking-{self.b_baron.pk}": "keep", f"order-{self.o_baron.pk}": "cancel",
+                                                 f"booking-{self.b_granit.pk}": "cancel", f"order-{self.o_granit.pk}": "keep"})
+        self.assertRedirects(r, reverse("entries:application", args=[self.app.pk]), fetch_redirect_response=False)
+        self.assertEqual(self.app.entries.filter(decision=Entry.Decision.CANCELLED).count(), 3)
+        self.assertEqual(Booking.objects.get(pk=self.b_baron.pk).state, Booking.State.PENDING)  # выбрано «Оставить»
+        self.assertEqual(ServiceOrder.objects.get(pk=self.o_baron.pk).state, ServiceOrder.State.CANCELLED)
+        self.assertEqual(Booking.objects.get(pk=self.b_granit.pk).state, Booking.State.CANCELLED)
+        self.assertEqual(ServiceOrder.objects.get(pk=self.o_granit.pk).state, ServiceOrder.State.ORDERED)
+        # отменённые остаются в списке со статусом «Отменено»
+        page = self.page(edit=False)
+        self.assertEqual(page.count("data-ae-entry"), 3)
+        self.assertEqual(page.count(">Отменено</span>"), 3)
+
+    def test_stable_of_horse_with_remaining_start_kept(self):
+        self.client.force_login(self.coach)
+        one = self.app.entries.filter(horse=self.h3).first()  # у «Гранита» остаётся второй старт
+        self.post([one], **{f"booking-{self.b_granit.pk}": "cancel", f"order-{self.o_granit.pk}": "cancel"})
+        one.refresh_from_db()
+        self.assertEqual(one.decision, Entry.Decision.CANCELLED)
+        self.assertEqual(Booking.objects.get(pk=self.b_granit.pk).state, Booking.State.PENDING)
+        self.assertEqual(ServiceOrder.objects.get(pk=self.o_granit.pk).state, ServiceOrder.State.ORDERED)
+
+    def test_repeat_is_idempotent(self):
+        self.client.force_login(self.coach)
+        data = {f"booking-{self.b_baron.pk}": "cancel"}
+        self.post([self.e_baron], **data)
+        self.e_baron.refresh_from_db()
+        rev = self.e_baron.revision
+        r = self.post([self.e_baron], **data)  # повтор (двойное нажатие, «Назад» + отправка)
+        self.assertEqual(r.status_code, 302)
+        self.e_baron.refresh_from_db()
+        self.assertEqual(self.e_baron.revision, rev)
+        self.assertEqual(Booking.objects.filter(pk=self.b_baron.pk, state=Booking.State.CANCELLED).count(), 1)
+        page = self.client.get(r["Location"]).content.decode()
+        self.assertNotIn("Не выполнено", page)
+        self.assertEqual(self.app.entries.exclude(decision=Entry.Decision.CANCELLED).count(), 2)
+
+    def test_foreign_entry_and_stable_ignored(self):
+        h = Horse.objects.create(name="Чужой", birth_year=2010, color="bay", sex="mare", breed="x", manager=self.other)
+        foreign = sservices.book(self.other, self.cat.pk, h, self.cat.available_from, self.cat.available_to, "bk9")
+        second = self.submit(self.coach, [services.Line(self.a1, self.h1, self.c2)], key="k-second")
+        e_second = second.entries.get()
+        self.client.force_login(self.coach)
+        # позиция другой заявки, подставленная в форму этой, не отменяется
+        self.post([self.e_baron, e_second], **{f"booking-{foreign.pk}": "cancel"})
+        e_second.refresh_from_db()
+        self.assertEqual(e_second.decision, Entry.Decision.PENDING)
+        self.assertEqual(Booking.objects.get(pk=foreign.pk).state, Booking.State.PENDING)
+
+    def test_guest_and_stranger(self):
+        url = reverse("entries:cancel", args=[self.app.pk])
+        data = {"edit": "1", "entry": [self.e_baron.pk], f"rev-{self.e_baron.pk}": self.e_baron.revision}
+        self.assertIn("login", self.client.post(url, data)["Location"])
+        self.assertIn("login", self.client.get(reverse("entries:application", args=[self.app.pk]) + "?edit=1")["Location"])
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.post(url, data).status_code, 403)
+        self.assertEqual(self.client.get(reverse("entries:application", args=[self.app.pk]) + "?edit=1").status_code, 403)
+        self.e_baron.refresh_from_db()
+        self.assertEqual(self.e_baron.decision, Entry.Decision.PENDING)
+
+    def test_judge_sees_no_edit_mode(self):
+        self.client.force_login(self.judge)
+        page = self.page()
+        self.assertNotIn("data-ae-form", page)
+        self.assertNotIn("Изменить заявку", page)

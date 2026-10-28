@@ -2,60 +2,107 @@
 {% load tournaments %}
 {% block title %}Заявка №{{ app.pk }} — СтартЛист{% endblock %}
 {% block content %}
-<div class="app-head">
+{# Макет 28.10.2026 (R2_03B): просмотр по дням; «Изменить заявку» — режим правки с отменой строк и решением по денникам #}
+<div class="app-head ae-head">
   <a class="back" href="{% if owner %}{% url 'entries:competitions' %}{% else %}{% url 'entries:manage' t.pk %}{% endif %}">← {% if owner %}Мои соревнования{% else %}Заявки турнира{% endif %}</a>
-  <h1 class="h2 app-head__title">{% if owner and t.publication == "published" %}<a href="{% url 'tournaments:public' t.pk %}">{{ t.pub_title }}</a>{% else %}{{ t.pub_title }}{% endif %}</h1>
-  <p class="table__sub">Заявка №{{ app.pk }} · {% if app.is_group %}групповая{% else %}индивидуальная{% endif %} · подана {{ app.created_at|date:"j E в H:i" }}{% if app.late %} · внесена судьёй{% endif %}</p>
-  <div class="chips">{% for label, n, color in summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>
+  <div class="ae-head__row">
+    <div class="ae-head__text">
+      <h1 class="h2 app-head__title">Заявка №{{ app.pk }}{% if edit %} <span class="chip ae-head__mode">правка</span>{% endif %}</h1>
+      <p class="ae-head__t">{% if owner and t.publication == "published" %}<a href="{% url 'tournaments:public' t.pk %}">{{ t.pub_title }}</a>{% else %}{{ t.pub_title }}{% endif %}</p>
+      <p class="table__sub">{% if app.is_group %}Групповая{% else %}Индивидуальная{% endif %} · подана {{ app.created_at|date:"j E в H:i" }}{% if app.late %} · внесена судьёй{% endif %}</p>
+    </div>
+    {% if edit %}
+      <a class="btn btn--ghost btn--sm ae-head__btn" href="{% url 'entries:application' app.pk %}">Выйти из правки</a>
+    {% elif can_edit %}
+      <a class="btn btn--dark ae-head__btn" href="?edit=1" data-ae-edit>Изменить заявку</a>
+    {% endif %}
+  </div>
+  {% if not edit %}<div class="chips">{% for label, n, color in summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>{% endif %}
 </div>
 
 <div class="wizard-grid">
   <div class="wizard-main">
-    <form method="post" action="{% url 'entries:cancel' app.pk %}" id="entries-form">
-      {% csrf_token %}
-      <section class="card app-card">
-        <div class="section-head app-card__head">
-          <h2 class="h3" style="margin: 0;">Выступления · {{ entries|length }}</h2>
-          {% if owner %}<button class="btn btn--danger btn--sm" type="submit">Отменить выбранные…</button>{% endif %}
-        </div>
-        {% for g in groups %}
-          <div class="app-day">
-            <h3 class="app-day__h">{{ g.day|date:"j E, D" }}<span class="table__sub"> · выступлений: {{ g.count }}</span></h3>
-            {% for r in g.riders %}
-              <div class="app-rider">
-                <div class="app-rider__name">{{ r.name }}</div>
-                {% for e in r.entries %}
-                <article class="entry-row app-entry{% if not e.is_active %} is-muted{% endif %}">
-                  {% if owner %}<label class="entry-row__pick"><input type="checkbox" name="entry" value="{{ e.pk }}" aria-label="Выбрать {{ e.athlete_snapshot.name }} / {{ e.horse_snapshot.name }}"{% if not e.is_active or e.is_started %} disabled{% endif %}></label><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}">{% endif %}
-                  <div class="entry-row__main">
-                    <strong>{{ e.horse_snapshot.name }}</strong>
-                    <span class="table__sub">{{ e.program_name }} · {{ e.class_name }}{% if e.height %} · {{ e.height }} см{% endif %}</span>
-                    {% if e.program.is_dressage and e.program.test_snapshot and e.result %}<a class="table__sub" href="{% url 'conduct:my_sheets' e.pk %}">Листы судей</a>{% endif %}
-                    {% if e.decision == "rejected" and e.decision_reason and show_contacts %}<span class="table__sub" style="color: var(--danger);">Причина: {{ e.decision_reason }}</span>{% endif %}
-                    {% if e.decision == "cancelled" and e.cancel_reason and show_contacts %}<span class="table__sub">Причина отмены: {{ e.cancel_reason }}</span>{% endif %}
-                    {% if e.pending_proposal %}
-                      <div class="proposal">Предложено: {{ e.pending_proposal.describe }}
-                        {% if judge %}
-                          <span class="proposal__actions">
-                            <button class="btn btn--primary btn--sm" form="pp-{{ e.pending_proposal.pk }}" name="decision" value="accept">Принять изменение</button>
-                            <button class="btn btn--ghost btn--sm" form="pp-{{ e.pending_proposal.pk }}" name="decision" value="reject">Отклонить</button>
-                          </span>
-                        {% endif %}
-                      </div>
-                    {% endif %}
-                  </div>
-                  <div class="entry-row__side">
-                    {% include "entries/_entry_chips.html" %}
-                    {% if owner and e.is_active and not e.is_started and not e.pending_proposal %}<a class="btn btn--ghost btn--sm" href="{% url 'entries:propose' e.pk %}">Предложить замену</a>{% endif %}
-                  </div>
-                </article>
-                {% endfor %}
+    {% if edit %}<form method="post" action="{% url 'entries:cancel' app.pk %}" class="ae-form" id="entries-form" data-ae-form>
+      {% csrf_token %}<input type="hidden" name="edit" value="1">
+      <p class="table__sub ae-lead">Нажмите «Отменить» у выступлений, которые нужно снять. До сохранения всё можно вернуть.</p>
+    {% endif %}
+    <section class="ae-card" aria-label="Выступления · {{ entries|length }}">
+      {% for g in groups %}
+        <div class="app-day">
+          <h2 class="ae-dh">{{ g.day|date:"D, j E" }}<span class="ae-dh__n"> · {{ g.count }}</span></h2>
+          {% for e in g.entries %}
+          <article class="ae-row{% if not e.is_active %} is-off{% endif %}" data-ae-entry>
+            {% if edit and e.cancellable %}<input class="ae-x" type="checkbox" id="x-{{ e.pk }}" name="entry" value="{{ e.pk }}" data-horse="{{ e.horse_id }}"><input type="hidden" name="rev-{{ e.pk }}" value="{{ e.revision }}">{% endif %}
+            <div class="ae-row__main">
+              <div class="ae-row__name">{{ e.athlete_snapshot.name }} — {{ e.horse_snapshot.name }}</div>
+              <div class="ae-row__sub num">{% if e.program.start_time %}{{ e.program.start_time|time:"H:i" }} · {% endif %}{{ e.program_name }}{% if e.height %} · {{ e.height }} см{% endif %} · {{ e.class_name }}</div>
+              {% if e.decision == "rejected" and e.decision_reason and show_contacts %}<div class="ae-row__note ae-row__note--bad">Причина: {{ e.decision_reason }}</div>{% endif %}
+              {% if e.decision == "cancelled" and e.cancel_reason and show_contacts %}<div class="ae-row__note">Причина отмены: {{ e.cancel_reason }}</div>{% endif %}
+              <div class="ae-row__chips">
+                {% include "entries/_entry_chips.html" %}
+                {% if edit and e.cancellable %}<span class="chip chip--danger ae-will">Будет отменено</span>{% endif %}
               </div>
-            {% endfor %}
+              {% if e.pending_proposal %}
+                <div class="proposal">Предложено: {{ e.pending_proposal.describe }}
+                  {% if judge %}
+                    <span class="proposal__actions">
+                      <button class="btn btn--primary btn--sm" form="pp-{{ e.pending_proposal.pk }}" name="decision" value="accept">Принять изменение</button>
+                      <button class="btn btn--ghost btn--sm" form="pp-{{ e.pending_proposal.pk }}" name="decision" value="reject">Отклонить</button>
+                    </span>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </div>
+            <div class="ae-row__side">
+              {% if edit %}
+                {% if e.cancellable %}<label class="ae-btn ae-btn--x" for="x-{{ e.pk }}">Отменить</label><label class="ae-btn ae-btn--back" for="x-{{ e.pk }}">Вернуть</label>{% endif %}
+              {% else %}
+                {% if e.program.is_dressage and e.program.test_snapshot and e.result %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:my_sheets' e.pk %}">Листы судей</a>{% endif %}
+                {% if owner and e.is_active and not e.is_started and not e.pending_proposal %}<a class="btn btn--ghost btn--sm" href="{% url 'entries:propose' e.pk %}">Предложить замену</a>{% endif %}
+              {% endif %}
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </section>
+
+    {% if edit %}
+      {% if bookings or orders %}
+      <section class="ae-card" data-ae-stables aria-labelledby="ae-st-h">
+        <h2 class="ae-dh" id="ae-st-h">Денники и услуги</h2>
+        <p class="table__sub ae-nojs">Отменятся, только если у лошади не останется выступлений на турнире.</p>
+        {% for b in bookings %}
+          <div class="ae-row ae-row--stable" data-ae-stable data-need="{{ b.need }}">
+            <div class="ae-row__main">
+              <div class="ae-row__name">Денник · {{ b.horse_name }}</div>
+              <div class="ae-row__sub num">{{ b.arrive|date:"j E" }} — {{ b.depart|date:"j E" }} · {{ b.category.name }} · у лошади не останется выступлений</div>
+            </div>
+            <div class="ae-seg" role="radiogroup" aria-label="Денник · {{ b.horse_name }}">
+              <input type="radio" id="b-{{ b.pk }}-k" name="booking-{{ b.pk }}" value="keep" checked><label for="b-{{ b.pk }}-k">Оставить</label>
+              <input type="radio" id="b-{{ b.pk }}-c" name="booking-{{ b.pk }}" value="cancel"><label for="b-{{ b.pk }}-c">Отменить</label>
+            </div>
+          </div>
+        {% endfor %}
+        {% for o in orders %}
+          <div class="ae-row ae-row--stable" data-ae-stable data-need="{{ o.need }}">
+            <div class="ae-row__main">
+              <div class="ae-row__name">{{ o.service.name }} × {{ o.quantity }} {{ o.service.unit }} · {{ o.recipient_label }}</div>
+              {% if o.for_date %}<div class="ae-row__sub num">к {{ o.for_date|date:"j E" }}</div>{% endif %}
+            </div>
+            <div class="ae-seg" role="radiogroup" aria-label="{{ o.service.name }} · {{ o.recipient_label }}">
+              <input type="radio" id="o-{{ o.pk }}-k" name="order-{{ o.pk }}" value="keep" checked><label for="o-{{ o.pk }}-k">Оставить</label>
+              <input type="radio" id="o-{{ o.pk }}-c" name="order-{{ o.pk }}" value="cancel"><label for="o-{{ o.pk }}-c">Отменить</label>
+            </div>
           </div>
         {% endfor %}
       </section>
-    </form>
+      {% endif %}
+      <div class="ae-bar">
+        <button class="btn btn--ghost" type="reset">Сбросить</button>
+        <button class="btn ae-bar__go" type="submit" data-ae-go>Отменить отмеченное</button>
+      </div>
+    </form>{% endif %}
     {% for e in entries %}{% if e.pending_proposal and judge %}<form id="pp-{{ e.pending_proposal.pk }}" method="post" action="{% url 'entries:proposal_decide' e.pending_proposal.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>{% endif %}{% endfor %}
 
     {% if judge %}
@@ -87,4 +134,46 @@
     {% endif %}
   </aside>
 </div>
+{% if edit %}
+<script>
+(function () {
+  // Режим правки: счётчик в кнопке, показ денников лошадей без оставшихся выступлений, «Сбросить».
+  // Без JS форма тоже работает: строки переключаются CSS, сервер проверяет денники сам.
+  function plural(n) {
+    var a = n % 10, b = n % 100;
+    if (a === 1 && b !== 11) return "выступление";
+    if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return "выступления";
+    return "выступлений";
+  }
+  function sync() {
+    var f = document.querySelector("[data-ae-form]");
+    if (!f) return;
+    var marked = {};
+    f.querySelectorAll(".ae-x").forEach(function (x) { if (x.checked) marked[x.value] = true; });
+    var n = Object.keys(marked).length, extra = 0, shown = 0;
+    f.querySelectorAll("[data-ae-stable]").forEach(function (row) {
+      var need = (row.getAttribute("data-need") || "").split(",").filter(Boolean);
+      var on = need.every(function (id) { return marked[id]; });
+      row.hidden = !on;
+      if (!on) { var k = row.querySelector('input[value="keep"]'); if (k) k.checked = true; }
+      if (on) shown++;
+      var c = row.querySelector('input[value="cancel"]');
+      if (on && c && c.checked) extra++;
+    });
+    var box = f.querySelector("[data-ae-stables]");
+    if (box) box.hidden = !shown;
+    var go = f.querySelector("[data-ae-go]");
+    go.textContent = n ? "Отменить " + n + " " + plural(n) : (extra ? "Отменить денники и услуги" : "Отметьте выступления");
+    go.disabled = !n && !extra;
+  }
+  if (!window.__aeInit) {
+    window.__aeInit = true;
+    document.addEventListener("change", function (e) { if (e.target.closest && e.target.closest("[data-ae-form]")) sync(); });
+    document.addEventListener("reset", function (e) { if (e.target.matches && e.target.matches("[data-ae-form]")) setTimeout(sync, 0); });
+    document.addEventListener("htmx:afterSettle", sync);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", sync); else sync();
+})();
+</script>
+{% endif %}
 {% endblock %}
