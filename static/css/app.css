@@ -1375,3 +1375,7 @@ html.is-loading::before { content: ""; position: fixed; top: 0; left: 0; height:
   .stb-svc { padding: 14px; }
   .stb-order__bar .btn { flex: 0 0 auto; }
 }
+
+/* ===== Тест 5.1: заявки и «Мои соревнования» ===== */
+
+/* ===== Тест 5.1: спортсмены и лошади ===== */
