@@ -1,0 +1,22 @@
+<script>
+(function () {
+  /* Фильтр списка спортсменов по мере ввода: начало любого слова фамилии, имени, клуба или год рождения. */
+  var input = document.querySelector("[data-ps-filter]");
+  if (!input || input.dataset.bound) return;
+  input.dataset.bound = "1";
+  var box = document.querySelector(input.dataset.psFilter);
+  var rows = box.querySelectorAll(".ps-rw[data-text]"), groups = box.querySelectorAll(".ps-group"), empty = box.querySelector(".ps-nores");
+  function norm(s) { return (s || "").toLowerCase().replace(/ё/g, "е"); }
+  function apply() {
+    var qs = norm(input.value).split(/\s+/).filter(Boolean), shown = 0;
+    rows.forEach(function (r) {
+      var words = norm(r.dataset.text).split(/[\s\-«»"'.,]+/);
+      var ok = qs.every(function (q) { return words.some(function (w) { return w.indexOf(q) === 0; }); });
+      r.hidden = !ok; if (ok) shown++;
+    });
+    groups.forEach(function (g) { var any = g.querySelector(".ps-rw:not([hidden])"); g.hidden = !any; });
+    if (empty) empty.hidden = shown > 0 || !qs.length;
+  }
+  input.addEventListener("input", apply);
+})();
+</script>

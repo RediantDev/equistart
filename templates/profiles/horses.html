@@ -1,49 +1,70 @@
 {% extends "base.html" %}
 {% block title %}Лошади — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head pf-head">
-  <div>
-    <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
-    <h1 class="h1">Мои лошади</h1>
+{# Макеты R2_05 и R2_06C (утверждены 28.10.2026) #}
+<div class="ps-screen">
+  <a class="ps-back" href="{% url 'accounts:cabinet' %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Кабинет</a>
+  <div class="ps-headrow">
+    <h1 class="ps-h1">Мои лошади{% if total %} <span class="ps-count">{{ total }}</span>{% endif %}</h1>
+    {% if total %}<button class="ps-ib ps-ib--o ps-js" type="button" aria-label="Поиск по кличке или номеру ФКСР" aria-expanded="{% if q %}true{% else %}false{% endif %}" aria-controls="ps-hsearch" data-ps-toggle><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>{% endif %}
+    <a class="ps-ib ps-ib--y" href="{% url 'profiles:horse_new' %}" aria-label="Добавить лошадь" title="Добавить лошадь"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a>
   </div>
-  <div class="form-actions">
-    <a class="btn btn--primary btn--sm" href="{% url 'profiles:horse_new' %}">+ Добавить</a>
+
+  {% for o in invites %}
+    <section class="ps-invite" aria-label="Приглашение">
+      <div class="ps-invite__top"><span class="ps-chip ps-chip--wait">Ожидает вашего ответа</span><span class="ps-m">{{ o.created_at|date:"j E" }}</span></div>
+      <div><b class="ps-invite__title">{{ o.from_name }} открывает вам доступ к лошади {{ o.horse.name }}</b>
+        <div class="ps-m ps-ink">{{ o.horse.name }} · {{ o.horse.summary }}</div></div>
+      <p class="ps-invite__text">Вы сможете подавать заявки с этой лошадью. Документы и сведения остаются у создателя.</p>
+      <form method="post" action="{% url 'profiles:offer_respond' o.pk %}" class="ps-grid2">{% csrf_token %}
+        <input type="hidden" name="next" value="{% url 'profiles:horses' %}">
+        <button name="decision" value="decline" class="ps-btn">Отклонить</button>
+        <button name="decision" value="accept" class="ps-btn ps-btn--y">Принять</button>
+      </form>
+    </section>
+  {% endfor %}
+
+  {% if horses or shared %}
+  {# Тест 5.1: без кнопки «Найти» — список фильтруется по мере ввода (начало клички или слова в кличке, номер ФКСР / FEI / код EQ) #}
+  <form class="ps-hsearch" id="ps-hsearch" role="search" onsubmit="return false"{% if q %} data-open{% endif %}>
+    <label class="ps-srch">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <span class="visually-hidden">Кличка или номер</span>
+      <input id="hq" name="q" type="search" value="{{ q }}" placeholder="Кличка или номер ФКСР" autocomplete="off" enterkeyhint="search" data-horse-filter="#pf-horses">
+    </label>
+  </form>
+  {% if shared or ponies %}
+  <div class="ps-chips ps-js" role="group" aria-label="Фильтр">
+    <button class="ps-flt is-on" type="button" data-f="all" aria-pressed="true">Все <small>{{ total }}</small></button>
+    <button class="ps-flt" type="button" data-f="mine" aria-pressed="false">Мои <small>{{ horses|length }}</small></button>
+    {% if shared %}<button class="ps-flt" type="button" data-f="shared" aria-pressed="false">С доступом <small>{{ shared|length }}</small></button>{% endif %}
+    {% if ponies %}<button class="ps-flt" type="button" data-f="pony" aria-pressed="false">Пони <small>{{ ponies }}</small></button>{% endif %}
   </div>
-</div>
-{% if horses or shared %}
-{# Тест 5.1: без кнопки «Найти» — список фильтруется по мере ввода (начало клички или слова в кличке, номер ФКСР / FEI / код EQ) #}
-<form class="search pf-search" role="search" onsubmit="return false">
-  <label class="visually-hidden" for="hq">Кличка или номер</label>
-  <input id="hq" name="q" type="search" value="{{ q }}" placeholder="Кличка или номер ФКСР" autocomplete="off" enterkeyhint="search" data-horse-filter="#pf-horses">
-</form>
-<div class="pf-list" id="pf-horses">
-  {% for h in horses %}
-    <article class="pf-row" data-name="{{ h.name }}" data-nums="{{ h.fksr_number }} {{ h.fei_id }} {{ h.code }}">
-      <a class="pf-row__main" href="{% url 'profiles:horse' h.pk %}">
-        <span class="pf-row__title">{{ h.name }}</span>
-        <span class="pf-row__meta">{{ h.summary }}{% if h.fksr_number %} · ФКСР {{ h.fksr_number }}{% endif %}</span>
+  {% endif %}
+  <div class="ps-list" id="pf-horses">
+    {% for h in horses %}
+      <a class="ps-rw" data-hrow href="{% url 'profiles:horse' h.pk %}" data-name="{{ h.name }}" data-nums="{{ h.fksr_number }} {{ h.fei_id }} {{ h.code }}" data-kind="mine{% if h.is_pony %} pony{% endif %}">
+        <span class="ps-t"><b>{{ h.name }}</b>{% if h.is_pony %} <span class="ps-chip ps-chip--pink">пони</span>{% endif %}<span class="ps-s">{{ h.summary }}{% if h.fksr_number %} · ФКСР {{ h.fksr_number }}{% endif %}</span></span>
+        <svg class="ps-chev" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
       </a>
-      {% url 'profiles:horse_edit' h.pk as href %}{% include "partials/edit_icon.html" with label="Изменить лошадь" %}
-    </article>
-  {% endfor %}
-  {% for h in shared %}
-    {# Решение 28.10.2026: лошади, к которым дали доступ, — для заявок, без редактирования #}
-    <article class="pf-row" data-name="{{ h.name }}" data-nums="{{ h.fksr_number }} {{ h.fei_id }} {{ h.code }}">
-      <a class="pf-row__main" href="{% url 'profiles:horse' h.pk %}">
-        <span class="pf-row__title">{{ h.name }} <span class="chip">Доступ</span></span>
-        <span class="pf-row__meta">{{ h.summary }} · управляет {{ h.manager.short_name }}</span>
+    {% endfor %}
+    {% for h in shared %}
+      {# Решение 28.10.2026: лошади, к которым дали доступ, — для заявок, без редактирования #}
+      <a class="ps-rw" data-hrow href="{% url 'profiles:horse' h.pk %}" data-name="{{ h.name }}" data-nums="{{ h.fksr_number }} {{ h.fei_id }} {{ h.code }}" data-kind="shared{% if h.is_pony %} pony{% endif %}">
+        <span class="ps-t"><b>{{ h.name }}</b> <span class="ps-chip ps-chip--info">Доступ</span>{% if h.is_pony %} <span class="ps-chip ps-chip--pink">пони</span>{% endif %}<span class="ps-s">{{ h.short_meta }} · управляет {{ h.manager_name }}</span></span>
+        <svg class="ps-chev" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
       </a>
-    </article>
-  {% endfor %}
-  <p class="muted pf-empty" hidden>Среди ваших лошадей не найдено.</p>
-</div>
+    {% endfor %}
+    <p class="muted pf-empty" hidden>Среди ваших лошадей не найдено.</p>
+  </div>
 <script>
 (function () {
   var input = document.getElementById("hq");
   if (!input || input.dataset.bound) return;
   input.dataset.bound = "1";
-  var box = document.querySelector(input.dataset.horseFilter);
-  var rows = box.querySelectorAll(".pf-row"), empty = box.querySelector(".pf-empty");
+  var box = document.querySelector(input.dataset.horseFilter), wrap = document.getElementById("ps-hsearch");
+  var rows = box.querySelectorAll("[data-hrow]"), empty = box.querySelector(".pf-empty");
+  var toggle = document.querySelector("[data-ps-toggle]"), chips = document.querySelectorAll(".ps-flt"), kind = "all";
   function norm(s) { return (s || "").toLowerCase().replace(/ё/g, "е").trim(); }
   function code(s) { return (s || "").toUpperCase().replace(/[\s-]/g, ""); }
   function match(row, q, qc) {
@@ -54,16 +75,37 @@
     for (var i = 0; i < words.length; i++) if (words[i] && words[i].indexOf(q) === 0) return true;
     return (/\d/.test(qc) || qc.indexOf("EQ") === 0) && code(row.dataset.nums).indexOf(qc) !== -1;
   }
-  function apply() {  // чистая функция текущего ввода: стёрли символ — список снова шире
+  function apply() {  // чистая функция текущего ввода и чипа: стёрли символ — список снова шире
     var q = norm(input.value), qc = code(input.value), shown = 0;
-    rows.forEach(function (r) { var ok = match(r, q, qc); r.hidden = !ok; if (ok) shown++; });
+    rows.forEach(function (r) {
+      var ok = match(r, q, qc) && (kind === "all" || (" " + r.dataset.kind + " ").indexOf(" " + kind + " ") !== -1);
+      r.hidden = !ok; if (ok) shown++;
+    });
     empty.hidden = shown > 0;
   }
   input.addEventListener("input", apply);
+  chips.forEach(function (c) {
+    c.addEventListener("click", function () {
+      kind = c.dataset.f;
+      chips.forEach(function (x) { x.classList.toggle("is-on", x === c); x.setAttribute("aria-pressed", x === c ? "true" : "false"); });
+      apply();
+    });
+  });
+  if (toggle) toggle.addEventListener("click", function () {
+    var open = !wrap.hasAttribute("data-open");
+    if (open) { wrap.setAttribute("data-open", ""); input.focus(); }
+    else { wrap.removeAttribute("data-open"); input.value = ""; apply(); }
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  });
   apply();
 })();
 </script>
-{% else %}
-  <div class="card empty"><h2 class="h3">Лошадей пока нет</h2><p class="muted">Нужны кличка, год рождения, масть, пол и порода.</p></div>
-{% endif %}
+  {% elif not invites %}
+    <div class="ps-empty">
+      <h2 class="ps-h2">Лошадей пока нет</h2>
+      <p class="muted">Нужны кличка, год рождения, масть, пол и порода.</p>
+      <div class="ps-empty__actions"><a class="btn btn--primary" href="{% url 'profiles:horse_new' %}">Добавить лошадь</a></div>
+    </div>
+  {% endif %}
+</div>
 {% endblock %}

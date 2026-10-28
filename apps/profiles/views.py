@@ -1,3 +1,5 @@
+import datetime
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -16,19 +18,57 @@ from apps.core.models import audit
 
 from . import services
 from .forms import AthleteForm, DocumentForm, HorseForm, PhoneForm
-from .models import Athlete, AthleteDelegate, Horse, HorseAccess, HorseDocument, Offer
+from .models import COLOR_SHORT, SEX_SHORT, Athlete, AthleteDelegate, Horse, HorseAccess, HorseDocument, Offer
 
 
 # ---------------- спортсмены ----------------
 
+def _last_first(u):
+    return " ".join(p for p in (u.last_name, u.first_name) if p) or u.phone
+
+
+def _self_word(a):
+    """«управляет сам/сама» — по отчеству; если его нет, по имени управляющего."""
+    mid = (a.middle_name or "").lower()
+    if mid.endswith(("вна", "чна", "кызы")):
+        return "сама"
+    if mid.endswith(("вич", "ич", "оглы")):
+        return "сам"
+    return ""
+
+
+def _athlete_meta(a):
+    """Строка под именем (макет S04B): разряд · клуб · год; без даты/разряда — пометка, заполняются в профиле."""
+    parts = [a.rank_short, a.club, str(a.birth_year) if a.birth_year else ""]
+    missing = [w for w, ok in (("год", a.birth_date), ("разряд", a.rank)) if not ok]
+    if len(missing) == 2:
+        parts.append("год и разряд не указаны")
+    elif missing:
+        parts.append(f"{missing[0]} не указан")
+    return " · ".join(p for p in parts if p)
+
+
 @login_required
 def athletes(request):
-    items = services.athletes_for_entry(request.user)
-    rows = [
-        {"a": a, "manage": a.manager_id == request.user.pk, "own": a.linked_user_id == request.user.pk}
-        for a in items.select_related("manager")
-    ]
-    return render(request, "profiles/athletes.html", {"rows": rows})
+    """Спортсмены по группам (макет S04B): «Это я», «Мои», «Мне доверили»."""
+    me, mine, trusted = [], [], []
+    for a in services.athletes_for_entry(request.user).select_related("manager"):
+        row = {"a": a, "manage": a.manager_id == request.user.pk, "own": a.linked_user_id == request.user.pk,
+               "ini": (a.last_name[:1] + a.first_name[:1]).upper(), "meta": _athlete_meta(a)}
+        if row["own"]:
+            me.append(row)
+        elif row["manage"]:
+            mine.append(row)
+        else:
+            if a.manager_id == a.linked_user_id:
+                who = "управляет " + (_self_word(a) or "сам спортсмен")
+            else:
+                who = "управляет " + _last_first(a.manager)
+            row["meta"] = " · ".join(p for p in (row["meta"], who) if p)
+            trusted.append(row)
+    return render(request, "profiles/athletes.html", {
+        "me": me, "mine": mine, "trusted": trusted, "count": len(me) + len(mine) + len(trusted),
+    })
 
 
 @login_required
@@ -144,10 +184,23 @@ def _with_param(url, key, value):
 
 @login_required
 def horses(request):
-    # Только свои (управляемые) лошади — каждую можно открыть. Фильтр по вводу — на странице, без перезагрузки.
-    items = Horse.objects.filter(manager=request.user, archived=False, added_by_judge=False).order_by("name", "birth_year")
-    shared = Horse.objects.filter(accesses__user=request.user, archived=False).exclude(manager=request.user).select_related("manager").order_by("name", "birth_year")
-    return render(request, "profiles/horses.html", {"horses": items, "shared": shared, "q": request.GET.get("q", "")[:100]})
+    """Мои лошади (макет R2_05): свои и с доступом, чипы-фильтры, поиск по мере ввода.
+    Входящие приглашения к чужой лошади — карточкой сверху с «Принять / Отклонить» (R2_06C)."""
+    items = list(Horse.objects.filter(manager=request.user, archived=False, added_by_judge=False).order_by("name", "birth_year"))
+    shared = list(Horse.objects.filter(accesses__user=request.user, archived=False).exclude(manager=request.user)
+                  .select_related("manager").order_by("name", "birth_year"))
+    for h in shared:
+        h.manager_name = _last_first(h.manager)
+        h.short_meta = " · ".join(p for p in (str(h.birth_year), SEX_SHORT.get(h.sex, ""), COLOR_SHORT.get(h.color, "")) if p)
+    invites = list(Offer.objects.filter(phone=request.user.phone, state=Offer.State.PENDING, kind=Offer.Kind.HORSE_ACCESS, horse__archived=False)
+                   .select_related("horse", "created_by"))
+    for o in invites:
+        o.from_name = _last_first(o.created_by)
+    everything = items + shared
+    return render(request, "profiles/horses.html", {
+        "horses": items, "shared": shared, "invites": invites, "q": request.GET.get("q", "")[:100],
+        "total": len(everything), "ponies": sum(1 for h in everything if h.is_pony),
+    })
 
 
 @login_required
@@ -182,24 +235,79 @@ def horse_edit(request, pk=None):
     return render(request, "profiles/horse_form.html", {"form": form, "horse": horse, "similar": similar, "next": _back_to(request)})
 
 
+DOC_SOON_DAYS = 42  # «Истекает» — за шесть недель до окончания срока (подсказка интерфейса, не норма)
+HORSE_TABS = ("info", "docs", "access")
+
+
+def _mask_phone(phone):
+    """+79161234545 → +7 916 ***-**-45 (макет R2_06A)."""
+    if phone and phone.startswith("+7") and len(phone) == 12:
+        return f"+7 {phone[2:5]} ***-**-{phone[-2:]}"
+    return phone
+
+
+def _open_tournaments_for(user):
+    """Турниры с открытым приёмом заявок (для кнопки «Подать заявку с …»)."""
+    from apps.tournaments.models import Tournament
+
+    qs = Tournament.objects.filter(publication=Tournament.Publication.PUBLISHED, pub_deadline__gte=timezone.localdate() - datetime.timedelta(days=1))
+    return [t for t in qs.order_by("pub_starts_on")[:50] if t.public_entries_open()]
+
+
 @login_required
 def horse_detail(request, pk):
-    h = get_object_or_404(Horse, pk=pk)
+    """Профиль лошади. У управляющего — вкладки Сведения / Документы / Доступ (R2_06A, S08A);
+    у получателя доступа — только сведения, «Подать заявку» и «Отказаться от доступа» (R2_06D)."""
+    h = get_object_or_404(Horse.objects.select_related("manager"), pk=pk)
     manage = services.can_manage_horse(request.user, h)
     docs_visible = services.can_view_horse_documents(request.user, h)
-    return render(
-        request, "profiles/horse_detail.html",
-        {
-            "h": h, "manage": manage, "docs_visible": docs_visible,
-            "documents": h.documents.all() if docs_visible else [],
-            "doc_form": DocumentForm() if manage else None,
-            "offers": h.offers.filter(state=Offer.State.PENDING, kind=Offer.Kind.HORSE_TRANSFER) if manage else [],
-            "access_offers": h.offers.filter(state=Offer.State.PENDING, kind=Offer.Kind.HORSE_ACCESS) if manage else [],
-            "accesses": h.accesses.select_related("user") if manage else [],
-            "my_access": not manage and services.has_horse_access(request.user, h),
-            "form": PhoneForm(),
-        },
-    )
+    my_access = None if manage else HorseAccess.objects.filter(horse=h, user=request.user).first()
+    tabs = [t for t in HORSE_TABS if t == "info" or (t == "docs" and docs_visible) or (t == "access" and manage)]
+    tab = request.GET.get("tab") if request.GET.get("tab") in tabs else "info"
+    documents = list(h.documents.all()) if docs_visible else []
+    today = timezone.localdate()
+    for d in documents:
+        if not d.valid_until:
+            d.status = ""
+        elif d.valid_until < today:
+            d.status = "expired"
+        elif (d.valid_until - today).days <= DOC_SOON_DAYS:
+            d.status = "soon"
+        else:
+            d.status = "ok"
+    ctx = {
+        "h": h, "manage": manage, "docs_visible": docs_visible, "documents": documents, "tabs": tabs, "tab": tab,
+        "my_access": my_access, "manager_name": _last_first(h.manager), "form": PhoneForm(),
+    }
+    if manage:
+        accesses = list(h.accesses.select_related("user"))
+        for a in accesses:
+            a.name = _last_first(a.user)
+            a.ini = ((a.user.last_name[:1] + a.user.first_name[:1]) or "?").upper()
+        pending = list(h.offers.filter(state=Offer.State.PENDING, kind=Offer.Kind.HORSE_ACCESS))
+        busy = {o.phone for o in pending} | {a.user.phone for a in accesses}
+        # Отклонённые приглашения — за последние 30 дней, если тому же номеру не отправлено новое
+        declined, seen = [], set()
+        for o in h.offers.filter(state=Offer.State.DECLINED, kind=Offer.Kind.HORSE_ACCESS,
+                                 responded_at__gte=timezone.now() - datetime.timedelta(days=30)).order_by("-responded_at"):
+            if o.phone not in busy and o.phone not in seen:
+                seen.add(o.phone)
+                declined.append(o)
+        for o in pending + declined:
+            o.masked = _mask_phone(o.phone)
+        ctx.update({
+            "doc_form": DocumentForm(),
+            "offers": h.offers.filter(state=Offer.State.PENDING, kind=Offer.Kind.HORSE_TRANSFER),
+            "access_offers": pending, "accesses": accesses, "declined": declined,
+            "access_count": len(pending) + len(accesses),
+        })
+    if my_access:
+        opened = _open_tournaments_for(request.user)
+        if len(opened) == 1:
+            ctx["apply_url"] = reverse("entries:apply", args=[opened[0].pk]) + "?" + urlencode({"horse": h.pk})
+        elif opened:
+            ctx["apply_url"] = reverse("core:calendar") + "?open=1"
+    return render(request, "profiles/horse_detail.html", ctx)
 
 
 @login_required
@@ -278,7 +386,8 @@ def horse_action(request, pk, action):
         messages.success(request, "Документ удалён.")
     else:
         raise Http404
-    return redirect("profiles:horse", pk=h.pk)
+    tab = "docs" if action in ("upload", "delete_doc") else "access"
+    return redirect(reverse("profiles:horse", args=[h.pk]) + f"?tab={tab}")
 
 
 def _document_or_403(request, pk, doc_id):
@@ -339,6 +448,7 @@ def offers(request):
 @require_POST
 def offer_respond(request, offer_id):
     accept = request.POST.get("decision") == "accept"
+    back = _back_to(request) or reverse("profiles:offers")  # из «Моих лошадей» — обратно туда (R2_06C)
     try:
         offer = services.respond_offer(request.user, offer_id, accept)
     except Offer.DoesNotExist:
@@ -346,6 +456,9 @@ def offer_respond(request, offer_id):
     else:
         if offer.state == Offer.State.CANCELLED:
             messages.error(request, "Предложение уже неактуально.")
-            return redirect("profiles:offers")
-        messages.success(request, "Принято." if accept else "Отклонено.")
-    return redirect("profiles:offers")
+            return redirect(back)
+        if offer.kind == Offer.Kind.HORSE_ACCESS and offer.horse_id:
+            messages.success(request, f"Доступ к лошади «{offer.horse.name}» принят." if accept else "Приглашение отклонено.")
+        else:
+            messages.success(request, "Принято." if accept else "Отклонено.")
+    return redirect(back)
