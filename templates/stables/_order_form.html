@@ -1,0 +1,1 @@
+{% if o.state == "ordered" and not o.delivered and open %}<form method="post" action="{% url 'stables:my_cancel' 'order' o.pk %}" id="o{{ o.pk }}" hidden>{% csrf_token %}<input type="hidden" name="next" value="{{ here }}"></form>{% endif %}

@@ -1,4 +1,5 @@
 import datetime
+import re
 import uuid
 
 from django.contrib import messages
@@ -110,7 +111,10 @@ def _render_book(request, t, form=None, preview=None, errors=None, field_errors=
     order_errors = order_errors or {}
     my_bookings = list(Booking.objects.filter(tournament=t, requested_by=request.user).select_related("category").order_by("arrive", "pk"))
     my_orders = list(ServiceOrder.objects.filter(tournament=t, ordered_by=request.user).select_related("service").order_by("-created_at"))
-    return render(request, "stables/book.html", {
+    if not staff:
+        return _render_cart(request, t, cats, svcs, horses, my_bookings, my_orders, post=order_post, status=status,
+                            errors=list(errors or []) + list((field_errors or {}).values()) + [m for v in order_errors.values() for m in v])
+    return render(request, "stables/book_staff.html", {
         "t": t, "staff": staff, "cats": cats, "svcs": svcs, "horses": horses, "form": form, "preview": preview, "errors": errors or [],
         "fe": field_errors or {}, "open": services.booking_open(t), "okey": (order_post or {}).get("key") or uuid.uuid4().hex,
         "svc_rows": _service_rows(svcs, horses, order_post, order_errors), "order_general": order_errors.get(None, []),
@@ -121,6 +125,144 @@ def _render_book(request, t, form=None, preview=None, errors=None, field_errors=
     }, status=status)
 
 
+# ---------------- экран «Денники и услуги» (макет 10B: лента ночей по каждой лошади) ----------------
+
+WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"]
+
+
+def _plural(n, one, few, many):
+    n = abs(n)
+    if n % 10 == 1 and n % 100 != 11:
+        return one
+    if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
+        return few
+    return many
+
+
+def period_label(arrive, depart):
+    """«20–23 ноября · 3 ночи»: даты заезда и выезда."""
+    n = (depart - arrive).days
+    if arrive.month == depart.month:
+        dates = f"{arrive.day}–{depart.day} {MONTHS[depart.month - 1]}"
+    else:
+        dates = f"{arrive.day} {MONTHS[arrive.month - 1]} – {depart.day} {MONTHS[depart.month - 1]}"
+    return f"{dates} · {n} {_plural(n, 'ночь', 'ночи', 'ночей')}"
+
+
+def _contiguous(nights):
+    return all((b - a).days == 1 for a, b in zip(nights, nights[1:]))
+
+
+def _render_cart(request, t, cats, svcs, horses, my_bookings, my_orders, post=None, errors=None, status=200):
+    """Карточка на каждую лошадь: лента ночей (union периодов активных категорий), счётчики услуг «на лошадь»,
+    её брони и заказы со статусами."""
+    post = post or {}
+    days = sorted({d for c in cats for d in c.nights()})
+    horse_svcs = [s for s in svcs if s.recipient == Service.Recipient.HORSE]
+    other_svcs = [s for s in svcs if s.recipient != Service.Recipient.HORSE]
+    default_cat = str(cats[0].pk) if cats else ""
+    for b in my_bookings:
+        b.period = period_label(b.arrive, b.depart)
+    cards, shown = [], set()
+    for h in horses:
+        bks = [b for b in my_bookings if b.horse_id == h.pk]
+        busy = {d for b in bks if b.is_holding for d in services._days(b.arrive, b.depart)}
+        chosen = set(post.getlist(f"n-{h.pk}")) if post else set()
+        cat = post.get(f"c-{h.pk}", default_cat) if post else default_cat
+        nights = [{"d": d, "iso": d.isoformat(), "wd": f"{WEEKDAYS[d.weekday()]} → {WEEKDAYS[(d.weekday() + 1) % 7]}",
+                   "busy": d in busy, "on": d.isoformat() in chosen and d not in busy,
+                   "cats": " ".join(str(c.pk) for c in cats if c.available_from <= d < c.available_to)} for d in days]
+        on = [n["d"] for n in nights if n["on"]]
+        holding = [b for b in bks if b.is_holding]
+        empty = "; ".join(b.period for b in holding) if holding else "без денника"
+        summary = period_label(on[0], on[-1] + datetime.timedelta(days=1)) if on else empty
+        counters = [{"s": s, "name": f"q-{s.pk}-{h.pk}", "value": post.get(f"q-{s.pk}-{h.pk}", "") if post else ""} for s in horse_svcs]
+        cards.append({"h": h, "nights": nights, "cat": cat, "bookings": bks, "summary": summary, "empty": empty, "selected": bool(on),
+                      "orders": [o for o in my_orders if o.horse_id == h.pk], "counters": counters})
+        shown.add(h.pk)
+    others = [{"s": s, "name": f"q-{s.pk}", "value": post.get(f"q-{s.pk}", "") if post else "", "trailer": post.get(f"trailer-{s.pk}", "") if post else ""}
+              for s in other_svcs]
+    cols = min(len(days), 4) or 1
+    return render(request, "stables/book.html", {
+        "t": t, "cats": cats, "cards": cards, "others": others, "open": services.booking_open(t), "errors": errors or [],
+        "key": post.get("key") if post else uuid.uuid4().hex,
+        "extra_bookings": [b for b in my_bookings if b.horse_id not in shown],
+        "extra_orders": [o for o in my_orders if o.horse_id not in shown],
+        "cols": cols, "cols_wide": min(len(days), 7) or 1,
+        "required": post.get("required") == "on" if post else False, "contact_phone": post.get("contact_phone", "") if post else "",
+        "comment": post.get("comment", "") if post else "",
+        "contacts": _contacts(t) if (my_bookings or my_orders) else [], "here": reverse("stables:book", args=[t.pk]),
+        "units": {s.pk: s.unit for s in svcs},
+    }, status=status)
+
+
+_FIELD = re.compile(r"^(?:n|c)-(\d+)$|^q-\d+-(\d+)$")
+
+
+def _book_cart(request, t):
+    """Отправка экрана «Денники и услуги»: брони и услуги для нескольких лошадей одной кнопкой."""
+    staff = services.can_stable(request.user, t)
+    horses = _book_horses(request.user, t, staff)
+    allowed = {h.pk for h in horses}
+    for name in request.POST:
+        m = _FIELD.match(name)
+        if m and any(v.strip() for v in request.POST.getlist(name)):
+            if int(m.group(1) or m.group(2)) not in allowed:
+                raise PermissionDenied  # чужая лошадь
+    cats = {str(c.pk): c for c in t.stable_categories.filter(is_active=True)}
+    errors, bookings, lines = [], [], []
+    for h in horses:
+        raw = request.POST.getlist(f"n-{h.pk}")
+        nights = sorted({d for d in (_date(x) for x in raw) if d})
+        if len(nights) != len(set(raw)):
+            errors.append(f"«{h.name}»: неверная дата — обновите страницу.")
+            continue
+        if not nights:
+            continue
+        c = cats.get(request.POST.get(f"c-{h.pk}", "")) or (next(iter(cats.values())) if len(cats) == 1 else None)
+        if c is None:
+            errors.append(f"«{h.name}»: выберите категорию денника.")
+        elif not _contiguous(nights):
+            errors.append(f"«{h.name}»: ночи должны идти подряд — одна бронь на один период.")
+        else:
+            bookings.append({"category": c.pk, "horse": h, "arrive": nights[0], "depart": nights[-1] + datetime.timedelta(days=1)})
+    for s in t.services.filter(is_active=True):
+        if s.recipient == Service.Recipient.HORSE:
+            for h in horses:
+                q = request.POST.get(f"q-{s.pk}-{h.pk}", "").strip()
+                if q and q != "0":
+                    lines.append({"service": s.pk, "quantity": q, "horse": h})
+        else:
+            q = request.POST.get(f"q-{s.pk}", "").strip()
+            if q and q != "0":
+                lines.append({"service": s.pk, "quantity": q, "trailer": request.POST.get(f"trailer-{s.pk}", "")})
+    phone = ""
+    if request.POST.get("contact_phone", "").strip():
+        phone = normalize_phone(request.POST["contact_phone"])
+        if not phone:
+            errors.append("Телефон: мобильный номер с кодом страны, например +7 999 123-45-67.")
+    if not errors:
+        try:
+            made, orders = services.submit_cart(request.user, t.pk, bookings, lines, request.POST.get("key", ""),
+                                                request.POST.get("required") == "on", phone, request.POST.get("comment", ""))
+            parts = []
+            if made:
+                parts.append("брони отправлены: " + ", ".join(f"«{b.horse_name}»" for b in made) + " — конюшня подтвердит их и назначит номера денников")
+            if orders:
+                parts.append("услуги заказаны: " + ", ".join(f"{o.service.name} × {o.quantity} ({o.recipient_label})" for o in orders))
+            messages.success(request, ("; ".join(parts) or "Готово").capitalize() + ".")
+            return redirect(reverse("stables:book", args=[t.pk]))
+        except services.OrderErrors as e:
+            errors += [m for _, m in e.items]
+        except (ValueError, services.Conflict) as e:
+            errors.append(str(e))
+    svcs = list(t.services.filter(is_active=True))
+    my_bookings = list(Booking.objects.filter(tournament=t, requested_by=request.user).select_related("category").order_by("arrive", "pk"))
+    my_orders = list(ServiceOrder.objects.filter(tournament=t, ordered_by=request.user).select_related("service").order_by("-created_at"))
+    return _render_cart(request, t, list(cats.values()), svcs, horses, my_bookings, my_orders, post=request.POST, errors=errors)
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def book(request, pk):
@@ -128,6 +270,8 @@ def book(request, pk):
     t = get_object_or_404(Tournament, pk=pk, publication__in=PUBLIC)
     if request.method == "GET":
         return _render_book(request, t)
+    if request.POST.get("mode") == "cart":
+        return _book_cart(request, t)
     cats = list(t.stable_categories.filter(is_active=True))
     staff = services.can_stable(request.user, t)
     horses = _book_horses(request.user, t, staff)

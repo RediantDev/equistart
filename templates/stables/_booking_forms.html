@@ -1,0 +1,2 @@
+{% if b.is_holding and open %}{% if b.state == "pending" %}<form method="post" action="{% url 'stables:my_edit' b.pk %}" id="e{{ b.pk }}" hidden>{% csrf_token %}<input type="hidden" name="revision" value="{{ b.revision }}"></form>{% endif %}
+<form method="post" action="{% url 'stables:my_cancel' 'booking' b.pk %}" id="x{{ b.pk }}" hidden>{% csrf_token %}<input type="hidden" name="next" value="{{ here }}"></form>{% endif %}

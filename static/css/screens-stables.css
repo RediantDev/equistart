@@ -1,1 +1,83 @@
 /* Экраны по утверждённому макету (28.10.2026): stables */
+
+/* 10B · Денники и услуги — лента ночей по каждой лошади */
+.sb-page { max-width: 760px; margin: 0 auto; }
+.sb-back { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; font-size: 13px; font-weight: 600; text-decoration: none; color: var(--text); max-width: 100%; }
+.sb-back span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-back svg, .sb-si svg { fill: none; stroke: currentColor; stroke-width: 1.8px; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.sb-head { display: flex; align-items: flex-end; gap: 8px; margin: 0 0 10px; }
+.sb-head__text { flex: 1; min-width: 0; }
+.sb-h1 { margin: 0; font-size: 22px; line-height: 28px; font-weight: 800; }
+.sb-m { font-size: 12px; line-height: 16px; color: var(--text-muted); margin: 0; }
+.sb-copy { min-height: 44px; font-size: 13px; padding: 0 12px; flex: none; }
+.sb-page > .alert, .sb-note { margin-bottom: 8px; }
+.sb-form { display: flex; flex-direction: column; gap: 8px; }
+
+.sb-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sb-card__head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.sb-card__head b { font-size: 15px; }
+.sb-card__sum { flex: 1; min-width: 0; }
+.sb-muted { color: var(--text-muted); }
+.sb-cat { min-height: 32px; height: 32px; padding: 0 28px 0 10px; font-size: 13px; border-radius: var(--radius-pill); max-width: 100%; width: auto; }
+
+.sb-strip { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 4px; }
+.sb-nt { position: relative; display: block; cursor: pointer; }
+.sb-nt input { position: absolute; opacity: 0; inset: 0; margin: 0; width: 100%; height: 100%; cursor: pointer; }
+.sb-nt__in { height: 44px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px; line-height: 16px; user-select: none; }
+.sb-nt__in small { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+.sb-nt input:checked + .sb-nt__in { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.sb-nt input:checked + .sb-nt__in small { color: var(--border); }
+.sb-nt input:focus-visible + .sb-nt__in { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sb-nt.is-busy { cursor: default; }
+.sb-nt.is-busy input { cursor: default; }
+.sb-nt.is-busy .sb-nt__in { background: var(--surface-2); border-color: var(--control-border); border-style: dashed; color: var(--text); }
+.sb-nt.is-busy input:checked + .sb-nt__in { background: var(--surface-2); border-color: var(--control-border); color: var(--text); }
+.sb-nt.is-busy input:checked + .sb-nt__in small { color: var(--text-muted); }
+.sb-nt.is-off { cursor: not-allowed; }
+.sb-nt.is-off .sb-nt__in { opacity: .4; }
+.sb-nt input:disabled { cursor: inherit; }
+
+.sb-sv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sb-si { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: var(--radius-pill); min-height: 44px; padding: 0 12px; min-width: 0; }
+.sb-si label { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-si input { width: 52px; min-height: 36px; height: 36px; padding: 0 4px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sb-si.is-js { padding-right: 0; gap: 0; }
+.sb-si.is-js input { width: 28px; border: 0; background: transparent; padding: 0; -moz-appearance: textfield; appearance: textfield; box-shadow: none; }
+.sb-si.is-js input::-webkit-outer-spin-button, .sb-si.is-js input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.sb-si.is-js input::placeholder { color: var(--text); }
+.sb-si button { width: 36px; height: 42px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; color: var(--text); flex: none; }
+.sb-si button[hidden] { display: none; }
+.sb-trailer { min-height: 44px; border-radius: var(--radius-pill); }
+
+.sb-mine { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.sb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 0 0; font-size: 13px; scroll-margin-top: 72px; }
+.sb-row + .sb-row { border-top: 1px dashed var(--border); margin-top: 8px; }
+.sb-row__main { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sb-row__acts { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 100%; }
+.sb-act[open] { flex: 1 1 100%; }
+.sb-act__body { padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); display: flex; flex-direction: column; gap: 8px; }
+.sb-act__body.inline-row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.sb-act__body.inline-row input { flex: 1 1 180px; }
+
+.sb-extra { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; }
+.sb-extra > summary { cursor: pointer; font-weight: 600; font-size: 13px; min-height: 28px; display: flex; align-items: center; }
+.sb-extra[open] > summary { margin-bottom: 8px; }
+.sb-extra .field { margin-top: 8px; }
+
+.sb-bar { position: sticky; bottom: 0; z-index: 6; display: flex; align-items: center; gap: 12px; margin-top: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 10px 10px 16px; box-shadow: 0 -4px 20px rgba(20,20,20,.06); }
+.sb-bar__text { flex: 1; min-width: 0; }
+.sb-bar__text b { display: block; font-size: 14px; line-height: 18px; }
+.sb-bar__text .sb-m { display: block; overflow: hidden; text-overflow: ellipsis; }
+.sb-bar__btn { flex: none; min-height: 44px; }
+
+@media (min-width: 721px) {
+  .sb-strip { grid-template-columns: repeat(var(--cols-wide, 3), minmax(0, 1fr)); }
+  .sb-sv { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sb-bar { bottom: 12px; }
+}
+@media (max-width: 720px) {
+  /* Панель «Заказать» — во всю ширину над нижним меню, как в макете */
+  .sb-bar { bottom: calc(var(--bnav-h) + env(safe-area-inset-bottom)); margin-left: -16px; margin-right: -16px; border-radius: 0; border-width: 1px 0 0; box-shadow: none; padding: 8px 16px 10px; }
+}
