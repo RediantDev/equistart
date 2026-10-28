@@ -4,8 +4,11 @@ from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.http import urlencode
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.accounts.models import User
@@ -141,8 +144,9 @@ def _with_param(url, key, value):
 
 @login_required
 def horses(request):
-    items = Horse.objects.filter(manager=request.user, archived=False, added_by_judge=False)
-    return render(request, "profiles/horses.html", {"horses": items})
+    # Только свои (управляемые) лошади — каждую можно открыть. Фильтр по вводу — на странице, без перезагрузки.
+    items = Horse.objects.filter(manager=request.user, archived=False, added_by_judge=False).order_by("name", "birth_year")
+    return render(request, "profiles/horses.html", {"horses": items, "q": request.GET.get("q", "")[:100]})
 
 
 @login_required
@@ -243,25 +247,50 @@ def horse_action(request, pk, action):
     return redirect("profiles:horse", pk=h.pk)
 
 
-@login_required
-def horse_document(request, pk, doc_id):
+def _document_or_403(request, pk, doc_id):
     h = get_object_or_404(Horse, pk=pk)
     if not services.can_view_horse_documents(request.user, h):
         raise PermissionDenied
-    d = get_object_or_404(HorseDocument, pk=doc_id, horse=h)
+    return h, get_object_or_404(HorseDocument, pk=doc_id, horse=h)
+
+
+@login_required
+@xframe_options_sameorigin  # тест 5.1: превью внутри страницы просмотра документа
+def horse_document(request, pk, doc_id):
+    h, d = _document_or_403(request, pk, doc_id)
     ext = {"application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/heic": "heic"}.get(d.content_type, "bin")
-    resp = FileResponse(d.file.open("rb"), content_type=d.content_type, filename=f"{h.code}-{d.kind}.{ext}")
+    download = request.GET.get("download") == "1"
+    resp = FileResponse(d.file.open("rb"), content_type=d.content_type, as_attachment=download, filename=f"{h.code}-{d.kind}.{ext}")
     resp["X-Content-Type-Options"] = "nosniff"
-    resp["Content-Security-Policy"] = "sandbox"
+    if d.content_type != "application/pdf":
+        # Встроенный просмотрщик PDF в браузерах не работает в «песочнице»; тип PDF проверен по сигнатуре при загрузке
+        resp["Content-Security-Policy"] = "sandbox"
+    resp["Cache-Control"] = "private, no-store"
     return resp
 
 
 @login_required
+def horse_document_view(request, pk, doc_id):
+    """Страница документа: шапка с возвратом к лошади, сведения, превью и «Скачать» (тест 5.1)."""
+    h, d = _document_or_403(request, pk, doc_id)
+    return render(request, "profiles/horse_document.html", {
+        "h": h, "d": d, "is_pdf": d.content_type == "application/pdf", "is_image": d.content_type.startswith("image/"),
+        "manage": services.can_manage_horse(request.user, h),
+    })
+
+
+@login_required
 def horse_search(request):
+    """Поиск по всему сервису нужен только для выбора лошади в заявке (есть ?next=).
+    Без next открыть можно лишь свои профили — это «Мои лошади» с тем же запросом (тест 5.1)."""
     q = request.GET.get("q", "")
+    nxt = _back_to(request)
+    if not nxt:
+        url = reverse("profiles:horses")
+        return redirect(url + ("?" + urlencode({"q": q}) if q else ""))
     mode = request.GET.get("mode", "auto")
     results = services.search_horses(q, mode)
-    return render(request, "profiles/horse_search.html", {"q": q, "mode": mode, "results": results, "next": request.GET.get("next", "")})
+    return render(request, "profiles/horse_search.html", {"q": q, "mode": mode, "results": results, "next": nxt})
 
 
 # ---------------- входящие предложения ----------------

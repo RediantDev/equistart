@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ d.label }} — {{ h.name }} — СтартЛист{% endblock %}
+{% block content %}
+{% url 'profiles:horse_document' h.pk d.pk as file_url %}
+<div class="pf-head pf-head--detail">
+  <a class="back" href="{% url 'profiles:horse' h.pk %}">← {{ h.name }}</a>
+  <div class="pf-title">
+    <h1 class="h1">{{ d.label }}</h1>
+    <a class="btn btn--dark btn--sm" href="{{ file_url }}?download=1" download hx-boost="false">Скачать</a>
+  </div>
+  <p class="muted pf-sub">{{ d.get_kind_display }}{% if d.valid_until %} · действует до {{ d.valid_until|date:"d.m.Y" }}{% endif %}{% if d.expired %} <span class="chip chip--danger">Срок истёк</span>{% endif %}</p>
+</div>
+<div class="pf-doc">
+  {% if is_pdf %}
+    <iframe class="pf-doc__frame" src="{{ file_url }}" title="{{ d.label }}"></iframe>
+    <p class="muted pf-doc__note">Не отображается? <a href="{{ file_url }}?download=1" download hx-boost="false">Скачайте файл</a>.</p>
+  {% elif is_image %}
+    <img class="pf-doc__img" src="{{ file_url }}" alt="{{ d.label }}">
+    {% if d.content_type == "image/heic" %}<p class="muted pf-doc__note">Фото HEIC показывают не все браузеры — <a href="{{ file_url }}?download=1" download hx-boost="false">скачайте файл</a>.</p>{% endif %}
+  {% else %}
+    <p class="muted">Предпросмотр недоступен. <a href="{{ file_url }}?download=1" download hx-boost="false">Скачайте файл</a>.</p>
+  {% endif %}
+</div>
+{% endblock %}

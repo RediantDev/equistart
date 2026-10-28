@@ -74,7 +74,16 @@ def search_horses(query: str, mode: str):
 
         norm = normalize_fksr(q)
         return qs.filter(Q(fksr_number=norm) | Q(fei_id=norm) | Q(code=q.upper()) | Q(code="EQ-" + q.upper().replace("EQ", "").strip(" -")))[:20]
-    return qs.filter(name__icontains=q).order_by("name", "birth_year")[:30]
+    # Тест 5.1: по началу клички или началу любого слова в кличке (не по вхождению); ё = е, регистр не важен
+    from django.db.models import Value
+    from django.db.models.functions import Lower, Replace
+
+    qn = q.lower().replace("ё", "е")
+    nm = Replace(Lower("name"), Value("ё"), Value("е"))
+    word = Q(nm__startswith=qn)
+    for sep in (" ", "-", "«", "\"", "("):
+        word |= Q(nm__contains=sep + qn)
+    return qs.annotate(nm=nm).filter(word).order_by("name", "birth_year")[:30]
 
 
 @transaction.atomic

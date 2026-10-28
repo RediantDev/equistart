@@ -18,20 +18,23 @@ class AthleteForm(forms.ModelForm):
         model = Athlete
         fields = ["last_name", "first_name", "middle_name", "birth_date", "rank", "fksr_number", "fei_id", "club", "region", "coach_name"]
         widgets = {"birth_date": DATE}
-        help_texts = {
-            "birth_date": "Нужна для зачётов с возрастными условиями. Публично показывается только год.",
-            "rank": "Один для конкура и выездки. По нему проверяются зачёты с условием о разряде.",
-            "fksr_number": "Необязательно. Один номер — один спортсмен в сервисе.",
-            "fei_id": "Необязательно. Для спортсменов с регистрацией FEI.",
-        }
+
+    # Решение заказчика 28.10.2026: дата рождения и разряд обязательны (б/р — допустимый выбор).
+    # Прежние записи без них в БД остаются; заполнить их потребуется при следующем сохранении.
+    REQUIRED = ("birth_date", "rank")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for f in self.fields.values():
+            f.help_text = ""  # Тест 5.1: без длинных подсказок под полями
+        for name in self.REQUIRED:
+            self.fields[name].required = True
+            self.fields[name].error_messages["required"] = "Обязательное поле."
         if "region" in self.fields:
             from .catalogs import regions_json
 
             self.fields["region"].widget.attrs.update({"data-suggest": regions_json(), "placeholder": "Начните вводить: «Моск…»"})
-        self.fields["rank"].choices = [("", "— не указан —")] + list(self.fields["rank"].choices)[1:]
+        self.fields["rank"].choices = [("", "— выберите —")] + list(self.fields["rank"].choices)[1:]
 
     def clean_birth_date(self):
         d = self.cleaned_data.get("birth_date")
@@ -57,12 +60,23 @@ class HorseForm(forms.ModelForm):
     class Meta:
         model = Horse
         fields = ["name", "birth_year", "color", "sex", "breed", "fksr_number", "fei_id", "sire", "birthplace", "owner_name", "is_pony", "height_cm"]
-        help_texts = {"fksr_number": "Необязательно. Если номер уже есть в сервисе, мы предложим найденный профиль.",
-                      "fei_id": "Необязательно. Один номер — одна лошадь в сервисе."}
+
+    MAX_AGE = 35  # Тест 5.1: реалистичный возраст лошади
+
+    @classmethod
+    def year_bounds(cls):
+        this = datetime.date.today().year
+        return this - cls.MAX_AGE, this
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.duplicate = None
+        for name, f in self.fields.items():
+            if name != "owner_name":
+                f.help_text = ""  # Тест 5.1: без длинных подсказок; у владельца — короткая
+        self.fields["owner_name"].help_text = "Не публикуется."
+        lo, hi = self.year_bounds()
+        self.fields["birth_year"].widget.attrs.update({"min": lo, "max": hi, "inputmode": "numeric", "placeholder": str(hi - 8)})
         self.fields["color"].choices = [("", "— выберите —")] + list(self.fields["color"].choices)[1:]
         self.fields["sex"].choices = [("", "— выберите —")] + list(self.fields["sex"].choices)[1:]
         from .catalogs import breeds_json
@@ -71,8 +85,11 @@ class HorseForm(forms.ModelForm):
 
     def clean_birth_year(self):
         y = self.cleaned_data["birth_year"]
-        if y > datetime.date.today().year or y < 1980:
-            raise ValidationError("Год рождения не может быть из будущего или раньше 1980.")
+        lo, hi = self.year_bounds()
+        if y > hi:
+            raise ValidationError(f"Год рождения не может быть из будущего: укажите год от {lo} до {hi}.")
+        if y < lo:
+            raise ValidationError(f"Лошади не бывает больше {self.MAX_AGE} лет: укажите год от {lo} до {hi}.")
         return y
 
     def clean_fksr_number(self):

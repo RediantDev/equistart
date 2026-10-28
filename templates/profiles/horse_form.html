@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block title %}{% if horse %}{{ horse.name }}{% else %}Новая лошадь{% endif %} — СтартЛист{% endblock %}
 {% block content %}
-<section class="auth">
+<section class="auth pf-form">
   <div class="card auth__card auth__card--wide">
     <a class="back" href="{% if next %}{{ next }}{% elif horse %}{% url 'profiles:horse' horse.pk %}{% else %}{% url 'profiles:horses' %}{% endif %}">{% if next %}← Вернуться к заявке{% else %}← Назад{% endif %}</a>
     <h1 class="h1">{% if horse %}Изменить лошадь{% else %}Новая лошадь{% endif %}</h1>
     {% if similar %}
       <div class="alert alert--warning" role="alert">
-        В сервисе уже есть лошадь с такой кличкой и тем же годом рождения. Если это она — не создавайте вторую: выберите её в заявке через «Найти лошадь в сервисе». Если это другая лошадь — просто сохраните.
+        Уже есть лошадь с такой кличкой и тем же годом рождения. Если это она — выберите её в заявке через поиск, вторую не создавайте.
         <ul class="list" style="margin-top: var(--space-2);">{% for s in similar %}<li class="list__row"><strong>{{ s.name }}</strong><span class="table__sub">{{ s.summary }}{% if s.fksr_number %} · ФКСР {{ s.fksr_number }}{% endif %}</span></li>{% endfor %}</ul>
       </div>
     {% endif %}
@@ -23,14 +23,16 @@
         {% include "partials/field.html" with field=form.sex %}
         {% include "partials/field.html" with field=form.breed %}
       </div>
-      {% include "partials/field.html" with field=form.fksr_number %}
-      {% include "partials/field.html" with field=form.fei_id %}
+      <div class="grid-2">
+        {% include "partials/field.html" with field=form.fksr_number %}
+        {% include "partials/field.html" with field=form.fei_id %}
+      </div>
       {# Тест 5, п. 15.2: «Рост в холке» — только для пони #}
       {% include "partials/field.html" with field=form.is_pony %}
       <div data-show-when="is_pony:checked">{% include "partials/field.html" with field=form.height_cm %}</div>
       <details{% if form.sire.value or form.birthplace.value or form.owner_name.value %} open{% endif %}>
         <summary class="label" style="cursor: pointer;">Дополнительно: отец, место рождения, владелец</summary>
-        <div class="form" style="margin-top: var(--space-3);">
+        <div class="form pf-more">
           <div class="grid-2">
             {% include "partials/field.html" with field=form.sire %}
             {% include "partials/field.html" with field=form.birthplace %}

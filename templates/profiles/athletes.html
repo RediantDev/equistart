@@ -1,36 +1,30 @@
 {% extends "base.html" %}
 {% block title %}Спортсмены — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
+<div class="page-head pf-head">
   <div>
     <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
     <h1 class="h1">Спортсмены</h1>
-    <p class="muted">Те, кем вы управляете, кто разрешил вам подавать заявки, и ваш собственный профиль.</p>
   </div>
   <div class="form-actions">
     {# Тест 5, п. 12.2: свой профиль уже в списке («Это вы») — кнопка нужна, только пока его нет #}
-    {% if user.is_athlete %}{% with own=rows|dictsort:"own"|last %}{% if not own.own %}<a class="btn btn--ghost" href="{% url 'profiles:athlete_new' %}?me=1">Создать мой профиль спортсмена</a>{% endif %}{% endwith %}{% endif %}
-    <a class="btn btn--primary" href="{% url 'profiles:athlete_new' %}">+ Добавить спортсмена</a>
+    {% if user.is_athlete %}{% with own=rows|dictsort:"own"|last %}{% if not own.own %}<a class="btn btn--ghost btn--sm" href="{% url 'profiles:athlete_new' %}?me=1">Мой профиль спортсмена</a>{% endif %}{% endwith %}{% endif %}
+    <a class="btn btn--primary btn--sm" href="{% url 'profiles:athlete_new' %}">+ Добавить</a>
   </div>
 </div>
 {% if rows %}
-  <div class="list-cards">
+  <div class="pf-list">
     {% for r in rows %}
-      <article class="row-card">
-        <div style="flex: 1 1 180px; min-width: 0;">
-          <a class="h3 row-card__title" href="{% url 'profiles:athlete' r.a.pk %}">{{ r.a.full_name }}</a>
-          <div class="table__sub">{{ r.a.summary|default:"Дополнительные сведения не заполнены" }}</div>
-        </div>
-        <div class="chips">
-          {% if r.own %}<span class="tag tag--lemon">Это вы</span>{% endif %}
-          {% if not r.manage %}<span class="tag tag--lilac">Можно подавать заявки</span>{% endif %}
-          {% if r.a.linked_user_id and not r.own %}<span class="tag tag--sky">Связан с аккаунтом</span>{% endif %}
-        </div>
+      <article class="pf-row">
+        <a class="pf-row__main" href="{% url 'profiles:athlete' r.a.pk %}">
+          <span class="pf-row__title">{{ r.a.full_name }}{% if r.own %} <span class="tag tag--lemon">Это вы</span>{% elif not r.manage %} <span class="tag tag--lilac">Можно заявлять</span>{% endif %}</span>
+          <span class="pf-row__meta">{{ r.a.summary|default:"Нет даты рождения и разряда" }}</span>
+        </a>
         {% if r.manage %}{% url 'profiles:athlete_edit' r.a.pk as href %}{% include "partials/edit_icon.html" with label="Изменить спортсмена" %}{% endif %}
       </article>
     {% endfor %}
   </div>
 {% else %}
-  <div class="card empty"><h2 class="h3">Спортсменов пока нет</h2><p class="muted">Добавьте спортсмена — регистрация и телефон ему не нужны.</p></div>
+  <div class="card empty"><h2 class="h3">Спортсменов пока нет</h2><p class="muted">Регистрация и телефон спортсмену не нужны.</p></div>
 {% endif %}
 {% endblock %}

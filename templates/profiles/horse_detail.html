@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block title %}{{ h.name }} — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <a class="back" href="{% url 'profiles:horses' %}">← Лошади</a>
+<div class="pf-head pf-head--detail">
+  <a class="back" href="{% url 'profiles:horses' %}">← Лошади</a>
+  <div class="pf-title">
     <h1 class="h1">{{ h.name }}</h1>
-    <p class="muted">{{ h.summary }}</p>
+    {% if manage %}{% url 'profiles:horse_edit' h.pk as href %}{% include "partials/edit_icon.html" with label="Изменить лошадь" %}{% endif %}
   </div>
-  {% if manage %}<a class="btn btn--ghost" href="{% url 'profiles:horse_edit' h.pk %}">Изменить</a>{% endif %}
+  <p class="muted pf-sub">{{ h.summary }}</p>
 </div>
-<div class="wizard-grid">
+<div class="wizard-grid pf-detail">
   <div class="wizard-main">
     <section class="card">
       <h2 class="h3">Сведения</h2>
@@ -32,12 +32,16 @@
     {% if docs_visible %}
     <section class="card">
       <h2 class="h3">Документы</h2>
-      <p class="muted">Видят только управляющий, а также организатор и судьи турнира, куда подана заявка с этой лошадью. Оригиналы проверяются на месте.</p>
+      {# Тест 5.1: вместо длинного абзаца — одна строка, полный текст по (i) #}
+      <details class="pf-hint">
+        <summary><span class="pf-hint__i" aria-hidden="true">i</span> Кто видит документы<span class="visually-hidden"> — подробнее</span></summary>
+        <p>Видят только управляющий, а также организатор и судьи турнира, куда подана заявка с этой лошадью. Оригиналы проверяются на месте.</p>
+      </details>
       {% if documents %}
-        <ul class="list">{% for d in documents %}
-          <li class="list__row"><span style="flex: 1;"><a href="{% url 'profiles:horse_document' h.pk d.pk %}" target="_blank" rel="noopener">{{ d.label }}</a><span class="table__sub">{{ d.get_kind_display }} · загружен {{ d.uploaded_at|date:"d.m.Y" }}{% if d.valid_until %} · до {{ d.valid_until|date:"d.m.Y" }}{% endif %}</span></span>
+        <ul class="list pf-docs">{% for d in documents %}
+          <li class="list__row"><a class="pf-docs__main" href="{% url 'profiles:horse_document_view' h.pk d.pk %}">{{ d.label }}<span class="table__sub">{{ d.get_kind_display }}{% if d.valid_until %} · до {{ d.valid_until|date:"d.m.Y" }}{% endif %}</span></a>
             {% if d.expired %}<span class="chip chip--danger">Срок истёк</span>{% endif %}
-            {% if manage %}<form method="post" action="{% url 'profiles:horse_action' h.pk 'delete_doc' %}">{% csrf_token %}<input type="hidden" name="document" value="{{ d.pk }}"><button class="btn btn--danger btn--sm">Удалить</button></form>{% endif %}
+            {% if manage %}<form method="post" action="{% url 'profiles:horse_action' h.pk 'delete_doc' %}">{% csrf_token %}<input type="hidden" name="document" value="{{ d.pk }}"><button class="btn btn--danger btn--sm" data-confirm="Удалить документ «{{ d.label }}»?" data-confirm-ok="Удалить">Удалить</button></form>{% endif %}
           </li>{% endfor %}</ul>
       {% else %}<p class="muted">Документов нет.</p>{% endif %}
       {% if manage %}
@@ -46,7 +50,7 @@
             {% csrf_token %}
             <div class="grid-2">{% include "partials/field.html" with field=doc_form.kind %}{% include "partials/field.html" with field=doc_form.title %}</div>
             <div class="grid-2">
-              <div class="field"><label class="field__label" for="docfile">Файл</label><input id="docfile" type="file" name="file" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,image/heic,.heic,.heif" data-max-mb="20" required><p class="field__help">PDF или фото (JPEG, PNG, WEBP, HEIC) до 20 МБ.</p></div>
+              <div class="field"><label class="field__label" for="docfile">Файл</label><input id="docfile" type="file" name="file" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,image/heic,.heic,.heif" data-max-mb="20" required><p class="field__help">PDF или фото, до 20 МБ.</p></div>
               {% include "partials/field.html" with field=doc_form.valid_until %}
             </div>
             <button class="btn btn--dark">Загрузить</button>
@@ -58,10 +62,14 @@
   </div>
   {% if manage %}
   <aside class="wizard-aside">
-    {% if offers %}<section class="card"><h2 class="h3">Ожидает ответа</h2><ul class="list">{% for o in offers %}<li class="list__row"><span style="flex: 1;">Передача на {{ o.phone }}</span><form method="post" action="{% url 'profiles:horse_action' h.pk 'cancel_offer' %}">{% csrf_token %}<input type="hidden" name="offer" value="{{ o.pk }}"><button class="btn btn--ghost btn--sm">Отменить</button></form></li>{% endfor %}</ul></section>{% endif %}
-    <details class="card"><summary class="h3">Передать управление</summary>
-      <p class="muted">После принятия новым управляющим вы потеряете редактирование. Код, заявки и история сохраняются. Это не подтверждение права собственности.</p>
-      <form method="post" action="{% url 'profiles:horse_action' h.pk 'transfer' %}" class="form">{% csrf_token %}<input name="phone" type="tel" placeholder="Телефон нового управляющего" aria-label="Телефон нового управляющего"><button class="btn btn--dark">Предложить передачу</button></form>
+    <details class="card"{% if offers %} open{% endif %}><summary class="h3">Передать управление</summary>
+      {% if offers %}
+        {# Тест 5.1: ожидающая передача — внутри этого блока #}
+        <ul class="list pf-offers">{% for o in offers %}<li class="list__row"><span style="flex: 1;">Ожидает ответа<span class="table__sub">Передача на {{ o.phone }}</span></span><form method="post" action="{% url 'profiles:horse_action' h.pk 'cancel_offer' %}">{% csrf_token %}<input type="hidden" name="offer" value="{{ o.pk }}"><button class="btn btn--ghost btn--sm">Отменить</button></form></li>{% endfor %}</ul>
+      {% else %}
+        <p class="muted">После принятия вы потеряете редактирование. Код, заявки и история сохранятся.</p>
+        <form method="post" action="{% url 'profiles:horse_action' h.pk 'transfer' %}" class="form">{% csrf_token %}<input name="phone" type="tel" placeholder="Телефон нового управляющего" aria-label="Телефон нового управляющего"><button class="btn btn--dark">Предложить передачу</button></form>
+      {% endif %}
     </details>
   </aside>
   {% endif %}

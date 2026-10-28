@@ -1,35 +1,60 @@
 {% extends "base.html" %}
 {% block title %}Лошади — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
+<div class="page-head pf-head">
   <div>
     <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
     <h1 class="h1">Мои лошади</h1>
-    <p class="muted">Лошади, профилями которых вы управляете. Чужую лошадь можно выбрать в заявке через поиск.</p>
   </div>
   <div class="form-actions">
-    <a class="btn btn--primary" href="{% url 'profiles:horse_new' %}">+ Добавить лошадь</a>
+    <a class="btn btn--primary btn--sm" href="{% url 'profiles:horse_new' %}">+ Добавить</a>
   </div>
 </div>
-{# Тест 5, п. 14.1: вместо кнопки «Найти лошадь» — поле поиска; кличка или номер определяется автоматически #}
-<form method="get" action="{% url 'profiles:horse_search' %}" class="search" role="search" data-require-input>
-  <label class="visually-hidden" for="hq">Найти лошадь в сервисе</label>
-  <input id="hq" name="q" type="search" placeholder="Кличка или номер ФКСР" enterkeyhint="search">
-  <button class="btn btn--dark" data-require-btn>Найти</button>
-</form>
 {% if horses %}
-  <div class="list-cards">
-    {% for h in horses %}
-      <article class="row-card">
-        <div style="flex: 1 1 180px; min-width: 0;">
-          <a class="h3 row-card__title" href="{% url 'profiles:horse' h.pk %}">{{ h.name }}</a>
-          <div class="table__sub">{{ h.summary }}{% if h.fksr_number %} · ФКСР {{ h.fksr_number }}{% endif %}</div>
-        </div>
-        {% url 'profiles:horse_edit' h.pk as href %}{% include "partials/edit_icon.html" with label="Изменить лошадь" %}
-      </article>
-    {% endfor %}
-  </div>
+{# Тест 5.1: без кнопки «Найти» — список фильтруется по мере ввода (начало клички или слова в кличке, номер ФКСР / FEI / код EQ) #}
+<form class="search pf-search" role="search" onsubmit="return false">
+  <label class="visually-hidden" for="hq">Кличка или номер</label>
+  <input id="hq" name="q" type="search" value="{{ q }}" placeholder="Кличка или номер ФКСР" autocomplete="off" enterkeyhint="search" data-horse-filter="#pf-horses">
+</form>
+<div class="pf-list" id="pf-horses">
+  {% for h in horses %}
+    <article class="pf-row" data-name="{{ h.name }}" data-nums="{{ h.fksr_number }} {{ h.fei_id }} {{ h.code }}">
+      <a class="pf-row__main" href="{% url 'profiles:horse' h.pk %}">
+        <span class="pf-row__title">{{ h.name }}</span>
+        <span class="pf-row__meta">{{ h.summary }}{% if h.fksr_number %} · ФКСР {{ h.fksr_number }}{% endif %}</span>
+      </a>
+      {% url 'profiles:horse_edit' h.pk as href %}{% include "partials/edit_icon.html" with label="Изменить лошадь" %}
+    </article>
+  {% endfor %}
+  <p class="muted pf-empty" hidden>Среди ваших лошадей не найдено.</p>
+</div>
+<script>
+(function () {
+  var input = document.getElementById("hq");
+  if (!input || input.dataset.bound) return;
+  input.dataset.bound = "1";
+  var box = document.querySelector(input.dataset.horseFilter);
+  var rows = box.querySelectorAll(".pf-row"), empty = box.querySelector(".pf-empty");
+  function norm(s) { return (s || "").toLowerCase().replace(/ё/g, "е").trim(); }
+  function code(s) { return (s || "").toUpperCase().replace(/[\s-]/g, ""); }
+  function match(row, q, qc) {
+    if (!q) return true;
+    var name = norm(row.dataset.name);
+    if (name.indexOf(q) === 0) return true;
+    var words = name.split(/[\s\-«»"']+/);
+    for (var i = 0; i < words.length; i++) if (words[i] && words[i].indexOf(q) === 0) return true;
+    return (/\d/.test(qc) || qc.indexOf("EQ") === 0) && code(row.dataset.nums).indexOf(qc) !== -1;
+  }
+  function apply() {  // чистая функция текущего ввода: стёрли символ — список снова шире
+    var q = norm(input.value), qc = code(input.value), shown = 0;
+    rows.forEach(function (r) { var ok = match(r, q, qc); r.hidden = !ok; if (ok) shown++; });
+    empty.hidden = shown > 0;
+  }
+  input.addEventListener("input", apply);
+  apply();
+})();
+</script>
 {% else %}
-  <div class="card empty"><h2 class="h3">Лошадей пока нет</h2><p class="muted">Добавьте лошадь: кличка, год рождения, масть, пол и порода.</p></div>
+  <div class="card empty"><h2 class="h3">Лошадей пока нет</h2><p class="muted">Нужны кличка, год рождения, масть, пол и порода.</p></div>
 {% endif %}
 {% endblock %}
