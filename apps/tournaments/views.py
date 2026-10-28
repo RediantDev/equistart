@@ -828,16 +828,36 @@ def _club_of(t):
     return Club.objects.filter(venue_id=t.venue_id, confirmed_at__isnull=False, merged_into__isnull=True).first() if t.venue_id else None
 
 
+def _dates_short(start, end):
+    """«21–22 ноября», «30 ноября — 1 декабря» — для плитки «Даты» (год — строкой ниже)."""
+    from .templatetags.tournaments import isodate
+
+    if not start:
+        return ""
+    if not end or end == start:
+        return isodate(start, False)
+    if (start.year, start.month) == (end.year, end.month):
+        return f"{start.day}–{isodate(end, False)}"
+    return f"{isodate(start, False)} — {isodate(end, False)}"
+
+
 def public_detail(request, pk):
     t = get_object_or_404(Tournament, pk=pk, publication__in=PUBLIC_STATES)
     s = t.snapshot
     days = {}
     for p in s["programs"]:
         days.setdefault(p["day"], []).append(p)
+    # Строка программы ведёт к стартовому протоколу маршрута (макет R2_01): номер элемента — по дню и названию
+    ids = {(p.day.isoformat(), p.name): p.pk for p in t.programs.all()}
+    for progs in days.values():
+        for i, p in enumerate(progs):
+            progs[i] = dict(p, pk=ids.get((p["day"], p["name"])))
     day_list = [
         {"date": datetime.date.fromisoformat(d), "weekday": ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"][datetime.date.fromisoformat(d).weekday()], "programs": progs}
         for d, progs in sorted(days.items())
     ]
+    venue = s.get("venue") or {}
+    map_query = ", ".join(x for x in (venue.get("region_name"), venue.get("settlement"), venue.get("address"), venue.get("name") if not venue.get("address") else "") if x)
     deadline = datetime.date.fromisoformat(s["entry_deadline"]) if s.get("entry_deadline") else None
     days_left = None
     if deadline and t.pub_timezone:
@@ -848,7 +868,7 @@ def public_detail(request, pk):
         "tournaments/public_detail.html",
         {
             "t": t, "s": s, "days": day_list, "deadline": deadline, "days_left": days_left,
-            "club": _club_of(t),
+            "club": _club_of(t), "map_query": map_query, "dates_short": _dates_short(t.pub_starts_on, t.pub_ends_on),
             "open": t.public_entries_open(), "card": _card(t),
             "can_manage": request.user.is_authenticated and services.can_manage(request.user, t),
             "can_judge": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "judge"}),
@@ -906,7 +926,7 @@ def _public_tabs(request, t):
     tab = request.GET.get("tab", "")
     if tab not in ("starts", "results"):
         tab = ""
-    out = {"tab": tab, "starts": [], "results": [], "days_nav": [], "day": ""}
+    out = {"tab": tab, "starts": [], "results": [], "days_nav": [], "day": "", "route": None}
     if not tab:
         return out
     programs = list(t.programs.prefetch_related("classes").order_by("day", "start_time", "position", "id"))
@@ -931,6 +951,9 @@ def _public_tabs(request, t):
                 d = datetime.date.fromisoformat(day)
             except ValueError:
                 d = None
+            if d not in days and request.GET.get("prog", "").isdigit():
+                # Переход со строки программы к протоколу маршрута — день этого маршрута
+                d = next((p.day for p in have if p.pk == int(request.GET["prog"])), None)
             if d not in days:
                 # Тест 5.1, п. 7: по умолчанию — все дни; идёт турнир — сегодняшний день
                 local_today = timezone.now().astimezone(zoneinfo.ZoneInfo(t.pub_timezone or "Europe/Moscow")).date()
@@ -952,6 +975,15 @@ def _public_tabs(request, t):
             rows = [dict(r, mark={"withdrawn": "Снят", "no_show": "Не явился"}.get(r.get("status")) or ("Снят" if r["entry"] in inactive else ""))
                     for r in pub.rows]
             out["starts"].append({"p": p, "pub": pub, "rows": rows, "timed": any(r.get("time") for r in rows)})
+        # Макет R2_02A: маршрут выбирается чипами, на экране — один протокол.
+        # По умолчанию — первый маршрут с опубликованным протоколом.
+        for b in out["starts"]:
+            b["short"] = b["p"].name[len("Маршрут "):] if b["p"].name.startswith("Маршрут ") else b["p"].name
+        sel = request.GET.get("prog", "")
+        route = next((b for b in out["starts"] if str(b["p"].pk) == sel), None)
+        if route is None:
+            route = next((b for b in out["starts"] if b["pub"]), None) or (out["starts"][0] if out["starts"] else None)
+        out["route"] = route
     else:
         need_h = {r["entry"] for p in have if len(p.heights or []) > 1 for c in p.classes.all() if c.pk in pubs
                   for r in pubs[c.pk].rows if "height" not in r}
