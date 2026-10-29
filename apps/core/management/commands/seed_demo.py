@@ -133,7 +133,7 @@ class Command(BaseCommand):
                                             checkout_time=datetime.time(18, 0), conditions="Первая подстилка (опилки) включена.")
         StableCategory.objects.create(tournament=t, name="Летний денник", available_from=start - datetime.timedelta(days=1),
                                       available_to=end + datetime.timedelta(days=1), capacity=20)
-        sawdust = Service.objects.create(tournament=t, name="Опилки", unit="мешок", limit=200)
+        sawdust = Service.objects.create(tournament=t, name="Опилки", unit="брикет", limit=200)
         Service.objects.create(tournament=t, name="Сено", unit="тюк")
         Service.objects.create(tournament=t, name="Электричество для коневоза", unit="сутки", recipient="trailer")
         b1 = ss.book(coach, cat.pk, baron, cat.available_from, cat.available_to, "demo-b1", required=True, contact_phone=coach.phone)

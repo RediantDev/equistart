@@ -96,7 +96,7 @@ class BookingTests(StableBase):
 class ServiceTests(StableBase):
     def setUp(self):
         super().setUp()
-        self.sawdust = Service.objects.create(tournament=self.t, name="Опилки", unit="мешок", limit=5)
+        self.sawdust = Service.objects.create(tournament=self.t, name="Опилки", unit="брикет", limit=5)
         self.power = Service.objects.create(tournament=self.t, name="Электричество", unit="сутки", recipient="trailer")
 
     def test_order_limit_and_partial_delivery(self):
@@ -365,7 +365,7 @@ class EditBookingTests(StableBase):
 class MultiServiceOrderTests(StableBase):
     def setUp(self):
         super().setUp()
-        self.sawdust = Service.objects.create(tournament=self.t, name="Опилки", unit="мешок", limit=5)
+        self.sawdust = Service.objects.create(tournament=self.t, name="Опилки", unit="брикет", limit=5)
         self.hay = Service.objects.create(tournament=self.t, name="Сено", unit="тюк")
         self.power = Service.objects.create(tournament=self.t, name="Электричество", unit="сутки", recipient="trailer")
         self.url = reverse("stables:order", args=[self.t.pk])
@@ -459,7 +459,7 @@ class CartScreenTests(StableBase):
         super().setUp()
         self.cat.capacity = 2
         self.cat.save()
-        self.sawdust = Service.objects.create(tournament=self.t, name="Опилки", unit="мешок", limit=10)
+        self.sawdust = Service.objects.create(tournament=self.t, name="Опилки", unit="брикет", limit=10)
         self.url = reverse("stables:book", args=[self.t.pk])
         self.n0, self.n1 = self.d0, self.d0 + datetime.timedelta(days=1)
 
@@ -569,7 +569,7 @@ class Test52Tests(StableBase):
         super().setUp()
         self.cat.capacity = 2
         self.cat.save()
-        self.sawdust = Service.objects.create(tournament=self.t, name="Опилки", unit="мешок")
+        self.sawdust = Service.objects.create(tournament=self.t, name="Опилки", unit="брикет")
         self.power = Service.objects.create(tournament=self.t, name="Электричество для коневоза", unit="сутки", recipient="trailer")
         self.url = reverse("stables:book", args=[self.t.pk])
 
@@ -747,3 +747,37 @@ class Test52VariantATests(StableBase):
         self.assertContains(r, "Бронь уже рассмотрена")
         self.b.refresh_from_db()
         self.assertEqual((self.b.arrive, self.b.state), (self.d0, "confirmed"))
+
+
+class Test53Tests(StableBase):
+    """Тест 5.3: опилки — брикетами (п. 21); статус под строкой, «⋯» справа (п. 23, 24)."""
+
+    def test_sawdust_migration_and_forms(self):
+        from importlib import import_module
+
+        from django.apps import apps as django_apps
+
+        from apps.stables.views import qty_label
+
+        a = Service.objects.create(tournament=self.t, name="Опилки древесные", unit="мешок")
+        b = Service.objects.create(tournament=self.t, name="Сено", unit="мешок")
+        import_module("apps.stables.migrations.0004_sawdust_briquette").sawdust_to_briquette(django_apps, None)
+        a.refresh_from_db(), b.refresh_from_db()
+        self.assertEqual((a.unit, b.unit), ("брикет", "мешок"))  # только опилки
+        self.assertEqual([qty_label(n, "брикет") for n in (1, 2, 5, 11, 21)], ["1 брикет", "2 брикета", "5 брикетов", "11 брикетов", "21 брикет"])
+
+    def test_row_layout_status_under_title(self):
+        s = Service.objects.create(tournament=self.t, name="Опилки", unit="брикет")
+        bk = self.book(self.h1, "b1")
+        services.order(self.coach, s.pk, 2, "o1", horse=self.h1)
+        self.client.force_login(self.coach)
+        page = self.client.get(reverse("stables:book", args=[self.t.pk])).content.decode()
+        self.assertIn("2 брикета", page)
+        self.assertIn("Опилки<span class=\"sb-si__unit\">, брикет</span>", page)
+        row = page[page.index(f'id="b{bk.pk}"'):]
+        main_end = row.index("</div>")
+        self.assertLess(row.index("Ожидает подтверждения"), main_end)  # статус внутри колонки названия
+        self.assertGreater(row.index('class="sb-menu"'), main_end)  # «⋯» после неё, справа
+        self.client.logout()
+        r = self.client.get(reverse("stables:book", args=[self.t.pk]))
+        self.assertEqual(r.status_code, 302)

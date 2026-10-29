@@ -43,7 +43,8 @@
 .sb-sv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .sb-si { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: var(--radius-pill); min-height: 44px; padding: 0 12px; min-width: 0; }
 .sb-si.is-js { padding-left: 10px; }
-.sb-si label { flex: 1; min-width: 0; font-size: 13px; line-height: 16px; font-weight: 600; overflow-wrap: anywhere; hyphens: auto; }
+/* тест 5.3, п. 21: подпись переносится целым словом, без дефиса («Опилки, / брикет») */
+.sb-si label { flex: 1; min-width: 0; font-size: 13px; line-height: 16px; font-weight: 600; overflow-wrap: break-word; word-break: normal; -webkit-hyphens: none; hyphens: none; }
 .sb-si input { width: 52px; min-height: 36px; height: 36px; padding: 0 4px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 .sb-si.is-js { padding-right: 0; gap: 0; }
 .sb-si.is-js input { width: 22px; min-width: 0; flex: none; border: 0; background: transparent; padding: 0; -moz-appearance: textfield; appearance: textfield; box-shadow: none; }
@@ -68,19 +69,24 @@
 .sb-chev { flex: none; fill: none; stroke: currentColor; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
 details[open] > summary .sb-chev { transform: rotate(180deg); }
 
-.sb-row { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 52px; padding: 4px 4px 4px 12px; border-top: 1px solid var(--border-soft, var(--border)); font-size: 15px; line-height: 20px; scroll-margin-top: 72px; }
-.sb-row__ico { flex: none; width: 28px; height: 28px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--text); }
-.sb-row__main { flex: 1 1 140px; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+/* тест 5.3, п. 24: [значок] [название · даты / статус второй строкой] [⋯ справа] — «⋯» всегда в строке, у правого края */
+.sb-row { position: relative; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 8px; min-height: 52px; padding: 4px 4px 4px 12px; border-top: 1px solid var(--border-soft, var(--border)); font-size: 15px; line-height: 20px; scroll-margin-top: 72px; }
+.sb-row__ico { margin-top: 8px; flex: none; width: 28px; height: 28px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--text); }
+.sb-row__main { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 8px 0; }
 .sb-row__main b { font-weight: 600; }
-.sb-row__chips { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.sb-row__chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .sb-row__chips .chip { white-space: nowrap; }
 /* меню «⋯» */
 .sb-menu { position: relative; flex: none; }
-.sb-menu__btn { list-style: none; width: 44px; height: 44px; border-radius: 999px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text); }
+/* тест 5.3, п. 23: аккуратная кнопка-значок без заливки; меню — у правого края кнопки, при нехватке места снизу — вверх */
+.sb-menu { margin-top: 4px; }
+.sb-menu__btn { list-style: none; width: 40px; height: 40px; border-radius: 999px; border: 1px solid transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text); -webkit-appearance: none; appearance: none; }
+.sb-menu__btn:hover { background: var(--surface); border-color: var(--border); }
 .sb-menu__btn::-webkit-details-marker { display: none; }
-.sb-menu[open] .sb-menu__btn { background: var(--ink); color: var(--surface); }
+.sb-menu[open] .sb-menu__btn { background: var(--surface); border-color: var(--border); }
+.sb-menu.is-up .sb-menu__pop { top: auto; bottom: calc(100% + 4px); }
 .sb-dot { fill: currentColor; stroke: none; }
-.sb-menu__pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; width: 220px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+.sb-menu__pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; width: 220px; max-width: calc(100vw - 32px); background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
   box-shadow: 0 8px 24px rgba(20,20,20,.16); padding: 4px; display: flex; flex-direction: column; }
 .sb-menu__item { width: 100%; min-height: 44px; border: 0; background: transparent; border-radius: 10px; text-align: left; padding: 0 12px; font: inherit; font-size: 15px; font-weight: 600; color: var(--text);
   display: flex; align-items: center; gap: 8px; cursor: pointer; }

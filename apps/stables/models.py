@@ -82,7 +82,7 @@ class Service(models.Model):
 
     tournament = models.ForeignKey("tournaments.Tournament", on_delete=models.CASCADE, related_name="services")
     name = models.CharField("название", max_length=120, help_text="Опилки, сено, электричество для коневоза…")
-    unit = models.CharField("единица", max_length=30, help_text="мешок, тюк, сутки")
+    unit = models.CharField("единица", max_length=30, help_text="брикет, тюк, сутки")
     recipient = models.CharField("получатель", max_length=8, choices=Recipient.choices, default=Recipient.HORSE)
     available_from = models.DateField("с", null=True, blank=True)
     available_to = models.DateField("по", null=True, blank=True)
