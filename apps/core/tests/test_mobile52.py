@@ -121,3 +121,14 @@ class Test53Tests(Base):
             self.assertNotContains(r, ">Найти</button>")
             self.assertContains(r, 'data-live="#club-results"')
             self.assertContains(r, 'id="club-results"')
+
+    def test_tournament_tiles_colored_and_bar_in_row(self):
+        r = self.client.get(reverse("tournaments:public", args=[self.t.pk]))
+        self.assertContains(r, 'class="tp-row"')
+        self.assertContains(r, "tp-tile--dates")
+        self.assertContains(r, "tp-tile--place")
+        self.assertContains(r, "tp-tile--org")
+
+    def test_my_competitions_back_on_desktop(self):
+        self.client.force_login(self.coach)
+        self.assertContains(self.client.get(reverse("entries:competitions")), 'class="back back--desk"')

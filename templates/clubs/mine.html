@@ -43,7 +43,13 @@
         <form method="post" action="{% url 'clubs:photo_delete' p.pk %}" class="club-photo__x">{% csrf_token %}<button type="submit" aria-label="Удалить фото" data-confirm="Удалить это фото?" data-confirm-ok="Удалить">×</button></form>
       </figure>
     {% endfor %}</div>
+    {# Тест 5.3, п. 48: как обложка выглядит на странице клуба — на компьютере 3:1, на телефоне 2:1 (края обрезаются) #}
+    <div class="cover-preview" aria-label="Обложка на странице клуба">
+      <figure class="cover-preview__f cover-preview__f--wide"><img src="{% url 'clubs:file' 'photo' photos.0.pk %}?w=1200" alt=""><figcaption>на компьютере</figcaption></figure>
+      <figure class="cover-preview__f cover-preview__f--phone"><img src="{% url 'clubs:file' 'photo' photos.0.pk %}?w=640" alt=""><figcaption>на телефоне</figcaption></figure>
+    </div>
   {% endif %}
+  <p class="field__help cover-hint">Первое фото — обложка клуба. Рекомендуемый размер обложки — 1600×533 px (3:1), не меньше 1200 px по ширине. Главное держите в центре кадра: на телефоне края обрезаются.</p>
   <form method="post" action="{% url 'clubs:photo_add' %}" enctype="multipart/form-data" class="form">
     {% csrf_token %}<input type="hidden" name="once" value="{{ once }}">
     <div class="field"><label class="field__label" for="ph">Добавить фото</label><input id="ph" type="file" name="file" accept="image/jpeg,image/png" data-max-mb="20" multiple required><p class="field__help">JPEG или PNG до 20 МБ, можно сразу несколько (до 10). Первое фото — обложка страницы.</p></div>

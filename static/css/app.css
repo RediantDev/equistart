@@ -1206,8 +1206,8 @@ html.js input[type=date]:not([data-ui]), html.js input[type=time]:not([data-ui])
 .tabs--wrap3 .tabs__item { flex: 1; text-align: center; }
 /* ===== Клубы по макету (утверждён 27.10.2026) ===== */
 .club-hero { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
-.club-hero__cover { position: relative; height: 220px; background: #d9d6c9; }
-.club-hero__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.club-hero__cover { position: relative; height: auto; aspect-ratio: 3 / 1; max-height: 320px; background: #d9d6c9; }  /* тест 5.3, п. 48: на компьютере 3:1, не выше 320px */
+.club-hero__cover img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
 .club-hero__back { position: absolute; left: 12px; top: 12px; width: 40px; height: 40px; border-radius: 50%; background: var(--surface); color: var(--text); display: grid; place-items: center; }
 .club-hero__edit { position: absolute; right: 12px; top: 12px; background: var(--surface); }
 .club-hero__body { padding: 0 var(--space-5) var(--space-5); }
@@ -1224,7 +1224,7 @@ html.js input[type=date]:not([data-ui]), html.js input[type=time]:not([data-ui])
 .club-tabs .tabs__item { flex: 1; text-align: center; }
 @media (max-width: 720px) {
   .club-hero { border-radius: 0; border-left: 0; border-right: 0; margin: calc(-1 * var(--space-3)) -12px 0; }  /* = отступам .page на телефоне, без сдвига вбок (тест 5.2, п. 3) */
-  .club-hero__cover { height: 196px; }
+  .club-hero__cover { height: 196px; aspect-ratio: auto; max-height: none; }
   .club-hero__body { padding: 0 var(--space-4) var(--space-4); }
   .club-tabs .tabs__item { padding: 10px 4px; font-size: 15px; }
 }
@@ -1816,3 +1816,17 @@ html:not(.js) .cal { display: none; }
 .tp-prow[open] > summary { background: var(--accent-soft); }
 .tp-prow[open] > summary .tp-prow__name { font-weight: 800; }
 a.list__row:visited, a.lrow:visited, a.tcard:visited, a.club-card:visited, .tp-prow a:visited { color: inherit; }
+/* п. 50: «Поделиться» — затемнение на весь экран (раньше на него действовал .sheet судейского листа: max-width 720px);
+   на компьютере — окно по центру, на телефоне — шторка снизу; закрывается кликом мимо окна и Esc */
+.sheet.sheet--modal { position: fixed; inset: 0; width: auto; height: auto; max-width: none; margin: 0; gap: 0; flex-direction: row; padding: 0; }
+@media (min-width: 721px) { .sheet.sheet--modal { align-items: center; padding: 24px; } .sheet--modal .sheet__box { margin: auto; border-radius: 24px; padding-bottom: 20px; } .sheet--modal .sheet__grip { display: none; } }
+/* п. 48: подсказка и предпросмотр обложки клуба */
+.cover-preview { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); gap: 10px; align-items: end; }
+.cover-preview__f { margin: 0; }
+.cover-preview__f img { display: block; width: 100%; object-fit: cover; object-position: center; border-radius: 10px; background: var(--surface-2); }
+.cover-preview__f--wide img { aspect-ratio: 3 / 1; }
+.cover-preview__f--phone img { aspect-ratio: 2 / 1; }
+.cover-preview__f figcaption { font-size: var(--fs-sub); color: var(--text-muted); margin-top: 4px; }
+.cover-hint { margin: 0; }
+/* п. 52: «назад» только на компьютере */
+@media (max-width: 720px) { .back--desk { display: none !important; } }

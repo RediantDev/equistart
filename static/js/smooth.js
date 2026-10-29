@@ -366,7 +366,7 @@
       ["Одноклассники", "https://connect.ok.ru/offer?url=" + enc + "&title=" + txt, "ok"],
       ["Почта", "mailto:?subject=" + txt + "&body=" + txt + "%0A" + enc, "mail"]
     ];
-    var back = el("div", "sheet"), box = el("div", "sheet__box");
+    var back = el("div", "sheet sheet--modal"), box = el("div", "sheet__box");
     box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "Поделиться");
     box.appendChild(el("div", "sheet__grip"));
     box.appendChild(el("p", "sheet__title", "Поделиться"));
