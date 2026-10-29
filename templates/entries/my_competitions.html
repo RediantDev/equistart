@@ -17,7 +17,7 @@
 {% include "partials/cal.html" with key="cal-mine" src="mc-dates" label="Мои соревнования по датам" start=cal_start %}
 <div class="mc-datebar" data-mc-datebar hidden><b data-mc-datebar-text></b><button type="button" data-mc-date-all>Все соревнования</button></div>
 
-<div id="mc-view" style="view-transition-name: swap-area;">
+<div id="mc-view">
 <nav class="tabs tabs--sticky mc-tabs" aria-label="Мои соревнования" data-swap="#mc-view">
   <a class="tabs__item{% if tab == 'upcoming' %} is-active{% endif %}" href="?tab=upcoming">Предстоящие{% if counts.upcoming %} · {{ counts.upcoming }}{% endif %}</a>
   <a class="tabs__item{% if tab == 'past' %} is-active{% endif %}" href="?tab=past">Прошедшие{% if counts.past %} · {{ counts.past }}{% endif %}</a>

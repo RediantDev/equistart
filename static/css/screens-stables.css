@@ -81,7 +81,7 @@ details[open] > summary .sb-chev { transform: rotate(180deg); }
 /* тест 5.3, п. 23: аккуратная кнопка-значок без заливки; меню — у правого края кнопки, при нехватке места снизу — вверх */
 .sb-menu { margin-top: 4px; }
 .sb-menu__btn { list-style: none; width: 40px; height: 40px; border-radius: 999px; border: 1px solid transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text); -webkit-appearance: none; appearance: none; }
-.sb-menu__btn:hover { background: var(--surface); border-color: var(--border); }
+@media (hover: hover) { .sb-menu__btn:hover { background: var(--surface); border-color: var(--border); } }
 .sb-menu__btn::-webkit-details-marker { display: none; }
 .sb-menu[open] .sb-menu__btn { background: var(--surface); border-color: var(--border); }
 .sb-menu.is-up .sb-menu__pop { top: auto; bottom: calc(100% + 4px); }

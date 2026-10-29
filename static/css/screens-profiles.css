@@ -6,7 +6,7 @@ html:not(.js) .ps-js { display: none !important; }
 html.js .ps-nojs { display: none !important; }
 
 .ps-back { display: inline-flex; align-self: flex-start; align-items: center; gap: 4px; min-height: 32px; text-decoration: none; font-size: 13px; font-weight: 600; color: var(--text); }
-.ps-back:hover { color: var(--text); text-decoration: underline; text-decoration-color: var(--accent); }
+@media (hover: hover) { .ps-back:hover { color: var(--text); text-decoration: underline; text-decoration-color: var(--accent); } }
 .ps-headrow { display: flex; align-items: center; gap: 8px; }
 .ps-headrow--sub { margin-top: 2px; }
 .ps-title { flex: 1; min-width: 0; }
@@ -23,22 +23,22 @@ html.js .ps-nojs { display: none !important; }
 /* Кнопки-иконки и кнопки */
 .ps-ib { width: 44px; height: 44px; border: 0; background: transparent; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; color: var(--text); text-decoration: none; flex: none; list-style: none; }
 .ps-ib::-webkit-details-marker { display: none; }
-.ps-ib:hover { background: var(--surface-2); color: var(--text); }
+@media (hover: hover) { .ps-ib:hover { background: var(--surface-2); color: var(--text); } }
 .ps-ib--y, .ps-ib--y:hover { background: var(--accent); }
-.ps-ib--y:hover { background: var(--accent-hover); }
+@media (hover: hover) { .ps-ib--y:hover { background: var(--accent-hover); } }
 .ps-ib--o { border: 1px solid var(--border); background: var(--surface); }
 .ps-ib--o[aria-expanded="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 .ps-btn { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--control-border); background: var(--surface); color: var(--text); font: inherit; font-weight: 700; font-size: 15px;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; cursor: pointer; white-space: nowrap; list-style: none; }
 .ps-btn::-webkit-details-marker { display: none; }
-.ps-btn:hover { color: var(--text); border-color: var(--text); }
+@media (hover: hover) { .ps-btn:hover { color: var(--text); border-color: var(--text); } }
 .ps-btn--y { background: var(--accent); border-color: var(--accent); }
-.ps-btn--y:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+@media (hover: hover) { .ps-btn--y:hover { background: var(--accent-hover); border-color: var(--accent-hover); } }
 .ps-btn--d, .ps-btn--d:hover { background: var(--ink); border-color: var(--ink); color: var(--surface); font-size: 14px; }
 .ps-btn--lg { min-height: 48px; }
 .ps-btn--block { width: 100%; }
 .ps-btn--danger { color: var(--danger); border-color: var(--danger); }
-.ps-btn--danger:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+@media (hover: hover) { .ps-btn--danger:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); } }
 .ps-btn--red, .ps-btn--red:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
 .ps-btn.htmx-request, .ps-btn[disabled] { opacity: .55; pointer-events: none; }
 .ps-lb { min-height: 44px; padding: 0 10px; border: 0; background: transparent; font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; flex: none; color: var(--text);
@@ -70,7 +70,7 @@ html.js .ps-nojs { display: none !important; }
 .ps-rw { display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 12px; border-top: 1px solid var(--border); text-decoration: none; min-height: 54px; color: var(--text); }
 .ps-list > .ps-rw { border-top: 0; }
 .ps-list > .ps-rw:not([hidden]) ~ .ps-rw { border-top: 1px solid var(--border); }
-a.ps-rw:hover { background: var(--bg); color: var(--text); }
+@media (hover: hover) { a.ps-rw:hover { background: var(--bg); color: var(--text); } }
 .ps-rw--static { min-height: 56px; }
 .ps-t { flex: 1; min-width: 0; font-size: 15px; line-height: 20px; }
 .ps-t > b { overflow-wrap: anywhere; font-weight: 700; }
@@ -103,7 +103,7 @@ a.ps-rw:hover { background: var(--bg); color: var(--text); }
 /* Профиль лошади: вкладки, сведения (R2_06A, R2_06D) */
 .ps-seg { display: flex; background: var(--surface-2); border-radius: 999px; padding: 3px; gap: 2px; }
 .ps-seg a { flex: 1; min-height: 38px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; color: var(--text-muted); text-decoration: none; text-align: center; padding: 0 6px; }
-.ps-seg a:hover { color: var(--text); }
+@media (hover: hover) { .ps-seg a:hover { color: var(--text); } }
 .ps-seg a.is-on { background: var(--ink); color: var(--surface); }
 .ps-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
 .ps-card--flush > .ps-cap2:first-child { border-top: 0; }
@@ -150,7 +150,7 @@ a.ps-rw:hover { background: var(--bg); color: var(--text); }
   border-radius: 12px; box-shadow: 0 12px 28px rgba(0,0,0,.12); color: var(--text); line-height: 18px; }
 .ps-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .ps-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 10px; display: flex; flex-direction: column; gap: 6px; text-decoration: none; min-height: 132px; color: var(--text); }
-.ps-tile:hover { border-color: var(--text); color: var(--text); }
+@media (hover: hover) { .ps-tile:hover { border-color: var(--text); color: var(--text); } }
 .ps-tile__i { width: 36px; height: 36px; border-radius: 10px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; }
 .ps-tile__t { font-size: 15px; line-height: 20px; overflow-wrap: anywhere; }
 .ps-docdel { margin-top: var(--space-4); }
@@ -181,7 +181,7 @@ a.ps-rw:hover { background: var(--bg); color: var(--text); }
 .ps-grid-32 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 8px; }
 .ps-src { min-height: 64px; border: 1px solid var(--border); border-radius: 16px; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; color: var(--text); }
-.ps-src:hover { border-color: var(--text); }
+@media (hover: hover) { .ps-src:hover { border-color: var(--text); } }
 html.js .ps-upload .file__btn { display: none; }
 html.js .ps-upload .ps-file .file { min-height: 0; }
 /* Тест 5.2, п. 56: пока файл не выбран, строки «Файл не выбран» нет (поле остаётся в форме — без display:none, чтобы работали label и камера) */
@@ -221,7 +221,7 @@ html.js .ps-upload .ps-grid2 + .ps-file .file:not(.has-file) { position: absolut
 .ps-segc input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
 .ps-summary { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 6px 4px 6px 12px; min-height: 52px;
   font: inherit; color: var(--text); text-align: left; cursor: pointer; width: 100%; }
-.ps-summary:hover { border-color: var(--text); }
+@media (hover: hover) { .ps-summary:hover { border-color: var(--text); } }
 .ps-summary .ps-t b { display: block; }
 html.js .ps-extra[data-off] { display: none; }
 .ps-extra__row { display: flex; gap: 4px; align-items: flex-end; }
@@ -232,7 +232,7 @@ html.js .ps-extra[data-off] { display: none; }
 .ps-add { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px dashed var(--control-border); background: var(--surface); font: inherit; font-weight: 600; font-size: 14px; color: var(--text);
   display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
 .ps-add[hidden] { display: none; }
-.ps-add:hover { border-style: solid; }
+@media (hover: hover) { .ps-add:hover { border-style: solid; } }
 .ps-bar { display: flex; gap: 8px; }
 @media (max-width: 720px) {
   .ps-bar { position: fixed; left: 0; right: 0; bottom: calc(var(--bnav-h) + env(safe-area-inset-bottom)); z-index: 39; background: var(--surface); border-top: 1px solid var(--border);

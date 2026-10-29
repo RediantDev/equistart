@@ -29,7 +29,7 @@
   </div>
 </section>
 
-<div id="club-view" style="view-transition-name: swap-area;">
+<div id="club-view">
 <nav class="tabs tabs--sticky club-tabs" aria-label="Разделы клуба" data-swap="#club-view">
   <a class="tabs__item{% if tab == 'tournaments' %} is-active{% endif %}" href="?tab=tournaments">Турниры</a>
   <a class="tabs__item{% if tab == 'news' %} is-active{% endif %}" href="?tab=news">Новости{% if news %} · {{ news|length }}{% endif %}</a>
