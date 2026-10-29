@@ -154,12 +154,44 @@ def create(request):
                else {"contact_name": request.user.full_name})  # телефон-логин не подставляем: он станет публичным
     created = request.session.get("tournament_create_keys", {})
     key = request.POST.get("create_key", "")
-    if request.method == "POST" and key and key in created:
-        # повторная отправка той же формы («Назад» в браузере, двойное нажатие) — не создаём второй черновик
+    if request.method == "POST" and key and key in created and not request.POST.get("autosave"):
+        # повторная отправка той же формы («Назад» в браузере, двойное нажатие) — не создаём второй черновик.
+        # Тест 6: черновик мог создаться автосохранением — тогда сохраняем форму в него и идём дальше.
         prev = Tournament.objects.filter(pk=created[key], owner=request.user).first()
         if prev:
-            messages.info(request, "Этот черновик уже создан — продолжаем его.")
-            return redirect("tournaments:step", pk=prev.pk, step=1)
+            pform = BasicsForm(request.user, request.POST)
+            if pform.is_valid() and not prev.is_locked:
+                with transaction.atomic():
+                    prev = Tournament.objects.select_for_update().get(pk=prev.pk)
+                    _apply_basics(request, prev, pform)
+                    prev.mark_changed()
+                    prev.save()
+                    audit(request.user, "tournament.edit", prev, step=1)
+                return redirect("tournaments:step", pk=prev.pk, step=2)
+            if prev.is_locked:
+                return redirect("tournaments:step", pk=prev.pk, step=LAST)
+            return render(request, "tournaments/step1.html", _wizard_ctx(prev, 1, form=pform), status=422)
+    if request.method == "POST" and request.POST.get("autosave"):
+        from django.http import JsonResponse
+
+        form = BasicsForm(request.user, request.POST)
+        form.is_new = True
+        form.is_valid()
+        if not (form.cleaned_data.get("title") or "").strip():
+            return JsonResponse({"ok": False, "reason": "title"})
+        with transaction.atomic():
+            prev = Tournament.objects.select_for_update().filter(pk=created.get(key), owner=request.user).first() if key in created else None
+            t = prev or Tournament(owner=request.user)
+            _autosave_basics(t, form)
+            if prev:
+                t.revision += 1
+            t.save()
+            if not prev:
+                audit(request.user, "tournament.create", t, autosave=True)
+        if key:
+            created[key] = t.pk
+            request.session["tournament_create_keys"] = dict(list(created.items())[-20:])
+        return _autosave_reply(t, True)
     form = BasicsForm(request.user, request.POST or None, initial=initial)
     form.is_new = True
     if request.method == "POST" and form.is_valid():
@@ -179,6 +211,50 @@ def create(request):
     return render(request, "tournaments/step1.html", {"form": form, "t": None, "step": 1, "create_key": key or uuid.uuid4().hex, "steps": [
         {"n": n, "name": name, "done": False, "current": n == 1, "reachable": n == 1} for n, name in STEPS
     ]})
+
+
+def _autosave_basics(t, form) -> bool:
+    """Тест 6, п. 8: автосохранение черновика — берём только заполненные и правильные поля, остальные не трогаем.
+    Новое место проведения не создаём: оно появится при обычном переходе «Далее». Возвращает True, если что-то изменилось."""
+    form.is_valid()
+    c = form.cleaned_data
+    changed = False
+
+    def put(field, value):
+        nonlocal changed
+        if getattr(t, field) != value:
+            setattr(t, field, value)
+            changed = True
+
+    title = (c.get("title") or "").strip()
+    if title:
+        put("title", title)
+    if c.get("starts_on") and "starts_on" not in form.errors:
+        put("starts_on", c["starts_on"])
+        if "ends_on" not in form.errors and c.get("ends_on"):
+            put("ends_on", c["ends_on"])
+        elif not c.get("multiday"):
+            put("ends_on", c["starts_on"])
+    venue = c.get("venue")
+    if venue and "venue" not in form.errors:
+        put("venue", venue)
+        put("timezone", venue.timezone)
+    for f in ("contact_name", "contact"):
+        if f in c and f not in form.errors:
+            put(f, (c.get(f) or "").strip())
+    if c.get("level") and "level" not in form.errors:
+        put("level", c["level"])
+    if "classification" in c:
+        put("classification", bool(c.get("classification")))
+    return changed
+
+
+def _autosave_reply(t, saved):
+    from django.http import JsonResponse
+
+    return JsonResponse({"ok": True, "saved": saved, "pk": t.pk, "revision": t.revision,
+                         "url": reverse("tournaments:step", kwargs={"pk": t.pk, "step": 1}),
+                         "at": timezone.localtime().strftime("%H:%M")})
 
 
 def _apply_basics(request, t, form):
@@ -234,6 +310,23 @@ def step(request, pk, step):
 
 
 def _step1(request, t):
+    if request.method == "POST" and request.POST.get("autosave"):
+        from django.http import JsonResponse
+
+        if t.is_locked:
+            return JsonResponse({"ok": False, "reason": "locked"}, status=409)
+        form = BasicsForm(request.user, request.POST)
+        try:
+            with transaction.atomic():
+                locked = _managed(request, t.pk, lock=True)
+                services.check_revision(locked, request.POST.get("revision"))
+                saved = _autosave_basics(locked, form)
+                if saved:
+                    locked.mark_changed()
+                    locked.save()
+        except Conflict:
+            return JsonResponse({"ok": False, "reason": "conflict"}, status=409)
+        return _autosave_reply(locked, saved)
     if request.method == "POST":
         if (r := _editable_or_redirect(request, t)):
             return r
@@ -277,7 +370,7 @@ def _step2_ctx(t, form=None, editing=None, class_form=None, class_program=None, 
         else:
             # форма своего зачёта строится только для открытой карточки — страница с 20 маршрутами остаётся лёгкой
             p.form, p.editing_class, p.form_open = None, None, False
-        p.expanded = p.form_open or len(programs) <= 6 or not p.classes.all()
+        p.expanded = p.form_open  # тест 6, п. 14: карточки свёрнуты, раскрываются нажатием
     by_day = [{"day": d, "programs": [p for p in programs if p.day == d]} for d in days]
     orphans = [p for p in programs if p.day not in days]
     return {
@@ -318,7 +411,7 @@ def program_save(request, pk, item_id=None):
         return redirect("tournaments:step", pk=pk, step=2)
     tail = f" Зачёты: {', '.join(c.label for c in added)}." if added else (" Добавьте зачёты — без них нельзя подать заявку." if not obj.classes.exists() else "")
     messages.success(request, f"«{obj.name}» сохранено.{tail}")
-    return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + f"#program-{obj.pk}")
+    return redirect(reverse("tournaments:step", kwargs={"pk": pk, "step": 2}) + f"?day={obj.day.isoformat()}#program-{obj.pk}")
 
 
 def _add_template_classes(t, program, template_ids, height=None):
@@ -487,6 +580,29 @@ def class_delete(request, pk, program_id, class_id):
 
 
 def _step3(request, t):
+    if request.method == "POST" and request.POST.get("autosave"):
+        from django.http import JsonResponse
+
+        if t.is_locked:
+            return JsonResponse({"ok": False, "reason": "locked"}, status=409)
+        form = TermsForm(request.POST, instance=t)
+        form.is_valid()
+        c = form.cleaned_data
+        try:
+            with transaction.atomic():
+                locked = _managed(request, t.pk, lock=True)
+                services.check_revision(locked, request.POST.get("revision"))
+                saved = False
+                for f in ("entry_deadline", "entry_deadline_time", "cancel_terms"):
+                    if f in c and f not in form.errors and getattr(locked, f) != c[f]:
+                        setattr(locked, f, c[f])
+                        saved = True
+                if saved:
+                    locked.mark_changed()
+                    locked.save()
+        except Conflict:
+            return JsonResponse({"ok": False, "reason": "conflict"}, status=409)
+        return _autosave_reply(locked, saved)
     if request.method == "POST":
         if (r := _editable_or_redirect(request, t)):
             return r
@@ -521,7 +637,16 @@ def _step3(request, t):
     else:
         form = TermsForm(instance=t)
     left3 = [p.text for p in services.problems(t) if p.step == 3] if request.GET.get("check") else []
-    return render(request, "tournaments/step3.html", _wizard_ctx(t, 3, form=form, left3=left3))
+    reg_name, reg_size = "", None
+    if t.regulation:
+        import os
+
+        reg_name = os.path.basename(t.regulation.name)
+        try:
+            reg_size = t.regulation.size
+        except (OSError, ValueError):
+            reg_size = None
+    return render(request, "tournaments/step3.html", _wizard_ctx(t, 3, form=form, left3=left3, regulation_name=reg_name, regulation_size=reg_size))
 
 
 def _step4(request, t):

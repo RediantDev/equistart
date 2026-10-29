@@ -1,11 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Календарь соревнований — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <h1 class="h1">Календарь соревнований</h1>
-  </div>
-  {% if user.is_authenticated and user.can_create_tournament %}<a class="btn btn--ghost" href="{% url 'tournaments:create' %}">+ Создать соревнование</a>{% endif %}
+{# Тест 6, п. 7 (вариант А): маленькая «+ Создать» в строке заголовка; видят только организаторы, судьи и клубы #}
+<div class="head-row">
+  <h1 class="h1">Календарь<span class="hide-phone"> соревнований</span></h1>
+  {% if user.is_authenticated and user.can_create_tournament %}<a class="btn btn--primary btn--sm" href="{% url 'tournaments:create' %}">+ Создать</a>{% endif %}
 </div>
 
 {# Тест 5.2/5.3: поиск — по мере ввода и по Enter, без перезагрузки (data-live в smooth.js), фильтры — иконкой; календарь (вариант B) и карточки (вариант A) #}

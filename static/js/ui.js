@@ -899,6 +899,63 @@
     if (e.key === "Escape") document.querySelectorAll("details.kebab[open]").forEach(function (d) { d.removeAttribute("open"); });
   });
 
+  // Тест 6, п. 8: автосохранение черновика турнира (формы с data-autosave). Кнопки «Сохранить черновик» нет:
+  // поля сохраняются сами через ~1 с после ввода, а при уходе со страницы (назад, другой раздел) — сразу.
+  (function () {
+    var form = null, timer = null, dirty = false, busy = false;
+    function status(text) { var el = document.querySelector("[data-autosave-status]"); if (el) el.textContent = text; }
+    function data(keep) {
+      var fd = new FormData(form);
+      Array.from(fd.keys()).forEach(function (k) { fd.getAll(k).forEach(function (v) { if (typeof v !== "string") fd.delete(k); }); });
+      fd.set("autosave", "1");
+      return fd;
+    }
+    function apply(j) {
+      if (!j || !j.ok) return;
+      var rev = form.querySelector("[name=revision]"), key = form.querySelector("[name=create_key]");
+      if (rev) rev.value = j.revision;
+      if (key && j.url) {
+        // первый автосейв нового турнира: дальше работаем с созданным черновиком
+        var inp = document.createElement("input"); inp.type = "hidden"; inp.name = "revision"; inp.value = j.revision;
+        form.appendChild(inp); key.remove();
+        form.setAttribute("action", j.url);
+        try { history.replaceState(history.state, "", j.url); } catch (e) {}
+      }
+      status("Черновик сохранён в " + j.at);
+    }
+    function save(keep) {
+      if (!form || !dirty) return;
+      var title = form.querySelector("[name=title]");
+      if (title && !title.value.trim()) return;  // черновик появляется, когда есть название
+      if (busy && !keep) { clearTimeout(timer); timer = setTimeout(save, 800); return; }
+      dirty = false; busy = true;
+      var url = form.getAttribute("action") || location.href;
+      var opts = { method: "POST", body: data(), credentials: "same-origin", headers: { "X-Requested-With": "fetch", "Accept": "application/json" } };
+      var t = document.querySelector("[name=csrfmiddlewaretoken]"); if (t) opts.headers["X-CSRFToken"] = t.value;
+      if (keep) opts.keepalive = true;
+      status("Сохраняем черновик…");
+      fetch(url, opts).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { busy = false; apply(j); })
+        .catch(function () { busy = false; dirty = true; status("Черновик не сохранён — проверьте связь"); });
+    }
+    function bind(scope) {
+      var f = (scope || document).querySelector("form[data-autosave]");
+      if (!f || f === form) return;
+      form = f; dirty = false;
+      form.addEventListener("input", function (e) { if (e.target.type === "file") return; dirty = true; clearTimeout(timer); timer = setTimeout(save, 1200); });
+      form.addEventListener("change", function (e) { if (e.target.type === "file") return; dirty = true; clearTimeout(timer); timer = setTimeout(save, 600); });
+      form.addEventListener("submit", function () { dirty = false; clearTimeout(timer); });
+    }
+    document.addEventListener("DOMContentLoaded", function () { bind(document); });
+    document.addEventListener("htmx:afterSettle", function () { bind(document); });
+    // уход со страницы: ссылка, «назад», закрытие вкладки
+    document.addEventListener("click", function (e) {
+      var a = e.target.closest && e.target.closest("a[href]");
+      if (a && form && dirty && !form.contains(a)) save(true);
+    }, true);
+    window.addEventListener("pagehide", function () { save(true); });
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") save(true); });
+  })();
+
   // «Раздел: …» в «Проведении»
   document.addEventListener("click", function (e) {
     var btn = e.target.closest("[data-start-drop] .start-drop__btn");

@@ -1,19 +1,25 @@
 {% extends "tournaments/_wizard.html" %}
 {% block step %}
-<form method="post" enctype="multipart/form-data" novalidate class="card form" style="margin-top: 0;">
+<form method="post" enctype="multipart/form-data" novalidate class="card form" style="margin-top: 0;" data-autosave>
   {% csrf_token %}
   <input type="hidden" name="revision" value="{{ t.revision }}">
   {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
 
   <div class="form__group">
     <h2 class="h3">Положение о соревновании</h2>
-    {% if t.regulation %}
-      <p>Загружено: <a href="{% url 'tournaments:regulation_working' t.pk %}" target="_blank" rel="noopener">открыть положение (PDF)</a>. Чтобы заменить, выберите новый файл.</p>
-    {% endif %}
+    {# Тест 6, пп. 20–21: файл — плитка «+»; загруженный — карточка с именем и корзиной #}
     <div class="field{% if form.regulation.errors %} field--error{% endif %}">
-      <label class="field__label" for="{{ form.regulation.id_for_label }}">{% if t.regulation %}Новый файл{% else %}Файл положения <span class="field__optional">обязательно для отправки на проверку</span>{% endif %}</label>
-      <input type="file" name="regulation" id="{{ form.regulation.id_for_label }}" accept="application/pdf,.pdf" data-max-mb="20">
-      <p class="field__help">{{ form.regulation.help_text }}</p>
+      <span class="field__label">Файл положения{% if not t.regulation %} <span class="field__optional">нужен для отправки на проверку</span>{% endif %}</span>
+      {% if t.regulation %}
+        <div class="file__card" data-saved-file>
+          <span class="file__card-ico" aria-hidden="true">PDF</span>
+          <span class="file__card-txt"><a class="file__name" href="{% url 'tournaments:regulation_working' t.pk %}" target="_blank" rel="noopener">{{ regulation_name }}</a><span class="file__meta">{% if regulation_size %}{{ regulation_size|filesizeformat }} · {% endif %}нажмите, чтобы открыть</span></span>
+          {% if not t.is_locked %}<button type="submit" name="regulation-clear" value="on" class="file__clear" aria-label="Удалить файл положения" data-confirm="Убрать файл положения? Без него турнир не отправить на проверку." data-confirm-ok="Убрать">{% include "partials/icon.html" with name="trash" size=18 %}</button>{% endif %}
+        </div>
+      {% else %}
+        <input type="file" name="regulation" id="{{ form.regulation.id_for_label }}" accept="application/pdf,.pdf" data-max-mb="20" data-plus-label="Положение, PDF">
+      {% endif %}
+      <p class="field__help">PDF до 20 МБ. Проверяется модератором.</p>
       {% for error in form.regulation.errors %}<p class="field__error" role="alert"><span aria-hidden="true">!</span> {{ error }}</p>{% endfor %}
     </div>
   </div>
@@ -31,7 +37,6 @@
   </div>{% endif %}
   <div class="form-actions">
     <a class="btn btn--ghost" href="{% url 'tournaments:step' t.pk 2 %}">← Программа и зачёты</a>
-    <button type="submit" name="save" class="btn btn--ghost"{% if t.is_locked %} disabled{% endif %}>Сохранить</button>
     <button type="submit" name="next" class="btn btn--primary"{% if t.is_locked %} disabled{% endif %}>Далее: проверка</button>
   </div>
 </form>
