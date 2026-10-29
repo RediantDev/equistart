@@ -4,7 +4,9 @@
 {% block content %}
 {# Макет 28.10.2026 (R2_03B): просмотр по дням; «Изменить заявку» — режим правки с отменой строк и решением по денникам #}
 <div class="app-head ae-head">
-  <a class="back" href="{% if owner %}{% url 'entries:competitions' %}{% else %}{% url 'entries:manage' t.pk %}{% endif %}">← {% if owner %}Мои соревнования{% else %}Заявки турнира{% endif %}</a>
+  {# тест 5.3 (п.35): в режиме правки «назад» ведёт на просмотр заявки; отдельной «Выйти из правки» нет #}
+  {% if edit %}<a class="back" href="{% url 'entries:application' app.pk %}">← Заявка №{{ app.number }}</a>
+  {% else %}<a class="back" href="{% if owner %}{% url 'entries:competitions' %}{% else %}{% url 'entries:manage' t.pk %}{% endif %}">← {% if owner %}Мои соревнования{% else %}Заявки турнира{% endif %}</a>{% endif %}
   <div class="ae-head__row">
     <div class="ae-head__text">
       {# тест 5.2 (п.37): сводка решений — в одной строке с заголовком, справа #}
@@ -15,9 +17,7 @@
       <p class="ae-head__t">{% if owner and t.publication == "published" %}<a href="{% url 'tournaments:public' t.pk %}">{{ t.pub_title }}</a>{% else %}{{ t.pub_title }}{% endif %}</p>
       <p class="table__sub">{% if app.is_group %}Групповая{% else %}Индивидуальная{% endif %} · подана {{ app.created_at|date:"j E в H:i" }}{% if app.late %} · внесена судьёй{% endif %}</p>
     </div>
-    {% if edit %}
-      <a class="btn btn--ghost btn--sm ae-head__btn" href="{% url 'entries:application' app.pk %}">Выйти из правки</a>
-    {% elif can_edit %}
+    {% if can_edit and not edit %}
       <a class="btn btn--dark ae-head__btn" href="?edit=1" data-ae-edit>Изменить заявку</a>
     {% endif %}
   </div>

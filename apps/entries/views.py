@@ -874,7 +874,10 @@ def my_competitions(request):
     user = request.user
     own = Entry.objects.filter(application__submitted_by=user)
     mine_as_athlete = Entry.objects.filter(athlete__linked_user=user).exclude(application__submitted_by=user)
-    entries = list((own | mine_as_athlete).select_related("tournament__venue", "application", "program")
+    # Тест 5.3 (п.29, решение заказчика): отменённые выступления, денники и услуги здесь не показываются;
+    # турнир, где у пользователя всё отменено, не попадает в список.
+    entries = list((own | mine_as_athlete).exclude(decision=Entry.Decision.CANCELLED)
+                   .select_related("tournament__venue", "application", "program")
                    .order_by("day", "program__start_time", "program__position", "program_id", "athlete_snapshot__name", "pk"))
     bookings = list(Booking.objects.filter(requested_by=user).exclude(state=Booking.State.CANCELLED)
                     .select_related("tournament__venue", "category").order_by("arrive", "pk"))
