@@ -127,8 +127,11 @@
 .ap-pair__err ul { margin: 0; padding-left: 1.2em; }
 .ap-pair__err:focus { outline: none; }
 .ap-filed { margin: 0; }
-.opt.is-filed { opacity: 1; background: var(--surface-2); border-style: dashed; cursor: default; }
-.opt.is-filed .opt__mark { color: var(--text-muted); }
+/* тест 5.3 (п.31): уже заявленный зачёт — контрастно: сплошная рамка, зелёный фон, галочка, обычный текст */
+.opt.is-filed { opacity: 1; background: var(--success-soft); border: 1px solid var(--success); color: var(--text); cursor: default; }
+.opt.is-filed .opt__mark { color: var(--success); font-weight: 700; }
+.opt.is-filed .opt__name { color: var(--text); }
+.opt.is-filed .opt__sub { color: var(--text); }
 /* Тест 5.2: изменение выступления (п.41/43) */
 .pr-pair { margin-bottom: var(--space-3); }
 .pr-pair .form { margin-top: var(--space-2); }
