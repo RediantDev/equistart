@@ -7,7 +7,7 @@
   <a class="ps-back" href="{% url 'profiles:horses' %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Мои лошади</a>
   <div class="ps-headrow">
     <div class="ps-title">
-      <h1 class="ps-h1 ps-h1--lg">{{ h.name }}{% if my_access %} <span class="ps-chip ps-chip--info ps-chip--lg">Доступ</span>{% endif %}</h1>
+      <h1 class="h1 ps-h1">{{ h.name }}{% if my_access %} <span class="ps-chip ps-chip--info ps-chip--lg">Доступ</span>{% endif %}</h1>
       <div class="ps-sub">{{ h.birth_year }} · {{ h.get_sex_display }} · {{ h.get_color_display }} · {{ h.breed }}</div>
       {% if my_access %}<div class="ps-m">Управляет {{ manager_name }} · доступ с {{ my_access.created_at|date:"j E" }}</div>{% endif %}
     </div>
@@ -17,15 +17,15 @@
   {% if tabs|length > 1 %}
   <nav class="ps-seg" aria-label="Разделы лошади">
     <a href="{{ self_url }}" class="{% if tab == 'info' %}is-on{% endif %}"{% if tab == 'info' %} aria-current="page"{% endif %}>Сведения</a>
-    {% if "docs" in tabs %}<a href="{{ self_url }}?tab=docs" class="{% if tab == 'docs' %}is-on{% endif %}"{% if tab == 'docs' %} aria-current="page"{% endif %}>Документы{% if documents %} {{ documents|length }}{% endif %}</a>{% endif %}
-    {% if "access" in tabs %}<a href="{{ self_url }}?tab=access" class="{% if tab == 'access' %}is-on{% endif %}"{% if tab == 'access' %} aria-current="page"{% endif %}>Доступ{% if access_count %} {{ access_count }}{% endif %}</a>{% endif %}
+    {% if "docs" in tabs %}<a href="{{ self_url }}?tab=docs" class="{% if tab == 'docs' %}is-on{% endif %}"{% if tab == 'docs' %} aria-current="page"{% endif %}>Документы</a>{% endif %}
+    {% if "access" in tabs %}<a href="{{ self_url }}?tab=access" class="{% if tab == 'access' %}is-on{% endif %}"{% if tab == 'access' %} aria-current="page"{% endif %}>Доступ</a>{% endif %}
   </nav>
   {% endif %}
 
   {% if tab == "info" %}
     {% if my_access and apply_url %}<a class="ps-btn ps-btn--y ps-btn--lg ps-btn--block" href="{{ apply_url }}">Подать заявку с лошадью {{ h.name }}</a>{% endif %}
     <section class="ps-card">
-      <h2 class="ps-card__h">Сведения</h2>
+      <h2 class="h3 ps-card__h">Сведения</h2>
       <dl class="ps-dl">
         {% if not manage and not my_access %}
           <dt>Год рождения</dt><dd>{{ h.birth_year }}</dd>
@@ -52,7 +52,7 @@
 
   {% if tab == "docs" %}
     <div class="ps-headrow ps-headrow--sub">
-      <h2 class="ps-h2">Документы{% if documents %} <span class="ps-count">{{ documents|length }}</span>{% endif %}</h2>
+      <h2 class="h3 ps-h2">Документы</h2>
       {# Тест 5.1: вместо длинного абзаца — значок (i), полный текст по нажатию #}
       <details class="pf-hint ps-hint">
         <summary class="ps-ib" aria-label="Кто видит документы" title="Кто видит документы"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></summary>
@@ -78,7 +78,7 @@
         <summary class="ps-btn ps-btn--y ps-fab"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Загрузить</summary>
         <div class="ps-sheet__panel" role="dialog" aria-label="Загрузить документ">
           <div class="ps-sheet__grip" aria-hidden="true"></div>
-          <div class="ps-sheet__head"><h2 class="ps-sheet__title">Новый документ</h2><button class="ps-ib" type="button" aria-label="Закрыть" data-ps-close><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+          <div class="ps-sheet__head"><h2 class="h3 ps-sheet__title">Новый документ</h2><button class="ps-ib" type="button" aria-label="Закрыть" data-ps-close><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
           <form method="post" enctype="multipart/form-data" action="{% url 'profiles:horse_action' h.pk 'upload' %}" class="ps-form ps-upload">
             {% csrf_token %}
             <div class="ps-grid2 ps-js">
@@ -108,7 +108,7 @@
         <summary class="ps-btn ps-btn--d"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Пригласить</summary>
         <div class="ps-sheet__panel" role="dialog" aria-label="Пригласить к лошади {{ h.name }}">
           <div class="ps-sheet__grip" aria-hidden="true"></div>
-          <div class="ps-sheet__head"><h2 class="ps-sheet__title">Доступ к лошади {{ h.name }}</h2><button class="ps-ib" type="button" aria-label="Закрыть" data-ps-close><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+          <div class="ps-sheet__head"><h2 class="h3 ps-sheet__title">Доступ к лошади {{ h.name }}</h2><button class="ps-ib" type="button" aria-label="Закрыть" data-ps-close><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
           {# Решение 28.10.2026: доступ даёт только управляющий; появляется после согласия получателя #}
           <form method="post" action="{% url 'profiles:horse_action' h.pk 'grant' %}" class="ps-form">{% csrf_token %}
             <div class="ps-f"><label class="ps-f__l" for="grant-phone">Телефон</label><input id="grant-phone" name="phone" type="tel" placeholder="+7 900 000-00-00" autocomplete="tel" required></div>
@@ -126,7 +126,7 @@
     {% if access_offers or accesses or declined %}
     <section class="ps-card ps-card--flush">
       {% if access_offers %}
-        <h3 class="ps-cap2">Ожидает подтверждения · {{ access_offers|length }}</h3>
+        <h3 class="ps-cap2">Ожидает подтверждения</h3>
         {% for o in access_offers %}
           <div class="ps-rw ps-rw--static">
             <span class="ps-ini" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 4 5a2 2 0 0 1 2-2"/></svg></span>
@@ -136,7 +136,7 @@
         {% endfor %}
       {% endif %}
       {% if accesses %}
-        <h3 class="ps-cap2">Есть доступ · {{ accesses|length }}</h3>
+        <h3 class="ps-cap2">Есть доступ</h3>
         {% for a in accesses %}
           <details class="ps-acc">
             <summary class="ps-rw ps-rw--static">
@@ -156,7 +156,7 @@
         {% endfor %}
       {% endif %}
       {% if declined %}
-        <h3 class="ps-cap2">Отклонено · {{ declined|length }}</h3>
+        <h3 class="ps-cap2">Отклонено</h3>
         {% for o in declined %}
           <div class="ps-rw ps-rw--static">
             <span class="ps-ini" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></span>

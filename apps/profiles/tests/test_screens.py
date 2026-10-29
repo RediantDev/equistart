@@ -18,7 +18,7 @@ class AthletesScreenTests(Base):
         Athlete.objects.create(last_name="Петров", first_name="Пётр", manager=self.other, birth_date=datetime.date(2001, 1, 1), rank="none")
         self.client.force_login(self.other)
         page = self.client.get(reverse("profiles:athletes")).content.decode()
-        me, mine, trusted = page.index("Это я"), page.index("Мои · 1"), page.index("Мне доверили · 1")
+        me, mine, trusted = page.index("Это я"), page.index(">Мои<"), page.index(">Мне доверили<")
         self.assertLess(me, page.index("Ким Алина"))
         self.assertLess(mine, page.index("Петров Пётр"))
         self.assertLess(trusted, page.index("Орлов Дима"))
@@ -36,6 +36,24 @@ class AthletesScreenTests(Base):
         self.client.force_login(mkuser("+79990001790"))
         self.assertNotContains(self.client.get(reverse("profiles:athletes")), "Орлов")
 
+    def test_detail_edit_is_pencil_for_manager_only(self):
+        """Тест 5.2, п. 50: «Изменить» — карандаш справа от имени; делегату, чужому и гостю — нет."""
+        url = reverse("profiles:athlete", args=[self.a1.pk])
+        edit = reverse("profiles:athlete_edit", args=[self.a1.pk])
+        self.client.force_login(self.coach)
+        page = self.client.get(url).content.decode()
+        self.assertIn(f'class="ps-ib ps-ib--o" href="{edit}" aria-label="Изменить сведения спортсмена"', page)
+        self.assertNotIn(">Изменить</a>", page)
+        AthleteDelegate.objects.create(athlete=self.a1, user=self.other, granted_by=self.coach)
+        self.client.force_login(self.other)
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, edit)
+        self.client.force_login(mkuser("+79990001791"))
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)
+
 
 @override_settings(MEDIA_ROOT=TMP)
 class MyHorsesScreenTests(Base):
@@ -44,10 +62,12 @@ class MyHorsesScreenTests(Base):
         Horse.objects.create(name="Пуговка", birth_year=2016, color="bay", sex="mare", breed="уэльский", manager=self.coach, is_pony=True)
         self.client.force_login(self.coach)
         page = self.client.get(reverse("profiles:horses")).content.decode()
-        self.assertIn("Все <small>3</small>", page)
-        self.assertIn("Мои <small>2</small>", page)
-        self.assertIn("С доступом <small>1</small>", page)
-        self.assertIn("Пони <small>1</small>", page)
+        # Тест 5.2, п. 54: без счётчиков после слов
+        self.assertIn('data-f="all" aria-pressed="true">Все</button>', page)
+        self.assertIn('data-f="mine" aria-pressed="false">Мои</button>', page)
+        self.assertIn('data-f="shared" aria-pressed="false">С доступом</button>', page)
+        self.assertIn('data-f="pony" aria-pressed="false">Пони</button>', page)
+        self.assertIn('<h1 class="h1 ps-h1">Мои лошади</h1>', page)
         self.assertIn("управляет Тест Юзер", page)
         self.assertIn('data-horse-filter', page)
         # документы в списке не показываем
@@ -91,13 +111,14 @@ class HorseTabsTests(Base):
                              state=Offer.State.DECLINED, responded_at=timezone.now())
         self.client.force_login(self.coach)
         page = self.client.get(self.url("access")).content.decode()
-        self.assertIn("Ожидает подтверждения · 1", page)
+        self.assertIn(">Ожидает подтверждения</h3>", page)
         self.assertIn("+7 916 ***-**-45", page)
-        self.assertIn("Есть доступ · 1", page)
+        self.assertIn(">Есть доступ</h3>", page)
         self.assertIn("Закрыть доступ", page)
-        self.assertIn("Отклонено · 1", page)
+        self.assertIn(">Отклонено</h3>", page)
         self.assertIn("+7 903 ***-**-12", page)
-        self.assertIn("Доступ 2", page)
+        self.assertIn('aria-current="page">Доступ</a>', page)
+        self.assertNotIn("Доступ 2", page)
         self.assertIn("Отправить приглашение", page)
 
     def test_actions_return_to_tab(self):
@@ -118,7 +139,10 @@ class HorseTabsTests(Base):
         self.assertIn("Срок истёк", page)
         self.assertIn("Истекает", page)
         self.assertIn("Действует", page)
-        self.assertIn("Документы 3", page)
+        # Тест 5.2, п. 54: ни во вкладке, ни в заголовке нет числа документов
+        self.assertIn('aria-current="page">Документы</a>', page)
+        self.assertIn('<h2 class="h3 ps-h2">Документы</h2>', page)
+        self.assertNotIn("Документы 3", page)
         self.assertIn("Сохранить документ", page)
 
     def test_foreign_and_guest_get_info_only(self):
