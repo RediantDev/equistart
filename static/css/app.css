@@ -704,14 +704,26 @@ select { -webkit-appearance: none; appearance: none; padding-right: 44px;
 .tp__hint { font-size: 12px; color: var(--text-muted); }
 @media (max-width: 480px) { .dp__pop, .tp__pop { width: min(320px, calc(100vw - 32px)); } }
 
-/* Файл */
-.file { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 14px; border: 1.5px dashed var(--control-border); border-radius: var(--radius-md); background: var(--surface); }
-.file.is-drag { border-color: var(--ink); background: var(--accent-soft); }
-.file.has-file { border-style: solid; border-color: var(--ink); }
+/* Файл — плитка «+» (тест 6, пп. 5, 20, 21) */
+.file { position: relative; display: flex; flex-direction: column; gap: 8px; }
 .file__native { position: absolute !important; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
-.file__name { color: var(--text-muted); font-size: 14px; min-width: 0; overflow-wrap: anywhere; flex: 1 1 160px; }
-.file.has-file .file__name { color: var(--text); font-weight: 600; }
-.file__clear { border: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--surface-2); font-size: 18px; cursor: pointer; }
+.file__plus { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 10px 14px; border: 1.5px dashed var(--control-border); border-radius: var(--radius-md); background: transparent; color: var(--ink); font-weight: 700; font-size: 15px; cursor: pointer; text-align: center; }
+.file__plus-ico { font-size: 24px; line-height: 1; font-weight: 600; }
+@media (hover: hover) { .file__plus:hover { border-color: var(--ink); background: var(--accent-soft); } }
+.file.is-drag .file__plus { border-color: var(--ink); background: var(--accent-soft); }
+.file__native:focus-visible + .file__thumbs .file__plus, .file__native:focus-visible ~ .file__plus { outline: 3px solid var(--focus); outline-offset: 2px; }
+.file--tiles .file__thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.file--tiles .file__plus { flex-direction: column; gap: 2px; aspect-ratio: 1; min-height: 0; padding: 6px; font-size: 13px; }
+.file__thumb { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); }
+.file__thumb-name { display: block; padding: 8px; font-size: 12px; overflow-wrap: anywhere; }
+.file__card { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.file__card[hidden], .file__plus[hidden] { display: none; }
+.file__card-ico { width: 40px; height: 40px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); display: grid; place-items: center; font-size: 11px; font-weight: 800; flex: none; }
+.file__card-txt { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.file__name { font-weight: 650; font-size: 15px; overflow-wrap: anywhere; color: var(--text); }
+a.file__name { text-decoration: none; }
+.file__meta { font-size: 13px; color: var(--text-muted); }
+.file__clear { border: 1px solid var(--border); width: 40px; height: 40px; border-radius: 50%; background: var(--surface); color: var(--danger); display: grid; place-items: center; cursor: pointer; flex: none; padding: 0; }
 
 /* Кнопка без изменений — неактивна и отличается цветом */
 .btn.is-inactive, .btn[disabled] { background: var(--surface-2) !important; color: var(--text-muted) !important; border-color: var(--border) !important; opacity: 1; cursor: not-allowed; pointer-events: none; }
@@ -1119,11 +1131,8 @@ html.js input[type=date]:not([data-ui]), html.js input[type=time]:not([data-ui])
 .sheet__url { flex: 1; min-width: 0; height: 44px; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0 12px; font-size: 14px !important; color: var(--text-muted); background: var(--surface-2); }
 .sheet__more { margin-top: 10px; }
 /* Фото — миниатюрой с крестиком (п. 24.3) */
-.file__thumbs { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; }
-.file__thumb { position: relative; width: 84px; height: 84px; border-radius: 12px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); }
 .file__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .file__thumb-x { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%; border: 0; background: rgba(20,20,20,.72); color: #fff; font-size: 16px; line-height: 1; cursor: pointer; }
-.file.has-thumbs .file__name:empty { display: none; }
 /* Подсказки при вводе: регион, порода (п. 13.2, 15.3) */
 .sg { position: relative; scroll-margin-top: 84px; }
 .sg__pop { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: 0 12px 28px rgba(0,0,0,.12); max-height: 280px; overflow-y: auto; }
@@ -1830,3 +1839,68 @@ a.list__row:visited, a.lrow:visited, a.tcard:visited, a.club-card:visited, .tp-p
 .cover-hint { margin: 0; }
 /* п. 52: «назад» только на компьютере */
 @media (max-width: 720px) { .back--desk { display: none !important; } }
+
+/* ===== Тест 6 (29.10.2026) ===== */
+/* Общие: чипы-вкладки и чипы дней — одна строка, прокрутка вбок без сдвига (пп. 3, 11, 31, 39) */
+.seg-tabs, .dchips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 6px; margin: 0; }
+.seg-tabs::-webkit-scrollbar, .dchips::-webkit-scrollbar { display: none; }
+.seg-tabs__item, .dchips__item { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 14px; font-weight: 650; text-decoration: none; white-space: nowrap; cursor: pointer; }
+.seg-tabs__item.is-active, .dchips__item.is-active, .dchips__item[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.dchips__n { font-size: 12px; font-weight: 800; color: inherit; opacity: .75; }
+.head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: var(--space-4); }
+.head-row > :first-child { min-width: 0; }
+.head-row .h1 { margin: 0; }
+.head-row .btn { flex: none; }
+.plus-row { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; padding: 8px 14px; border: 1.5px dashed var(--control-border); border-radius: var(--radius-md); background: transparent; color: var(--ink); font: inherit; font-weight: 700; font-size: 15px; text-decoration: none; cursor: pointer; }
+@media (hover: hover) { .plus-row:hover { border-color: var(--ink); background: var(--accent-soft); } }
+.kebab { position: relative; flex: none; }
+.kebab > summary { list-style: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: var(--surface); cursor: pointer; color: var(--text); }
+.kebab > summary::-webkit-details-marker { display: none; }
+.kebab[open] > summary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.kebab__menu { position: absolute; right: 0; top: 46px; z-index: 30; min-width: 220px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: 0 8px 24px rgba(20,20,20,.14); padding: 4px 0; display: flex; flex-direction: column; }
+.kebab__menu > a, .kebab__menu > form > button, .kebab__menu > button { display: block; width: 100%; text-align: left; padding: 12px 16px; font: inherit; font-size: 15px; font-weight: 600; color: var(--text); background: none; border: 0; text-decoration: none; cursor: pointer; }
+.kebab__menu .is-danger { color: var(--danger); }
+@media (hover: hover) { .kebab__menu > a:hover, .kebab__menu > form > button:hover, .kebab__menu > button:hover { background: var(--surface-2); } }
+
+/* Мой клуб: вариант В (п. 3) */
+.club-top { margin-bottom: var(--space-4); display: flex; flex-direction: column; gap: 10px; }
+.club-top__cover { position: relative; aspect-ratio: 3 / 1; min-height: 120px; border-radius: var(--radius-lg); background: var(--ink); margin-bottom: 30px; }
+.club-top__cover > img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
+.club-top__tools { position: absolute; top: 10px; right: 10px; display: flex; gap: 8px; }
+.icon-btn--on-cover { background: rgba(255,255,255,.94); border-color: transparent; color: var(--ink); }
+.club-top__logo { position: absolute; left: 14px; bottom: -28px; width: 64px; height: 64px; border-radius: 16px; object-fit: cover; background: #fff; border: 3px solid var(--bg); }
+.club-top__logo--empty { display: grid; place-items: center; background: var(--accent); color: var(--ink); font-weight: 800; font-size: 26px; }
+.club-top__head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.club-top__name { margin: 0; font-size: 24px; line-height: 1.2; font-weight: 800; letter-spacing: -0.02em; }
+.club-top__text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--text-muted); }
+/* Блок заполненности — свёрнут (п. 2) */
+details.club-progress { padding: 14px 16px; }
+.club-progress__sum { list-style: none; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.club-progress__sum::-webkit-details-marker { display: none; }
+.club-progress__sum-text { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
+.club-progress__sum .club-progress__bar { margin: 0; height: 6px; }
+.club-progress__chev { transition: transform .15s; display: grid; }
+details[open] > .club-progress__sum .club-progress__chev { transform: rotate(180deg); }
+details.club-progress[open] .club-check { margin-top: 10px; }
+/* Фото: «Сделать обложкой» читается, плитка «+» (пп. 4, 5) */
+.club-photo__btn { background: rgba(20,20,20,.86); color: #fff; }
+.club-photo--add { background: transparent; aspect-ratio: 1; display: flex; }
+.club-photo--add .file__plus { flex: 1 1 auto; flex-direction: column; gap: 2px; min-height: 0; font-size: 13px; }
+.cover-details > summary { cursor: pointer; font-size: 14px; font-weight: 650; color: var(--text-muted); padding: 4px 0; }
+.cover-details[open] > summary { margin-bottom: 8px; }
+/* Клавиатура открыта — нижнего меню нет (п. 18) */
+@media (max-width: 720px) {
+  .kb-open .bnav { display: none; }
+  .kb-open body { padding-bottom: var(--safe-b); }
+  .kb-open form[method=post] .form-actions--sticky, .kb-open form.form--long > .form-actions:last-child, .kb-open form.form--long > .form__actions:last-child,
+  .kb-open .pair-form__actions, .kb-open .stb-order__bar, .kb-open .dock, .kb-open .sticky-bar { bottom: 0 !important; }
+}
+textarea[data-autogrow] { resize: none; overflow: hidden; min-height: 96px; }
+/* Закреплённая внизу кнопка формы (п. 6 и шаги мастера) */
+.sticky-bar { position: sticky; bottom: 0; z-index: 6; display: flex; gap: 8px; margin: var(--space-4) 0 0; padding: 10px 0; background: var(--surface); border-top: 1px solid var(--border); }
+.sticky-bar .btn { flex: 1 1 auto; }
+@media (max-width: 720px) { .sticky-bar { bottom: calc(var(--bnav-h) + var(--safe-b)); } }
+.field-more > summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 700; cursor: pointer; }
+.field-more > summary::-webkit-details-marker { display: none; }
+.field-more > summary .ico { transition: transform .15s; }
+.field-more[open] > summary .ico { transform: rotate(45deg); }

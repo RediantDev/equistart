@@ -2,11 +2,10 @@
 {% block title %}Клубы — СтартЛист{% endblock %}
 {% block content %}
 {# Тест 5, п. 25.3: каталог по макету — поиск, быстрые фильтры, карточки с обложкой #}
-<div class="page-head">
-  <div>
-    <h1 class="h1">Клубы</h1>
-  </div>
-  {% if user.is_authenticated and user.is_club %}{% if my_club %}<a class="btn btn--ghost" href="{% url 'clubs:mine' %}">Мой клуб</a>{% else %}<a class="btn btn--dark" href="{% url 'clubs:mine' %}">+ Добавить клуб</a>{% endif %}{% endif %}
+{# Тест 6, п. 1: «Мой клуб» — в строке заголовка, у правого края #}
+<div class="head-row">
+  <h1 class="h1">Клубы</h1>
+  {% if user.is_authenticated and user.is_club %}{% if my_club %}<a class="btn btn--ghost btn--sm" href="{% url 'clubs:mine' %}">Мой клуб</a>{% else %}<a class="btn btn--dark btn--sm" href="{% url 'clubs:mine' %}">+ Добавить клуб</a>{% endif %}{% endif %}
 </div>
 <form method="get" role="search" class="club-search" data-live="#club-results">
   <label class="visually-hidden" for="q">Название, город или регион</label>

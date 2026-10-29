@@ -4,57 +4,78 @@
 {# Тест 5, п. 25.3: кабинет клуба по макету — статус, что заполнить, фото, новости, управляющие #}
 <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
 
-<section class="club-status">
-  <div class="club-status__head">
-    {% if club.logo %}<img class="club-status__logo" src="{% url 'clubs:file' 'logo' club.pk %}?w=320" alt="">{% else %}<span class="club-status__logo club-status__logo--empty" aria-hidden="true">{{ club.name|slice:":1" }}</span>{% endif %}
-    <div style="min-width: 0;">
-      <h1 class="club-status__name">{{ club.name }}</h1>
-      <span class="chip{% if club.status == 'confirmed' %} chip--success{% elif club.status == 'returned' %} chip--danger{% elif club.status == 'review' %} chip--warning{% endif %}">{% if club.status == "review" %}На проверке у модератора{% else %}{{ club.get_status_display }}{% endif %}</span>
+{# Тест 6, п. 3 (вариант В): обложка, логотип поверх, «Изменить» и «Как видят гости» — иконками на обложке, разделы — вкладками #}
+<section class="club-top">
+  <div class="club-top__cover">
+    {% if photos %}<img src="{% url 'clubs:file' 'photo' photos.0.pk %}?w=1200" alt="">{% endif %}
+    <div class="club-top__tools">
+      <a class="icon-btn icon-btn--on-cover" href="{% url 'clubs:detail' club.pk %}" aria-label="Как видят гости" title="Как видят гости">{% include "partials/icon.html" with name="eye" size=20 %}</a>
+      <a class="icon-btn icon-btn--on-cover" href="?edit=1" aria-label="{% if club.status == 'draft' or club.status == 'returned' %}Заполнить и отправить{% else %}Изменить сведения{% endif %}" title="Изменить сведения">{% include "partials/icon.html" with name="edit" size=20 %}</a>
     </div>
+    {% if club.logo %}<img class="club-top__logo" src="{% url 'clubs:file' 'logo' club.pk %}?w=320" alt="">{% else %}<span class="club-top__logo club-top__logo--empty" aria-hidden="true">{{ club.name|slice:":1" }}</span>{% endif %}
   </div>
-  {% if club.status == "returned" %}<p class="club-status__text"><strong>Модератор вернул профиль:</strong> {{ club.moderator_comment }}</p>
-  {% elif club.status == "review" %}<p class="club-status__text">Обычно проверка занимает рабочий день. Пока ждёте — добавьте фото и первую новость: они появятся сразу после подтверждения.</p>
-  {% elif club.status == "draft" %}<p class="club-status__text">{% if missing %}Чтобы отправить на проверку: {% for m in missing %}{{ m|lower }} {% endfor %}{% else %}Всё заполнено — отправьте профиль на проверку модератору.{% endif %}</p>{% endif %}
-  <div class="club-status__actions">
-    <a class="btn btn--primary btn--sm" href="{% url 'clubs:detail' club.pk %}">{% if club.is_public %}Открыть страницу клуба{% else %}Посмотреть страницу клуба{% endif %}</a>
-    <a class="btn btn--sm club-status__ghost" href="?edit=1">{% if club.status == "draft" or club.status == "returned" %}Заполнить и отправить{% else %}Изменить сведения{% endif %}</a>
+  <div class="club-top__head">
+    <h1 class="club-top__name">{{ club.name }}</h1>
+    <span class="chip{% if club.status == 'confirmed' %} chip--success{% elif club.status == 'returned' %} chip--danger{% elif club.status == 'review' %} chip--warning{% endif %}">{% if club.status == "review" %}На проверке{% elif club.status == "confirmed" %}Проверен{% else %}{{ club.get_status_display }}{% endif %}</span>
   </div>
+  {% if club.status == "returned" %}<p class="club-top__text"><strong>Модератор вернул профиль:</strong> {{ club.moderator_comment }} <a href="?edit=1">Исправить</a></p>
+  {% elif club.status == "draft" %}<p class="club-top__text">{% if missing %}Чтобы отправить на проверку: {% for m in missing %}{{ m|lower }} {% endfor %}{% else %}Всё заполнено — <a href="?edit=1">отправьте профиль на проверку</a>.{% endif %}</p>{% endif %}
+  <nav class="seg-tabs" aria-label="Разделы клуба">
+    <a class="seg-tabs__item is-active" href="#top" aria-current="page">Страница</a>
+    <a class="seg-tabs__item" href="#news">Новости</a>
+    <a class="seg-tabs__item" href="{% url 'core:calendar' %}?club={{ club.pk }}">Турниры{% if venue_t %} · {{ venue_t }}{% endif %}</a>
+    <a class="seg-tabs__item" href="{% url 'clubs:team' %}">Команда</a>
+  </nav>
 </section>
 
 {% if similar %}<div class="alert alert--warning" style="margin-top: var(--space-4);">В {{ club.settlement }} уже есть похожий клуб: {% for s in similar %}«{{ s.public_name }}»{% if not forloop.last %}, {% endif %}{% endfor %}. Если это ваш клуб — не создавайте второй профиль, напишите в поддержку, чтобы получить доступ.</div>{% endif %}
 
-<section class="card club-progress">
-  <div class="club-progress__head"><h2 class="h3" style="margin: 0;">Страница заполнена</h2><span class="label">{{ done }} / {{ checklist|length }}</span></div>
-  <div class="club-progress__bar"><span style="width: {% widthratio done checklist|length 100 %}%;"></span></div>
+{# Тест 6, п. 2: блок свёрнут, при 100 % не показывается #}
+{% if done < checklist|length %}
+<details class="card club-progress">
+  <summary class="club-progress__sum">
+    <span class="club-progress__sum-text"><strong>Страница заполнена на {% widthratio done checklist|length 100 %} %</strong>
+      <span class="club-progress__bar"><span style="width: {% widthratio done checklist|length 100 %}%;"></span></span></span>
+    <span class="club-progress__chev" aria-hidden="true">{% include "partials/icon.html" with name="chevron-down" size=20 %}</span>
+  </summary>
   <ul class="club-check">
     {% for label, ok, href in checklist %}
       <li><a href="{{ href }}" class="club-check__row"><span class="club-check__mark{% if ok %} is-ok{% endif %}" aria-hidden="true">{% if ok %}✓{% endif %}</span><span{% if ok %} class="muted"{% endif %}>{{ label }}</span><span class="club-check__go" aria-hidden="true">›</span></a></li>
     {% endfor %}
   </ul>
-</section>
+</details>
+{% endif %}
 
 <section class="card stack" id="photos">
   <div class="club-progress__head"><h2 class="h3" style="margin: 0;">Фото</h2><span class="table__sub">{{ photos|length }}</span></div>
-  {% if photos %}
-    <div class="club-photos">{% for p in photos %}
+  {# Тест 6, пп. 4–5: «Сделать обложкой» — чёрная плашка; добавление — плитка «+», загрузка сразу после выбора #}
+  <div class="club-photos">
+    {% for p in photos %}
       <figure class="club-photo">
         <img src="{% url 'clubs:file' 'photo' p.pk %}?w=640" alt="{{ p.caption|default:'Фото клуба' }}" loading="lazy">
         {% if forloop.first %}<span class="club-photo__badge">Обложка</span>{% else %}<form method="post" action="{% url 'clubs:photo_cover' p.pk %}" class="club-photo__cover">{% csrf_token %}<button class="club-photo__btn" type="submit">Сделать обложкой</button></form>{% endif %}
         <form method="post" action="{% url 'clubs:photo_delete' p.pk %}" class="club-photo__x">{% csrf_token %}<button type="submit" aria-label="Удалить фото" data-confirm="Удалить это фото?" data-confirm-ok="Удалить">×</button></form>
       </figure>
-    {% endfor %}</div>
+    {% endfor %}
+    {% if photos|length < 30 %}
+    <form method="post" action="{% url 'clubs:photo_add' %}" enctype="multipart/form-data" class="club-photo club-photo--add">
+      {% csrf_token %}<input type="hidden" name="once" value="{{ once }}">
+      <input id="ph" class="file__native" type="file" name="file" accept="image/jpeg,image/png" data-max-mb="20" multiple required data-ui="raw" data-autosubmit>
+      <label class="file__plus" for="ph"><span class="file__plus-ico" aria-hidden="true">+</span><span class="file__plus-text">Фото</span></label>
+    </form>
+    {% endif %}
+  </div>
+  {% if photos %}
     {# Тест 5.3, п. 48: как обложка выглядит на странице клуба — на компьютере 3:1, на телефоне 2:1 (края обрезаются) #}
-    <div class="cover-preview" aria-label="Обложка на странице клуба">
-      <figure class="cover-preview__f cover-preview__f--wide"><img src="{% url 'clubs:file' 'photo' photos.0.pk %}?w=1200" alt=""><figcaption>на компьютере</figcaption></figure>
-      <figure class="cover-preview__f cover-preview__f--phone"><img src="{% url 'clubs:file' 'photo' photos.0.pk %}?w=640" alt=""><figcaption>на телефоне</figcaption></figure>
-    </div>
+    <details class="cover-details">
+      <summary>Как обложка выглядит на странице</summary>
+      <div class="cover-preview" aria-label="Обложка на странице клуба">
+        <figure class="cover-preview__f cover-preview__f--wide"><img src="{% url 'clubs:file' 'photo' photos.0.pk %}?w=1200" alt=""><figcaption>на компьютере</figcaption></figure>
+        <figure class="cover-preview__f cover-preview__f--phone"><img src="{% url 'clubs:file' 'photo' photos.0.pk %}?w=640" alt=""><figcaption>на телефоне</figcaption></figure>
+      </div>
+    </details>
   {% endif %}
-  <p class="field__help cover-hint">Первое фото — обложка клуба. Рекомендуемый размер обложки — 1600×533 px (3:1), не меньше 1200 px по ширине. Главное держите в центре кадра: на телефоне края обрезаются.</p>
-  <form method="post" action="{% url 'clubs:photo_add' %}" enctype="multipart/form-data" class="form">
-    {% csrf_token %}<input type="hidden" name="once" value="{{ once }}">
-    <div class="field"><label class="field__label" for="ph">Добавить фото</label><input id="ph" type="file" name="file" accept="image/jpeg,image/png" data-max-mb="20" multiple required><p class="field__help">JPEG или PNG до 20 МБ, можно сразу несколько (до 10). Первое фото — обложка страницы.</p></div>
-    <div class="form__actions"><button type="submit" class="btn btn--dark btn--sm">Загрузить</button></div>
-  </form>
+  <p class="field__help cover-hint">JPEG или PNG до 20 МБ. Первое фото — обложка: лучше 1600×533 px (3:1), главное — в центре кадра.</p>
 </section>
 
 <section class="card stack" id="news">
@@ -73,8 +94,4 @@
   {% endif %}
 </section>
 
-<section class="card club-links">
-  <a href="{% url 'clubs:team' %}">Управляющие клубом<span class="muted">{{ members_count }} ›</span></a>
-  <a href="{% url 'core:calendar' %}?club={{ club.pk }}">Турниры на площадке клуба<span class="muted">{{ venue_t }} ›</span></a>
-</section>
 {% endblock %}

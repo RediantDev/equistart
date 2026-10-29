@@ -84,7 +84,7 @@ class ClubUploadTests(Base):
 
     def test_owner_sees_draft_link_others_404(self):
         r = self.client.get(reverse("clubs:mine"))
-        self.assertContains(r, "Посмотреть страницу клуба")
+        self.assertContains(r, "Как видят гости")
         self.assertEqual(self.client.get(reverse("clubs:detail", args=[self.club.pk])).status_code, 200)
         self.client.logout()
         self.assertEqual(self.client.get(reverse("clubs:detail", args=[self.club.pk])).status_code, 404)

@@ -390,6 +390,9 @@
     vis.autocomplete = "off";
     vis.inputMode = "numeric";
     vis.placeholder = placeholderFor(input) || "чч:мм";
+    // Тест 6, п. 13: на телефоне время выбирается только в окне — клавиатура не открывается и не закрывает окно
+    var touch = TOUCH || window.innerWidth < 720;
+    if (touch) { vis.readOnly = true; vis.inputMode = "none"; vis.classList.add("tp__input--pick"); }
     if (input.id) { vis.id = input.id; input.removeAttribute("id"); }
     input.type = "hidden";
     root.appendChild(vis);
@@ -428,8 +431,8 @@
       cols.appendChild(hc); cols.appendChild(mc);
       pop.appendChild(cols);
       var foot = el("div", "dp__foot");
-      var hint = el("span", "tp__hint", "Можно ввести вручную, например 9:40");
-      foot.appendChild(hint);
+      if (!touch) foot.appendChild(el("span", "tp__hint", "Можно ввести вручную, например 9:40"));
+      else { var ok = el("button", "btn btn--primary btn--sm", "Готово"); ok.type = "button"; ok.onclick = function () { close(); }; foot.appendChild(ok); }
       if (!input.required) { var clear = el("button", "dp__link", "Очистить"); clear.type = "button"; clear.onclick = function () { set(null); close(); }; foot.appendChild(clear); }
       pop.appendChild(foot);
     }
@@ -451,7 +454,7 @@
       if (openPopup && openPopup.root === root) openPopup = null;
     }
     vis.addEventListener("click", open);
-    vis.addEventListener("focus", function () { setTimeout(function () { vis.select(); }, 0); });  // ввод заменяет «23:59», а не дописывается
+    vis.addEventListener("focus", function () { if (touch) { open(); return; } setTimeout(function () { vis.select(); }, 0); });  // ввод заменяет «23:59», а не дописывается
     icon.addEventListener("click", function () { if (pop.hidden) { open(); focusSoft(vis); } else close(); });
     vis.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); vis.blur(); close(); } });
     vis.addEventListener("blur", function () {
@@ -483,21 +486,33 @@
     accept.split(",").forEach(function (a) { var h = map[a.trim().toLowerCase()]; if (h && out.indexOf(h) < 0) out.push(h); });
     return out.join(", ");
   }
+  // Тест 6, пп. 5, 20, 21: выбор файла — плитка «+». Фото — плитки в сетке, файл — карточка
+  // с именем, размером и корзиной. data-autosubmit — отправить форму сразу после выбора.
   function enhanceFile(input) {
     if (input.dataset.ui) return;
     input.dataset.ui = "1";
-    var root = el("div", "file");
+    var imgOnly = /^(image\/|\.(jpe?g|png|webp|heic))/i.test((input.accept || "").trim()) && !/pdf/i.test(input.accept || "");
+    var root = el("div", "file " + (imgOnly ? "file--tiles" : "file--doc"));
     input.parentNode.insertBefore(root, input);
     root.appendChild(input);
     input.classList.add("file__native");
-    var imgOnly = /^(image\/|\.(jpe?g|png|webp|heic))/i.test((input.accept || "").trim()) && !/pdf/i.test(input.accept || "");
-    var btn = el("label", "btn btn--ghost btn--sm file__btn", input.multiple ? (imgOnly ? "Добавить фото" : "Выбрать файлы") : (imgOnly ? "Выбрать фото" : "Выбрать файл"));
     if (!input.id) input.id = "f" + Math.random().toString(36).slice(2);
-    btn.setAttribute("for", input.id);
-    var name = el("span", "file__name", input.multiple ? "Файлы не выбраны" : "Файл не выбран");
-    var clear = el("button", "file__clear", "×"); clear.type = "button"; clear.hidden = true; clear.setAttribute("aria-label", "Убрать файл");
+    var label = input.getAttribute("data-plus-label") || (imgOnly ? "Фото" : (/pdf/i.test(input.accept || "") ? "Файл PDF" : "Файл"));
     var thumbs = el("div", "file__thumbs"); thumbs.hidden = true;
-    root.appendChild(btn); root.appendChild(name); root.appendChild(clear); root.appendChild(thumbs);
+    var plus = el("label", "file__plus");
+    plus.setAttribute("for", input.id);
+    plus.innerHTML = '<span class="file__plus-ico" aria-hidden="true">+</span>';
+    plus.appendChild(el("span", "file__plus-text", label));
+    var card = el("div", "file__card"); card.hidden = true;
+    var cardIco = el("span", "file__card-ico", "PDF"); cardIco.setAttribute("aria-hidden", "true");
+    var cardTxt = el("span", "file__card-txt");
+    var name = el("span", "file__name"), meta = el("span", "file__meta");
+    cardTxt.appendChild(name); cardTxt.appendChild(meta);
+    var clear = el("button", "file__clear"); clear.type = "button"; clear.setAttribute("aria-label", "Убрать файл");
+    clear.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
+    card.appendChild(cardIco); card.appendChild(cardTxt); card.appendChild(clear);
+    if (imgOnly) { thumbs.appendChild(plus); root.appendChild(thumbs); thumbs.hidden = false; }
+    else { root.appendChild(plus); root.appendChild(card); }
     var err = el("p", "field__error"); err.hidden = true; err.setAttribute("role", "alert"); root.appendChild(err);
     function size(f) { return f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + " КБ" : (f.size / 1048576).toFixed(1).replace(".", ",") + " МБ"; }
     function removeAt(idx) {
@@ -519,31 +534,35 @@
       err.innerHTML = bad ? '<span aria-hidden="true">!</span> ' : ""; err.appendChild(document.createTextNode(bad)); err.hidden = !bad;
       var f0 = root.closest(".field"); if (f0) f0.classList.toggle("field--error", !!bad);
       if (bad) { input.value = ""; files = []; if (window.SL && SL.toast) SL.toast(bad, "error"); }
-      thumbs.innerHTML = "";
-      var imgs = files.filter(function (f) { return /^image\//.test(f.type) && !/heic/i.test(f.type); });
-      thumbs.hidden = !imgs.length;
-      files.forEach(function (f, i) {
-        if (!/^image\//.test(f.type) || /heic/i.test(f.type)) return;
-        var t = el("div", "file__thumb");
-        var im = el("img"); im.alt = f.name; im.src = URL.createObjectURL(f); im.onload = function () { URL.revokeObjectURL(im.src); };
-        var x = el("button", "file__thumb-x", "×"); x.type = "button"; x.setAttribute("aria-label", "Убрать " + f.name);
-        x.onclick = function () { removeAt(i); };
-        t.appendChild(im); t.appendChild(x); thumbs.appendChild(t);
-      });
-      var others = files.filter(function (f) { return imgs.indexOf(f) < 0; });
-      name.textContent = !files.length ? (input.multiple ? "Файлы не выбраны" : "Файл не выбран")
-        : others.length ? others.map(function (f) { return f.name + " · " + size(f); }).join(", ") + (imgs.length ? " и фото: " + imgs.length : "")
-        : (imgs.length > 1 ? "Фото: " + imgs.length : "");
       root.classList.toggle("has-file", files.length > 0);
-      root.classList.toggle("has-thumbs", imgs.length > 0);
-      clear.hidden = !files.length || (imgs.length > 0 && !others.length);
+      if (imgOnly) {
+        thumbs.querySelectorAll(".file__thumb").forEach(function (t) { t.remove(); });
+        files.forEach(function (f, i) {
+          var t = el("div", "file__thumb");
+          if (/^image\//.test(f.type) && !/heic/i.test(f.type)) {
+            var im = el("img"); im.alt = f.name; im.src = URL.createObjectURL(f); im.onload = function () { URL.revokeObjectURL(im.src); };
+            t.appendChild(im);
+          } else { t.appendChild(el("span", "file__thumb-name", f.name)); }
+          var x = el("button", "file__thumb-x", "×"); x.type = "button"; x.setAttribute("aria-label", "Убрать " + f.name);
+          x.onclick = function () { removeAt(i); };
+          t.appendChild(x); thumbs.insertBefore(t, plus);
+        });
+        plus.hidden = !input.multiple && files.length > 0;
+      } else {
+        var f = files[0];
+        card.hidden = !f; plus.hidden = !!f;
+        if (f) { name.textContent = f.name; meta.textContent = size(f); cardIco.textContent = (f.name.split(".").pop() || "").slice(0, 4).toUpperCase() || "ФАЙЛ"; }
+      }
+      if (files.length && !bad && input.hasAttribute("data-autosubmit") && input.form && !root._syncing) {
+        if (input.form.requestSubmit) input.form.requestSubmit(); else input.form.submit();
+      }
     }
     input.addEventListener("change", function (e) { if (e.isTrusted !== false || !root._syncing) sync(); });
     clear.addEventListener("click", function () { input.value = ""; sync(); fire(input, "change"); });
     root.addEventListener("dragover", function (e) { e.preventDefault(); root.classList.add("is-drag"); });
     root.addEventListener("dragleave", function () { root.classList.remove("is-drag"); });
     root.addEventListener("drop", function (e) { e.preventDefault(); root.classList.remove("is-drag"); if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; sync(); fire(input, "change"); } });
-    sync();
+    root._syncing = true; sync(); root._syncing = false;
   }
 
   /* ---------- Условный показ: data-show-when="name=v1,v2" | "name:checked" | "name!=" ---------- */
@@ -829,6 +848,48 @@
     if (e.key !== "Escape") return;
     document.querySelectorAll("details[data-mnav][open]").forEach(function (d) { d.removeAttribute("open"); d.querySelector("summary").focus(); });
   });
+
+  // Тест 6, п. 5: плитка «+» без обёртки (data-ui="raw") — форма отправляется сразу после выбора
+  document.addEventListener("change", function (e) {
+    var inp = e.target;
+    if (!inp.matches || !inp.matches('input[type="file"][data-autosubmit][data-ui="raw"]') || !inp.files || !inp.files.length) return;
+    var max = (+inp.getAttribute("data-max-mb") || 0) * 1048576;
+    for (var i = 0; i < inp.files.length; i++) {
+      if (max && inp.files[i].size > max) {
+        var msg = "«" + inp.files[i].name + "» больше " + inp.getAttribute("data-max-mb") + " МБ — уменьшите файл и выберите снова.";
+        if (window.SL && SL.toast) SL.toast(msg, "error"); else alert(msg);
+        inp.value = ""; return;
+      }
+    }
+    var tile = inp.form && inp.form.querySelector(".file__plus");
+    if (tile) tile.classList.add("is-busy");
+    if (inp.form.requestSubmit) inp.form.requestSubmit(); else inp.form.submit();
+  });
+
+  // Тест 6, п. 18: пока открыта клавиатура, нижнее меню скрыто (не поднимается вместе с ней)
+  (function () {
+    var root = document.documentElement, vv = window.visualViewport, t = null;
+    function typing(el) {
+      if (!el || !el.matches) return false;
+      if (el.matches("textarea, [contenteditable=true]")) return !el.readOnly;
+      return el.matches("input") && !el.readOnly && !/^(checkbox|radio|file|button|submit|reset|range|color|hidden)$/i.test(el.type) && el.inputMode !== "none";
+    }
+    function sync() {
+      var on = typing(document.activeElement);
+      if (vv && !on) on = vv.height < window.innerHeight * 0.72;
+      root.classList.toggle("kb-open", on && window.innerWidth < 720);
+    }
+    document.addEventListener("focusin", sync);
+    document.addEventListener("focusout", function () { clearTimeout(t); t = setTimeout(sync, 60); });
+    if (vv) vv.addEventListener("resize", function () { clearTimeout(t); t = setTimeout(sync, 60); });
+  })();
+
+  // Тест 6, п. 6: поле текста растёт по мере ввода
+  function grow(ta) { ta.style.height = "auto"; ta.style.height = Math.max(ta.scrollHeight + 2, 96) + "px"; }
+  document.addEventListener("input", function (e) { if (e.target.matches && e.target.matches("textarea[data-autogrow]")) grow(e.target); });
+  function growAll() { document.querySelectorAll("textarea[data-autogrow]").forEach(grow); }
+  document.addEventListener("DOMContentLoaded", growAll);
+  document.addEventListener("htmx:afterSettle", growAll);
 
   // «Раздел: …» в «Проведении»
   document.addEventListener("click", function (e) {

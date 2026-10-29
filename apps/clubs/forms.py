@@ -40,13 +40,13 @@ class ClubForm(forms.ModelForm):
 
 class NewsForm(forms.ModelForm):
     photos = forms.FileField(label="Фото", required=False, widget=forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png"}),
-                             help_text="JPEG или PNG до 20 МБ. Можно добавить ещё после сохранения.")
+                             help_text="JPEG или PNG до 20 МБ.")
 
     class Meta:
         model = ClubNews
         fields = ["title", "text", "tournament"]
-        widgets = {"text": forms.Textarea(attrs={"rows": 6})}
-        labels = {"tournament": "О каком турнире новость"}
+        widgets = {"text": forms.Textarea(attrs={"rows": 4, "data-autogrow": ""})}
+        labels = {"tournament": "Турнир"}
 
     def __init__(self, club, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -57,7 +57,7 @@ class NewsForm(forms.ModelForm):
         self.fields["tournament"].queryset = qs.distinct().order_by("-starts_on")
         self.fields["tournament"].required = False
         self.fields["tournament"].empty_label = "— не о турнире —"
-        self.fields["tournament"].help_text = "Если новость о турнире на вашей площадке — выберите его: в новости появится ссылка на турнир."  # тест 5, п. 25.1
+        self.fields["tournament"].help_text = "В новости появится ссылка на турнир."  # тест 5, п. 25.1; тест 6, п. 6 — короче
 
     def clean_photos(self):
         f = self.cleaned_data.get("photos")
