@@ -57,7 +57,7 @@
       cal.querySelector("[data-cal-prev]").setAttribute("aria-label", mode === "week" ? "Предыдущая неделя" : "Предыдущий месяц");
       cal.querySelector("[data-cal-next]").setAttribute("aria-label", mode === "week" ? "Следующая неделя" : "Следующий месяц");
       var first = mode === "week" ? view : monday(view), count = mode === "week" ? 7 : 42;
-      var selD = parse(sel), selWeek = selD ? iso(monday(selD)) : null, tIso = iso(today);
+      var tIso = iso(today);  // тест 5.3, п. 10: подсвечивается только выбранный день, не неделя
       var frag = document.createDocumentFragment();
       for (var i = 0; i < count; i++) {
         var d = addDays(first, i), k = iso(d), info = data[k];
@@ -68,7 +68,6 @@
         if (mode === "month" && d.getMonth() !== view.getMonth()) b.classList.add("is-out");
         if ((d.getDay() + 6) % 7 > 4) b.classList.add("is-we");
         if (k === tIso) { b.classList.add("is-today"); label += ", сегодня"; }
-        if (mode === "month" && selWeek && iso(monday(d)) === selWeek) b.classList.add("is-wk");
         if (info) {
           var dot = document.createElement("i");
           dot.className = "cal__dot" + (info.n > 1 ? " cal__dot--2" : "") + (info.kind === "past" ? " cal__dot--past" : "");
@@ -158,6 +157,8 @@
     if (window.htmx) htmx.ajax("GET", url, { target: "#cal-list", select: "#cal-list", swap: "outerHTML" });
     else location.href = url;
   });
+  // Поиск и фильтры по мере ввода (smooth.js, data-live) — точки на датах обновляются
+  document.addEventListener("live:updated", function () { var cal = mainCal(); if (cal && cal._cal) cal._cal.reload(); });
   document.addEventListener("click", function (e) {
     var a = e.target.closest && e.target.closest("[data-cal-all]");
     var cal = mainCal();

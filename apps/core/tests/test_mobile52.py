@@ -93,3 +93,31 @@ class CalendarB52Tests(Base):
     def test_my_competitions_guest_redirected(self):
         r = self.client.get(reverse("entries:competitions"))
         self.assertEqual(r.status_code, 302)
+
+
+@override_settings(MEDIA_ROOT=TMP)
+class Test53Tests(Base):
+    """Тест 5.3: поиск по мере ввода, «Все соревнования», клубы без подзаголовка, цветная карточка."""
+
+    def test_calendar_live_search_and_all_label(self):
+        r = self.client.get(reverse("core:calendar"), {"day": self.start.isoformat()})
+        self.assertContains(r, 'data-live="#cal-list,#cal-dates,#cal-fbtn"')
+        self.assertContains(r, "Все соревнования")
+        self.assertNotContains(r, "Все даты")
+        self.assertNotContains(r, "data-require-btn>Найти")
+
+    def test_card_date_colored_by_state(self):
+        r = self.client.get(reverse("core:calendar"))
+        self.assertContains(r, "tcard__date--")
+        self.assertContains(r, "tcard__disc")
+
+    def test_clubs_without_subtitle_and_find_button(self):
+        for login in (None, self.coach):
+            if login:
+                self.client.force_login(login)
+            r = self.client.get(reverse("clubs:list"), {"q": "нет"})
+            self.assertEqual(r.status_code, 200)
+            self.assertNotContains(r, "Проверенные клубы: адреса")
+            self.assertNotContains(r, ">Найти</button>")
+            self.assertContains(r, 'data-live="#club-results"')
+            self.assertContains(r, 'id="club-results"')

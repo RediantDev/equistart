@@ -28,10 +28,14 @@
     toastBox().appendChild(t);
     requestAnimationFrame(function () { t.classList.add("is-in"); });
     function hide() { t.classList.remove("is-in"); setTimeout(function () { t.remove(); }, 250); }
+    t._hide = hide;
     x.onclick = hide;
     t.addEventListener("click", hide);
-    setTimeout(hide, kind === "error" ? 7000 : 4000);
+    // Тест 5.3, п. 33: текст ошибки — только в этом сообщении (в форме — подсветка поля), поэтому оно не исчезает само:
+    // закрывается нажатием или при следующей отправке/переходе
+    if (kind !== "error") setTimeout(hide, 4000);
   }
+  function clearErrorToasts() { document.querySelectorAll(".toast--error").forEach(function (t) { if (t._hide) t._hide(); }); }
   // Сообщения Django (успех/ошибка после действия) — всплывают поверх страницы
   function messagesToToasts(scope) {
     (scope || document).querySelectorAll(".messages .alert").forEach(function (a) {
@@ -68,15 +72,23 @@
     var err = field || alert;
     if (!err) return false;
     var text;
+    // Тест 5.3, п. 33: одна ошибка — в одном месте. Текст — во всплывающем сообщении; общий блок ошибки в форме
+    // скрывается (не дублируется), у полей остаются красная рамка и короткая подпись поля.
     if (alert) text = alertText(alert);
     else {
-      var name = fieldLabel(field), msg = field.querySelector(".field__error");
+      var n = 0; scope.querySelectorAll(".field--error").forEach(function (f) { if (!f.closest("[hidden]")) n++; });
+      var name = fieldLabel(field);
       if (name && name.length > 40) name = name.slice(0, 38) + "…";
-      var isClient = msg && msg.classList.contains("field__error--client");
-      text = name ? "Проверьте поле «" + name + "»" + (msg && !isClient ? ": " + msg.textContent.replace(/^!\s*/, "").trim() : "") : "Проверьте форму";
+      text = n > 1 ? "Проверьте поля, отмеченные красным" : name ? "Проверьте поле «" + name + "»" : "Проверьте форму";
     }
+    clearErrorToasts();
     toast(text || "Проверьте форму", "error");
-    // Блок ошибки остаётся на месте (тест 5.2, п. 34): сообщение поверх — дополнительно, к блоку ведём прокруткой
+    if (alert) {
+      scope.querySelectorAll(".alert--error, .form-errors").forEach(function (a) {
+        if (!a.closest(".messages") && alertText(a) === text) { a.hidden = true; a.setAttribute("data-toasted", ""); }
+      });
+      if (!field) err = alert.closest("form") || alert.parentElement;
+    }
     setTimeout(function () {
       err.scrollIntoView({ behavior: "smooth", block: "center" });
       var ctl = err.querySelector("input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, .sel__btn");
@@ -119,7 +131,7 @@
     if (f.classList.contains("is-busy")) { e.preventDefault(); e.stopImmediatePropagation(); return; }
     if (!f.hasAttribute("novalidate-client") && !precheck(f)) { e.preventDefault(); e.stopImmediatePropagation(); return; }
     // Обычная (не htmx) отправка: блокируем кнопки после того, как браузер взял значение нажатой
-    if (!f.hasAttribute("hx-boost") && !f.hasAttribute("hx-post")) {
+    if (!f.hasAttribute("hx-boost") && !f.hasAttribute("hx-post") && !f.hasAttribute("data-live")) {
       setTimeout(function () { busy(f, true); }, 0);
       if (!f.target) progStart();
       if ((f.method || "").toLowerCase() === "post") { try { sessionStorage.setItem("sl-posted", JSON.stringify({ path: new URL(f.action || location.href, location.href).pathname, at: Date.now() })); } catch (err) {} }
@@ -134,7 +146,7 @@
   function boostForms(scope) {
     if (!window.htmx) return;
     scope.querySelectorAll("form").forEach(function (f) {
-      if (f.hasAttribute("hx-boost") || f.hasAttribute("hx-post") || f.hasAttribute("hx-get") || f.hasAttribute("data-no-boost") || f.target) return;
+      if (f.hasAttribute("hx-boost") || f.hasAttribute("hx-post") || f.hasAttribute("hx-get") || f.hasAttribute("data-no-boost") || f.hasAttribute("data-live") || f.target) return;
       var action = f.getAttribute("action") || "";
       if (/^https?:/.test(action) && action.indexOf(location.origin) !== 0) return;
       f.setAttribute("hx-boost", "true");
@@ -176,6 +188,14 @@
     }
   }
   window.addEventListener("pageshow", function () { progDone(true); });
+  // Загрузка файлов: полоса показывает, сколько отправлено (тест 5.3, п. 19)
+  document.addEventListener("htmx:xhr:progress", function (e) {
+    var d = e.detail; if (!d || !d.lengthComputable || !d.total || d.total < 200000) return;
+    var p = progEl(), bar = p.firstChild; clearTimeout(progTimer); progTimer = null;
+    p.classList.remove("is-done"); p.classList.add("is-on");
+    bar.style.transition = "transform .2s"; bar.style.transform = "scaleX(" + Math.min(.95, d.loaded / d.total) + ")";
+  });
+  document.addEventListener("htmx:afterRequest", function () { var b = prog && prog.firstChild; if (b) { b.style.transition = ""; b.style.transform = ""; } });
   // Обычный переход по ссылке или отправка формы без htmx — та же полоса
   document.addEventListener("click", function (e) {
     if (e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -213,6 +233,7 @@
 
   document.addEventListener("htmx:beforeRequest", function (e) {
     var elt = e.detail.elt, f = elt && elt.closest ? elt.closest("form") : null;
+    if (f || e.detail.boosted) clearErrorToasts();
     if (!background(elt)) { e.detail.xhr._sl = true; progStart(); }
     if (e.detail.boosted) {
       before = { path: location.pathname, y: window.scrollY };
@@ -438,10 +459,54 @@
     });
   }
 
+  /* ---------- Поиск по мере ввода (тест 5.3, п. 6, 26): form[data-live="#список,#…"] ----------
+     Ввод — запрос через ~300 мс, Enter и «Применить» — сразу; меняются только блоки из data-live, адрес — без перезагрузки. */
+  var liveSeq = 0;
+  function liveUrl(f) {
+    var u = new URL(f.getAttribute("action") || location.pathname, location.href), fd = new FormData(f);
+    fd.forEach(function (v, k) { if (typeof v === "string" && v.trim() !== "") u.searchParams.append(k, v.trim()); });
+    return u.pathname + (u.searchParams.toString() ? "?" + u.searchParams.toString() : "");
+  }
+  function liveLoad(f) {
+    var url = liveUrl(f), seq = ++liveSeq, sels = (f.getAttribute("data-live") || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+    progStart();
+    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" }, credentials: "same-origin" }).then(function (r) { return r.text(); }).then(function (html) {
+      progDone();
+      if (seq !== liveSeq) return;  // пришёл ответ на устаревший запрос
+      var doc = new DOMParser().parseFromString(html, "text/html");
+      sels.forEach(function (sel) {
+        var old = document.querySelector(sel), neu = doc.querySelector(sel);
+        if (!old || !neu) return;
+        if (old.tagName === "SCRIPT") { old.textContent = neu.textContent; return; }
+        var imp = document.importNode(neu, true);
+        old.replaceWith(imp);
+        if (window.htmx) htmx.process(imp);
+        if (window.SL && SL.init) SL.init(imp);
+        afterPage(imp);
+      });
+      try { history.replaceState(history.state, "", url); } catch (err) {}
+      clampScroll();
+      f.dispatchEvent(new CustomEvent("live:updated", { bubbles: true, detail: { url: url } }));
+    }, function () { progDone(); toast("Нет связи с сервером. Проверьте интернет и повторите.", "error"); });
+  }
+  document.addEventListener("input", function (e) {
+    var i = e.target, f = i.form;
+    if (!f || !f.hasAttribute("data-live") || !i.matches || !i.matches("input[type=search], input[type=text]")) return;
+    clearTimeout(f._live); f._live = setTimeout(function () { liveLoad(f); }, 300);
+  });
+  document.addEventListener("submit", function (e) {
+    var f = e.target;
+    if (!f.hasAttribute || !f.hasAttribute("data-live")) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    clearTimeout(f._live); liveLoad(f);
+    f.querySelectorAll("details[open]").forEach(function (d) { d.removeAttribute("open"); });
+    var a = document.activeElement; if (a && a.type === "search" && TOUCH) a.blur();  // Enter на телефоне — убрать клавиатуру
+  });
+
   /* Стёрли запрос — список сразу обновляется (тест 5.1, п. 16) */
   document.addEventListener("input", function (e) {
     var i = e.target;
-    if (!i.matches || !i.matches('form[role=search] input[type=search]') || i.value !== "") return;
+    if (!i.matches || !i.matches('form[role=search] input[type=search]') || i.value !== "" || (i.form && i.form.hasAttribute("data-live"))) return;
     var params = new URLSearchParams(location.search);
     if (!params.get(i.name)) return;
     clearTimeout(i._clr);
@@ -531,6 +596,8 @@
       var initial = state();
       function sync() { var same = state() === initial; btn.disabled = same; btn.classList.toggle("is-inactive", same); }
       d.addEventListener("change", sync); d.addEventListener("input", sync); sync();
+      var lf = d.closest("form[data-live]");  // применили без перезагрузки — новое состояние становится исходным
+      if (lf) lf.addEventListener("live:updated", function () { initial = state(); sync(); });
     });
   }
 
