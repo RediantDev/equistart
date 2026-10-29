@@ -51,56 +51,114 @@
 .sb-si.is-js input::placeholder { color: var(--text); }
 .sb-si button { width: 32px; height: 42px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; color: var(--text); flex: none; }
 .sb-si button[hidden] { display: none; }
-.sb-trailer { min-height: 44px; border-radius: var(--radius-pill); }
-/* тест 5.2, п. 29: «Представителю и коневозу» — полное название, единица и кому */
-.sb-sv--others { grid-template-columns: minmax(0, 1fr); }
-.sb-si--full { border-radius: var(--radius-md); min-height: 52px; padding-top: 6px; padding-bottom: 6px; }
-.sb-si--full label { display: flex; flex-direction: column; gap: 1px; }
-.sb-si__name { font-size: 15px; line-height: 20px; font-weight: 600; }
-.sb-si__sub { font-size: 13px; line-height: 16px; font-weight: 400; color: var(--text-muted); }
+.sb-si__unit { font-weight: 500; color: var(--text-muted); }
+.sb-ico, .sb-row__ico svg, .sb-menu svg, .sb-blockhead svg, .sb-staff__head svg, .sb-call svg, .sb-stp svg { fill: none; stroke: currentColor; stroke-width: 1.8px; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.sb-row__ico .ico { stroke-width: 1.8px; }
 
+/* ---- Тест 5.2, вариант A (R3_04A): оформленное по лошади — свёрнуто до итога, раскрывается в компактные строки ---- */
 .sb-mine { list-style: none; margin: 0; padding: 0; }
-/* тест 5.2, п. 23: оформленное по лошади — свёрнуто до строки-итога */
-.sb-mine-box { border-top: 1px solid var(--border); }
-.sb-mine-sum { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 40px; padding-top: 6px; cursor: pointer; font-size: 13px; line-height: 18px; }
+.sb-mine-box { margin: 0 -12px -10px; border-top: 1px solid var(--border); background: var(--bg); border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.sb-mine-sum { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 12px; cursor: pointer; font-size: 13px; line-height: 18px; }
 .sb-mine-sum::-webkit-details-marker { display: none; }
 .sb-mine-sum__text { flex: 1; min-width: 0; font-weight: 600; }
-.sb-mine-sum__more { flex: none; }
-.sb-mine-box[open] .sb-mine-sum__more { display: none; }
-.sb-chev { flex: none; fill: none; stroke: currentColor; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; color: var(--text-muted); transition: transform .15s; }
+.sb-mine-sum__title { flex: 1; font-weight: 700; color: var(--text-muted); }
+.sb-mine-sum__more, .sb-mine-sum__less { flex: none; font-weight: 700; }
+.sb-mine-sum__title, .sb-mine-sum__less, .sb-mine-box[open] .sb-mine-sum__text, .sb-mine-box[open] .sb-mine-sum__more { display: none; }
+.sb-mine-box[open] .sb-mine-sum__title, .sb-mine-box[open] .sb-mine-sum__less { display: inline; }
+.sb-chev { flex: none; fill: none; stroke: currentColor; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
 details[open] > summary .sb-chev { transform: rotate(180deg); }
-.sb-mine-box[open] .sb-mine-sum { border-bottom: 1px dashed var(--border); padding-bottom: 6px; }
-/* тест 5.2, п. 25: ночи ожидающей брони меняются нажатием на ленту */
-.sb-nt.is-edit { cursor: pointer; }
-.sb-nt.is-edit input { pointer-events: none; }
-.sb-nt.is-edit .sb-nt__in { opacity: 1 !important; }
-.sb-nt.is-edit input:checked + .sb-nt__in { background: var(--ink); opacity: .8 !important; outline: 2px dashed var(--surface); outline-offset: -5px; }
-.sb-nt.is-edit:focus-visible { outline: none; }
-.sb-nt.is-edit:focus-visible .sb-nt__in { outline: 2px solid var(--focus); outline-offset: 2px; }
-.sb-hint { margin-top: -2px; }
-.sb-hint.is-warn { color: var(--danger, #b42318); }
-.sb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 0 0; font-size: 13px; scroll-margin-top: 72px; }
-.sb-row + .sb-row { border-top: 1px dashed var(--border); margin-top: 8px; }
-.sb-row__main { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.sb-row__acts { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 100%; }
-.sb-row__acts--inline { flex: none; }
-.sb-act[open] { flex: 1 1 100%; }
-.sb-act__body { padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); display: flex; flex-direction: column; gap: 8px; }
-.sb-act__body.inline-row { flex-direction: row; flex-wrap: wrap; align-items: center; }
-.sb-act__body.inline-row input { flex: 1 1 180px; }
 
-.sb-extra { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; }
-/* тест 5.2, п. 30: свёрнутый блок выглядит как карточка-действие */
-.sb-extra > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; min-height: 48px; }
-.sb-extra > summary::-webkit-details-marker { display: none; }
-.sb-extra__ico { flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--accent); color: var(--ink); display: flex; align-items: center; justify-content: center; }
-.sb-extra__ico svg { fill: none; stroke: currentColor; stroke-width: 1.8px; stroke-linecap: round; stroke-linejoin: round; }
-.sb-extra__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.sb-extra__text b { font-size: 15px; line-height: 20px; }
-.sb-extra__text .sb-m { font-size: 13px; line-height: 17px; }
-.sb-extra > summary .sb-chev { color: var(--text); }
-.sb-extra[open] > summary { margin-bottom: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
-.sb-extra .field { margin-top: 8px; }
+.sb-row { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 52px; padding: 4px 4px 4px 12px; border-top: 1px solid var(--border-soft, var(--border)); font-size: 15px; line-height: 20px; scroll-margin-top: 72px; }
+.sb-row__ico { flex: none; width: 28px; height: 28px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--text); }
+.sb-row__main { flex: 1 1 140px; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sb-row__main b { font-weight: 600; }
+.sb-row__chips { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.sb-row__chips .chip { white-space: nowrap; }
+/* меню «⋯» */
+.sb-menu { position: relative; flex: none; }
+.sb-menu__btn { list-style: none; width: 44px; height: 44px; border-radius: 999px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text); }
+.sb-menu__btn::-webkit-details-marker { display: none; }
+.sb-menu[open] .sb-menu__btn { background: var(--ink); color: var(--surface); }
+.sb-dot { fill: currentColor; stroke: none; }
+.sb-menu__pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; width: 220px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(20,20,20,.16); padding: 4px; display: flex; flex-direction: column; }
+.sb-menu__item { width: 100%; min-height: 44px; border: 0; background: transparent; border-radius: 10px; text-align: left; padding: 0 12px; font: inherit; font-size: 15px; font-weight: 600; color: var(--text);
+  display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.sb-menu__item[hidden] { display: none; }
+.sb-menu__item:hover, .sb-menu__item:focus-visible { background: var(--bg); }
+.sb-menu__item.is-danger { color: var(--danger); }
+/* форма «другая категория / даты»: без JS — своя кнопка, с JS — пункт меню */
+.sb-act { flex: 1 1 100%; }
+.sb-act:not([open]) { display: contents; }
+.is-js .sb-act__nojs { display: none; }
+.sb-act__body { margin: 4px 0 8px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
+.sb-act__btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.sb-act__btns [hidden] { display: none; }
+
+/* ---- Тест 5.2, вариант A (R3_05A): правка ночей ожидающей брони — пометки на ленте, «Было/Станет», сохранение кнопкой ---- */
+.sb-nt__st { display: none; font-style: normal; font-size: 12px; line-height: 14px; font-weight: 700; }
+.is-editing .sb-nt__in { height: 64px; gap: 1px; }
+.is-editing .sb-nt__st { display: block; }
+.is-editing .sb-nt input { pointer-events: none; }
+.is-editing .sb-nt.is-keep .sb-nt__in, .is-editing .sb-nt.is-rm .sb-nt__in, .is-editing .sb-nt.is-add .sb-nt__in { opacity: 1 !important; }
+.sb-nt.is-keep .sb-nt__in { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.sb-nt.is-keep .sb-nt__in small { color: var(--border); }
+.sb-nt.is-add .sb-nt__in { background: var(--accent); border-color: var(--accent); color: var(--ink); }
+.sb-nt.is-add .sb-nt__in small { color: var(--ink); }
+.sb-strip .sb-nt.is-rm .sb-nt__in { background: var(--surface); border: 2px dashed var(--danger); color: var(--danger); }
+.sb-nt.is-rm .sb-nt__d { text-decoration: line-through; }
+.sb-nt.is-rm .sb-nt__in small { color: var(--danger); }
+.sb-nt.is-tap { cursor: pointer; }
+.sb-nt.is-tap:focus-visible { outline: none; }
+.sb-nt.is-tap:focus-visible .sb-nt__in { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sb-edit { display: flex; flex-direction: column; gap: 10px; }
+.sb-edit[hidden] { display: none; }
+.sb-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; line-height: 18px; color: var(--text-muted); }
+.sb-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sb-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.sb-legend .is-keep { background: var(--ink); }
+.sb-legend .is-add { background: var(--accent); }
+.sb-legend .is-rm { border: 2px dashed var(--danger); }
+.sb-diff { padding: 10px 12px; background: var(--bg); border-radius: 12px; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 2px 8px; font-size: 15px; line-height: 21px; align-items: baseline; }
+.sb-diff s { color: var(--text-muted); }
+.sb-edit__btns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 8px; }
+.sb-edit__btns .btn { min-height: 48px; }
+.sb-hint:empty { display: none; }
+.sb-hint.is-warn { color: var(--danger); font-weight: 600; }
+
+/* ---- Тест 5.2, вариант A (R3_06A) + значок из B: «Представителю и коневозу» ---- */
+.sb-others { gap: 0; padding: 0; }
+.sb-blockhead { display: flex; align-items: center; gap: 10px; padding: 12px 12px 6px; }
+.sb-blockhead .h3 { margin: 0; flex: 1; min-width: 0; }
+.sb-ibox { flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--bg); display: flex; align-items: center; justify-content: center; color: var(--text); }
+.sb-svc { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+.sb-svc + .sb-svc { border-top: 1px solid var(--border); }
+.sb-svc__name { display: block; font-size: 15px; line-height: 20px; font-weight: 700; }
+.sb-svc__row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.sb-svc__row label { flex: 1; min-width: 0; font-size: 13px; }
+.sb-stp { display: flex; align-items: center; border: 1px solid var(--border-strong, #8a8983); border-radius: var(--radius-pill); min-height: 44px; flex: none; }
+.sb-stp button { width: 40px; height: 42px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; color: var(--text); }
+.sb-stp button[hidden] { display: none; }
+.sb-stp input { width: 56px; min-height: 40px; height: 40px; border: 0; background: transparent; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; padding: 0; box-shadow: none; }
+.is-js .sb-stp input { width: 32px; -moz-appearance: textfield; appearance: textfield; }
+.sb-stp input::-webkit-outer-spin-button, .sb-stp input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.is-js .sb-stp input::placeholder { color: var(--text); }
+.sb-svc__plate { margin: 0; }
+.sb-trailer { min-height: 44px; text-transform: uppercase; }
+.sb-trailer::placeholder { text-transform: none; }
+
+/* ---- «Для конюшни»: открытая заметная форма (R3_04A/06A) ---- */
+.sb-staff { background: var(--surface); border: 1.5px solid var(--ink); border-radius: var(--radius-md); overflow: hidden; }
+.sb-staff__head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--accent-soft); }
+.sb-staff__head .h3 { margin: 0; flex: 1; }
+.sb-staff__body { padding: 10px 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.sb-staff__body .field { margin: 0; }
+.sb-staff__body .field__help { margin: -6px 0 0; }
+
+/* ---- Контакт ответственного ---- */
+.sb-contact { flex-direction: row; align-items: center; gap: 10px; padding: 8px 8px 8px 12px; }
+.sb-contact__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sb-call { flex: none; width: 44px; height: 44px; border-radius: 999px; border: 1px solid var(--border-strong, #8a8983); background: var(--surface); color: var(--text); display: flex; align-items: center; justify-content: center; }
 
 .sb-bar { position: sticky; bottom: 0; z-index: 6; display: flex; align-items: center; gap: 12px; margin-top: 4px;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 10px 10px 16px; box-shadow: 0 -4px 20px rgba(20,20,20,.06); }
@@ -113,8 +171,8 @@ details[open] > summary .sb-chev { transform: rotate(180deg); }
 @media (min-width: 721px) {
   .sb-strip { grid-template-columns: repeat(var(--cols-wide, 3), minmax(0, 120px)); }
   .sb-sv { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .sb-sv--others { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sb-bar { bottom: 12px; }
+  .sb-edit__btns, .sb-svc__row { max-width: 480px; }
 }
 @media (max-width: 720px) {
   /* Панель «Заказать» — во всю ширину над нижним меню, как в макете */

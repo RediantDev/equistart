@@ -157,6 +157,26 @@ def dates_label(arrive, depart):
     return f"{arrive.day} {MONTHS[arrive.month - 1]} – {depart.day} {MONTHS[depart.month - 1]}"
 
 
+MONTHS_SHORT = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"]
+UNIT_FORMS = {"мешок": ("мешок", "мешка", "мешков"), "тюк": ("тюк", "тюка", "тюков"), "сутки": ("сутки", "суток", "суток"),
+              "брикет": ("брикет", "брикета", "брикетов"), "штука": ("штука", "штуки", "штук"), "кипа": ("кипа", "кипы", "кип"),
+              "рулон": ("рулон", "рулона", "рулонов"), "ночь": ("ночь", "ночи", "ночей"), "час": ("час", "часа", "часов"),
+              "раз": ("раз", "раза", "раз"), "день": ("день", "дня", "дней")}
+
+
+def qty_label(n, unit):
+    """«2 тюка»; незнакомая единица — как её записал организатор: «2 × ведро»."""
+    forms = UNIT_FORMS.get((unit or "").strip().lower())
+    return f"{n} {_plural(n, *forms)}" if forms else f"{n} × {unit}"
+
+
+def short_dates(arrive, depart):
+    """«20–21 ноя» — для компактной строки брони."""
+    if arrive.month == depart.month:
+        return f"{arrive.day}–{depart.day} {MONTHS_SHORT[depart.month - 1]}"
+    return f"{arrive.day} {MONTHS_SHORT[arrive.month - 1]} – {depart.day} {MONTHS_SHORT[depart.month - 1]}"
+
+
 SHORT_STATE = {"pending": "ожидает", "confirmed": "подтверждена", "rejected": "отклонена", "cancelled": "отменена"}
 
 
@@ -191,6 +211,9 @@ def _render_cart(request, t, cats, svcs, horses, my_bookings, my_orders, post=No
     default_cat = str(cats[0].pk) if cats else ""
     for b in my_bookings:
         b.period = period_label(b.arrive, b.depart)
+        b.short = short_dates(b.arrive, b.depart)
+    for o in my_orders:
+        o.qty = qty_label(o.quantity, o.service.unit)
     cards, shown = [], set()
     open_ = services.booking_open(t)
     for h in horses:
@@ -406,8 +429,16 @@ def my_edit(request, booking_id):
         raise PermissionDenied
     back = reverse("stables:book", args=[b.tournament_id])  # тест 5.1: экран открывается сверху, итог — в сообщении
     arrive, depart = _date(request.POST.get("arrive")), _date(request.POST.get("depart"))
+    raw = request.POST.getlist("nights")
+    if raw:
+        # тест 5.2, вариант A: правка ночей с ленты присылает итоговый набор ночей — они должны идти подряд
+        nights = sorted({d for d in (_date(x) for x in raw) if d})
+        if len(nights) != len(set(raw)) or not _contiguous(nights):
+            messages.error(request, "Ночи одной брони должны идти подряд — бронь осталась прежней.")
+            return redirect(back)
+        arrive, depart = nights[0], nights[-1] + datetime.timedelta(days=1)
     try:
-        services.update_booking(request.user, b.pk, request.POST.get("category") or 0, arrive, depart, request.POST.get("revision"))
+        services.update_booking(request.user, b.pk, request.POST.get("category") or b.category_id, arrive, depart, request.POST.get("revision"))
         messages.success(request, f"Бронь «{b.horse_name}» изменена. Она снова ждёт подтверждения конюшни.")
     except (ValueError, services.Conflict) as e:
         messages.error(request, str(e))

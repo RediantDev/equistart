@@ -23,18 +23,25 @@
       {% if cats|length > 1 %}<select class="sb-cat" name="c-{{ h.pk }}" aria-label="Категория денника для {{ h.name }}" data-cat{% if not open %} disabled{% endif %}>{% for k in cats %}<option value="{{ k.pk }}"{% if c.cat == k.pk|stringformat:"s" %} selected{% endif %}>{{ k.name }}</option>{% endfor %}</select>{% endif %}
     </div>
     {% if c.nights %}<div class="sb-strip" role="group" aria-label="Ночи: {{ h.name }}" style="--cols: {{ cols }}; --cols-wide: {{ cols_wide }};">{% for n in c.nights %}
-      <label class="sb-nt{% if n.busy %} is-busy{% endif %}" data-night="{{ n.iso }}" data-cats="{{ n.cats }}"{% if n.bk %} data-bk="{{ n.bk }}"{% endif %}{% if n.busy %} title="Уже забронировано"{% endif %}><input type="checkbox" name="n-{{ h.pk }}" value="{{ n.iso }}"{% if n.on or n.busy %} checked{% endif %}{% if n.busy or not open %} disabled{% endif %}><span class="sb-nt__in"><span class="sb-nt__d">{{ n.d.day }}</span><small>{{ n.wd }}</small></span></label>{% endfor %}
+      <label class="sb-nt{% if n.busy %} is-busy{% endif %}" data-night="{{ n.iso }}" data-cats="{{ n.cats }}"{% if n.bk %} data-bk="{{ n.bk }}"{% endif %}{% if n.busy %} title="Уже забронировано"{% endif %}><input type="checkbox" name="n-{{ h.pk }}" value="{{ n.iso }}"{% if n.on or n.busy %} checked{% endif %}{% if n.busy or not open %} disabled{% endif %}><span class="sb-nt__in"><span class="sb-nt__d">{{ n.d.day }}</span><small>{{ n.wd }}</small><em class="sb-nt__st" aria-hidden="true"></em></span></label>{% endfor %}
     </div>
-    {% if c.editable %}<p class="sb-m sb-hint" data-edit-hint hidden aria-live="polite">Ночи брони, ожидающей подтверждения, можно изменить: нажмите крайний день, чтобы убрать ночь, или соседний — чтобы добавить.</p>{% endif %}{% endif %}
+    {% if c.editable %}{# тест 5.2, вариант A (R3_05A): нажатия на ленте только помечают изменения; сохраняет кнопка #}
+    <p class="sb-m sb-hint" data-edit-intro hidden>Чтобы изменить ночи брони, ожидающей подтверждения, нажмите на день ленты.</p>
+    <div class="sb-edit" data-edit-panel hidden>
+      <div class="sb-legend" aria-hidden="true"><span><i class="is-keep"></i>оформлено</span><span><i class="is-add"></i>добавить</span><span><i class="is-rm"></i>убрать</span></div>
+      <div class="sb-diff"><span class="sb-m">Было</span><s data-was></s><span class="sb-m">Станет</span><b data-now></b></div>
+      <p class="sb-m sb-hint" data-edit-hint aria-live="polite"></p>
+      <div class="sb-edit__btns"><button type="button" class="btn btn--ghost" data-edit-reset>Сбросить</button><button type="button" class="btn btn--primary" data-edit-save>Сохранить изменения</button></div>
+    </div>{% endif %}{% endif %}
     {% if c.counters %}<div class="sb-sv">{% for q in c.counters %}
-      <div class="sb-si" data-counter data-svc="{{ q.s.pk }}" data-sname="{{ q.s.name }}" data-unit="{{ q.s.unit }}"><label for="{{ q.name }}" title="{{ q.s.name }}, {{ q.s.unit }}">{{ q.s.name }}</label>
+      <div class="sb-si" data-counter data-svc="{{ q.s.pk }}" data-sname="{{ q.s.name }}" data-unit="{{ q.s.unit }}"><label for="{{ q.name }}">{{ q.s.name }}<span class="sb-si__unit">, {{ q.s.unit }}</span></label>
         <button type="button" data-step="-1" aria-label="{{ q.s.name }}: меньше" hidden><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
         <input id="{{ q.name }}" type="number" name="{{ q.name }}" value="{{ q.value }}" min="0" step="1" inputmode="numeric" placeholder="0" title="{{ q.s.unit }}"{% if not open %} disabled{% endif %}>
         <button type="button" data-step="1" aria-label="{{ q.s.name }}: больше" hidden><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>{% endfor %}
     </div>{% endif %}
     {% if c.bookings or c.orders %}{# тест 5.2, п. 23: оформленное по лошади свёрнуто до строки-итога #}
     <details class="sb-mine-box" data-mine>
-      <summary class="sb-mine-sum"><span class="sb-mine-sum__text">{{ c.mine }}</span><span class="sb-m sb-mine-sum__more">Подробнее</span><svg class="sb-chev" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+      <summary class="sb-mine-sum"><span class="sb-mine-sum__text">{{ c.mine }}</span><span class="sb-mine-sum__title">Оформлено</span><span class="sb-m sb-mine-sum__more">Подробнее</span><span class="sb-mine-sum__less">Скрыть</span><svg class="sb-chev" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
       <ul class="sb-mine">
       {% for b in c.bookings %}{% include "stables/_booking_row.html" %}{% endfor %}
       {% for o in c.orders %}{% include "stables/_order_row.html" %}{% endfor %}
@@ -42,15 +49,19 @@
     </details>{% endif %}
   </section>{% endwith %}{% endfor %}
 
-  {% if others %}<section class="sb-card" aria-labelledby="oth-h"><div class="sb-card__head"><b id="oth-h">Представителю и коневозу</b></div>
-    <div class="sb-sv sb-sv--others">{% for q in others %}
-      {# тест 5.2, п. 29: полное название услуги с переносом, под ним — единица и кому #}
-      <div class="sb-si sb-si--full" data-counter data-svc="{{ q.s.pk }}" data-sname="{{ q.s.name }}" data-unit="{{ q.s.unit }}"><label for="{{ q.name }}"><span class="sb-si__name">{{ q.s.name }}</span><span class="sb-si__sub">{{ q.s.unit }} · {% if q.s.recipient == "trailer" %}для коневоза{% else %}для представителя{% endif %}</span></label>
-        <button type="button" data-step="-1" aria-label="{{ q.s.name }}: меньше" hidden><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
-        <input id="{{ q.name }}" type="number" name="{{ q.name }}" value="{{ q.value }}" min="0" step="1" inputmode="numeric" placeholder="0" title="{{ q.s.unit }}"{% if not open %} disabled{% endif %}>
-        <button type="button" data-step="1" aria-label="{{ q.s.name }}: больше" hidden><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
-      {% if q.s.recipient == "trailer" %}<input class="sb-trailer sb-trailer--full" type="text" name="trailer-{{ q.s.pk }}" value="{{ q.trailer }}" maxlength="40" autocomplete="off" placeholder="Номер коневоза" aria-label="{{ q.s.name }}: номер коневоза"{% if not open %} disabled{% endif %}>{% endif %}{% endfor %}
-    </div>
+  {% if others %}{# тест 5.2, вариант A (R3_06A) + значок грузовика из варианта B #}
+  <section class="sb-card sb-others" aria-labelledby="oth-h">
+    <div class="sb-blockhead"><span class="sb-ibox" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 7h11v9H2zM13 10h4l3 3v3h-7"/><circle cx="6" cy="17" r="2"/><circle cx="16" cy="17" r="2"/></svg></span><h2 class="h3" id="oth-h">Представителю и коневозу</h2></div>
+    {% for q in others %}<div class="sb-svc">
+      <div data-counter data-svc="{{ q.s.pk }}" data-sname="{{ q.s.name }}" data-unit="{{ q.s.unit }}">
+        <b class="sb-svc__name">{{ q.s.name }}</b>
+        <div class="sb-svc__row"><label class="sb-m" for="{{ q.name }}">Количество, {{ q.s.unit }}</label>
+          <div class="sb-stp"><button type="button" data-step="-1" aria-label="{{ q.s.name }}: меньше" hidden><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+          <input id="{{ q.name }}" type="number" name="{{ q.name }}" value="{{ q.value }}" min="0" step="1" inputmode="numeric" placeholder="0"{% if not open %} disabled{% endif %}>
+          <button type="button" data-step="1" aria-label="{{ q.s.name }}: больше" hidden><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
+      </div>
+      {% if q.s.recipient == "trailer" %}<div class="field sb-svc__plate"><label class="field__label" for="tr-{{ q.s.pk }}">Госномер коневоза</label><input id="tr-{{ q.s.pk }}" class="sb-trailer" type="text" name="trailer-{{ q.s.pk }}" value="{{ q.trailer }}" maxlength="40" autocomplete="off" autocapitalize="characters" placeholder="например, А123ВС 777"{% if not open %} disabled{% endif %}></div>{% endif %}
+    </div>{% endfor %}
   </section>{% endif %}
 
   {% if extra_bookings or extra_orders %}<section class="sb-card" aria-labelledby="ex-h"><div class="sb-card__head"><b id="ex-h">Другие брони и заказы</b></div><ul class="sb-mine">
@@ -58,19 +69,20 @@
     {% for o in extra_orders %}{% include "stables/_order_row.html" with show_horse=1 %}{% endfor %}
   </ul></section>{% endif %}
 
-  {% if open and cards and cats %}{# тест 5.2, п. 30: заметная карточка-действие, по умолчанию свёрнута #}
-  <details class="sb-extra"{% if contact_phone or comment or required %} open{% endif %}><summary class="sb-extra__sum">
-    <span class="sb-extra__ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></span>
-    <span class="sb-extra__text"><b>Телефон и комментарий для конюшни</b><span class="sb-m">Чтобы конюшня могла связаться с вами по брони. Необязательно.</span></span>
-    <svg class="sb-chev" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
-    <label class="check"><input type="checkbox" name="required"{% if required %} checked{% endif %}><span>Без денника выступления этих лошадей невозможны</span></label>
-    <p class="field__help">Тогда выступления лошади попадут в стартовый протокол только после подтверждения брони.</p>
-    <div class="field"><label class="field__label" for="b-p">Телефон для связи по брони</label><input id="b-p" placeholder="Необязательно" type="tel" name="contact_phone" value="{{ contact_phone }}"><p class="field__help">Увидит только конюшня турнира.</p></div>
-    <div class="field"><label class="field__label" for="b-c">Комментарий</label><input id="b-c" placeholder="Необязательно" type="text" name="comment" value="{{ comment }}" maxlength="500"></div>
-  </details>{% endif %}
+  {% if open and cards and cats %}{# тест 5.2, вариант A (R3_04A/06A): «Для конюшни» — открытая заметная форма #}
+  <section class="sb-staff" aria-labelledby="st-h">
+    <div class="sb-staff__head"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg><h2 class="h3" id="st-h">Для конюшни</h2></div>
+    <div class="sb-staff__body">
+      <p class="sb-m">Чтобы конюшня могла связаться с вами по брони. Увидит только конюшня турнира, заполнять необязательно.</p>
+      <div class="field"><label class="field__label" for="b-p">Телефон для связи</label><input id="b-p" placeholder="+7 900 000-00-00" type="tel" name="contact_phone" value="{{ contact_phone }}"></div>
+      <div class="field"><label class="field__label" for="b-c">Комментарий</label><input id="b-c" placeholder="Например, время заезда" type="text" name="comment" value="{{ comment }}" maxlength="500"></div>
+      <label class="check"><input type="checkbox" name="required"{% if required %} checked{% endif %}><span>Без денника выступления этих лошадей невозможны</span></label>
+      <p class="field__help">Тогда выступления лошади попадут в стартовый протокол только после подтверждения брони.</p>
+    </div>
+  </section>{% endif %}
 
-  {% if contacts %}<div class="card stb-contact"><div class="caption muted">ВОПРОСЫ ПО ДЕННИКАМ И УСЛУГАМ</div>{% for c in contacts %}
-    <div class="stb-contact__row"><span><strong>{{ c.name }}</strong><span class="table__sub">{{ c.role }}</span></span>{% if c.phone %}<a class="btn btn--ghost btn--sm" href="tel:{{ c.phone }}">{{ c.phone|phone }}</a>{% endif %}</div>{% endfor %}</div>{% endif %}
+  {% for c in contacts %}<div class="sb-card sb-contact"><span class="sb-contact__text"><span class="sb-m">Вопросы по денникам и услугам</span><b>{{ c.name }}</b>{% if c.phone %}<span class="sb-m">{{ c.phone|phone }} · {{ c.role }}</span>{% else %}<span class="sb-m">{{ c.role }}</span>{% endif %}</span>
+    {% if c.phone %}<a class="sb-call" href="tel:{{ c.phone }}" aria-label="Позвонить: {{ c.name }}"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></a>{% endif %}</div>{% endfor %}
 
   {% if open and cards or open and others %}<div class="sb-bar">
     <div class="sb-bar__text"><b data-bar-main>Отметьте ночи или услуги</b><span class="sb-m" data-bar-sub></span></div>
