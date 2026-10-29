@@ -6,6 +6,8 @@
 {# Тест 5, п. 3.1 и 4.2: вкладка, день, маршрут — меняют только эту часть страницы #}
 <div id="tview" class="tview">
 {% if tab %}
+{# Тест 6, п. 36: судья открыл «как видят участники» из «Проведения» — «Назад» возвращает на прежний экран (smooth.js подставит его) #}
+{% if staff %}<a class="back" href="{% url 'conduct:overview' t.pk %}">← Проведение</a>{% endif %}
 {# Макет R2_02A: на вкладках протоколов — короткая шапка; карточка турнира — на вкладке «Программа» #}
 <div class="tp-mini" data-swap="#tview"><a class="tp-mini__back" href="?"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span>{{ s.title }}</span></a>
   <p class="tp-mini__meta">{{ dates_short }} {{ t.pub_starts_on|date:"Y" }} · {{ s.venue.name }}</p></div>

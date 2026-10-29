@@ -904,10 +904,10 @@
 
   // Меню «три точки» (тест 6): закрыть по клику вне и по Escape; открыто только одно
   document.addEventListener("click", function (e) {
-    document.querySelectorAll("details.kebab[open]").forEach(function (d) { if (!d.contains(e.target)) d.removeAttribute("open"); });
+    document.querySelectorAll("details.kebab[open], details.rswitch[open], details.msearch__filter[open]").forEach(function (d) { if (!d.contains(e.target)) d.removeAttribute("open"); });
   });
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") document.querySelectorAll("details.kebab[open]").forEach(function (d) { d.removeAttribute("open"); });
+    if (e.key === "Escape") document.querySelectorAll("details.kebab[open], details.rswitch[open], details.msearch__filter[open]").forEach(function (d) { d.removeAttribute("open"); });
   });
 
   // Тест 6, п. 8: автосохранение черновика турнира (формы с data-autosave). Кнопки «Сохранить черновик» нет:
