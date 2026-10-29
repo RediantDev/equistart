@@ -51,6 +51,22 @@ class QuickAddForm(forms.Form):
         for f in self.REQUIRED_ATHLETE + self.REQUIRED_HORSE:
             self.fields[f].show_required = True
 
+    def clean_fksr_number(self):
+        from apps.profiles.models import FKSR_ERROR, fksr_valid
+
+        v = self.cleaned_data.get("fksr_number", "")
+        if not fksr_valid(v):
+            raise forms.ValidationError(FKSR_ERROR)
+        return v
+
+    def clean_horse_passport(self):
+        from apps.profiles.models import FKSR_ERROR, fksr_valid
+
+        v = self.cleaned_data.get("horse_passport", "")
+        if not fksr_valid(v):
+            raise forms.ValidationError(FKSR_ERROR)
+        return v
+
     def clean(self):
         from apps.profiles.models import Athlete, Horse
 

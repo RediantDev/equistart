@@ -2,7 +2,7 @@
 import datetime
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -221,3 +221,18 @@ class HorseFormScreenTests(Base):
         self.assertIn("login", self.client.get(reverse("profiles:horse_new"))["Location"])
         self.client.force_login(self.other)
         self.assertEqual(self.client.post(reverse("profiles:horse_edit", args=[self.h1.pk]), self.data()).status_code, 403)
+
+
+class FksrSixDigitsTests(TestCase):
+    """Решение 26.10.2026: номер ФКСР — ровно 6 цифр."""
+
+    def test_validation(self):
+        from apps.profiles.forms import AthleteForm
+        from apps.profiles.models import fksr_valid
+
+        self.assertTrue(fksr_valid(""))
+        self.assertTrue(fksr_valid("000 700"))
+        self.assertFalse(fksr_valid("12345"))
+        self.assertFalse(fksr_valid("12345A"))
+        f = AthleteForm({"last_name": "Ким", "first_name": "Алина", "birth_date": "2012-03-04", "rank": "none", "fksr_number": "123"})
+        self.assertIn("fksr_number", f.errors)

@@ -42,6 +42,15 @@ def normalize_fksr(value: str) -> str:
     return re.sub(r"[\s\-]", "", (value or "")).upper()
 
 
+FKSR_ERROR = "Номер ФКСР — ровно 6 цифр."
+
+
+def fksr_valid(value: str) -> bool:
+    """Решение 26.10.2026: номер ФКСР — ровно 6 цифр (пусто — допустимо)."""
+    n = normalize_fksr(value)
+    return not n or bool(re.fullmatch(r"\d{6}", n))
+
+
 def new_horse_code() -> str:
     alphabet = "ABCDEFGHJKLMNPRSTUVWXYZ23456789"
     return "EQ-" + "".join(secrets.choice(alphabet) for _ in range(6))

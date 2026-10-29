@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 
 from apps.accounts.phone import normalize_phone
 
-from .models import Athlete, Horse, HorseDocument, normalize_fksr
+from .models import FKSR_ERROR, Athlete, Horse, HorseDocument, fksr_valid, normalize_fksr
 
 DATE = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 DOC_MAX = 20 * 1024 * 1024
@@ -51,6 +51,8 @@ class AthleteForm(forms.ModelForm):
         return n
 
     def clean_fksr_number(self):
+        if not fksr_valid(self.cleaned_data.get("fksr_number", "")):
+            raise ValidationError(FKSR_ERROR)
         return self._unique("fksr_number", "номером ФКСР")
 
     def clean_fei_id(self):
@@ -99,6 +101,8 @@ class HorseForm(forms.ModelForm):
 
     def clean_fksr_number(self):
         n = normalize_fksr(self.cleaned_data.get("fksr_number", ""))
+        if not fksr_valid(n):
+            raise ValidationError(FKSR_ERROR)
         if n:
             dup = Horse.objects.filter(fksr_number=n, archived=False).exclude(pk=self.instance.pk).first()
             if dup:
