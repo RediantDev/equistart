@@ -5,7 +5,6 @@
 {# Вариант А (решение 27.10.2026), тест 5.1: вкладки «Предстоящие / Прошедшие», поиск и фильтр — на этой же странице #}
 <div class="mc-head">
   <h1 class="h1">Мои соревнования</h1>
-  <a class="btn btn--ghost btn--sm mc-find" href="{% url 'core:calendar' %}" aria-label="Найти соревнования" title="Найти соревнования">{% include "partials/icon.html" with name="calendar" size=18 %}<span class="mc-find__text">Найти соревнования</span></a>
 </div>
 
 <div class="mc-tools" data-mc-tools>
@@ -21,6 +20,8 @@
 </nav>
 {% include "entries/_competition_cards.html" %}
 </div>
+{# тест 5.2 (п.48): даты для раскрывающегося календаря — подключится, когда заказчик выберет вид #}
+{{ calendar_dates|json_script:"mc-dates" }}
 <script>
 (function () {
   // Тест 5.1: поиск и фильтр по решению — на странице, без запросов к серверу. «ё» = «е», регистр не важен.

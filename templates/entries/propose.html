@@ -1,15 +1,76 @@
 {% extends "base.html" %}
-{% block title %}Замена в заявке — СтартЛист{% endblock %}
+{% block title %}Изменить выступление — СтартЛист{% endblock %}
 {% block content %}
-<section class="auth"><div class="card auth__card auth__card--wide">
-  <a class="back" href="{% url 'entries:application' e.application_id %}">← Заявка №{{ e.application_id }}</a>
-  <h1 class="h1">Предложить замену</h1>
-  <p class="muted">Сейчас: <strong>{{ e.athlete_snapshot.name }}</strong> на <strong>{{ e.horse_snapshot.name }}</strong> · {{ e.program_name }} · {{ e.class_name }}. До решения судьи действуют прежние сведения.</p>
-  <form method="post" class="form">{% csrf_token %}
-    <div class="field"><label class="field__label" for="a">Спортсмен</label><select id="a" name="athlete">{% for a in athletes %}<option value="{{ a.pk }}"{% if a.pk == e.athlete_id %} selected{% endif %}>{{ a.full_name }}</option>{% endfor %}</select></div>
-    <div class="field"><label class="field__label" for="h">Лошадь</label><select id="h" name="horse">{% for h in horses %}<option value="{{ h.pk }}"{% if h.pk == e.horse_id %} selected{% endif %}>{{ h.name }} · {{ h.summary }}</option>{% endfor %}</select></div>
-    <div class="field"><label class="field__label" for="c">Программа и зачёт</label><select id="c" name="tclass">{% for group, items in class_groups %}<optgroup label="{{ group }}">{% for v, label in items %}<option value="{{ v }}"{% if v == e.tclass_id %} selected{% endif %}>{{ label }}</option>{% endfor %}</optgroup>{% endfor %}</select></div>
-    <button class="btn btn--primary btn--block">Отправить предложение</button>
-  </form>
-</div></section>
+{# Тест 5.2 (п.41/43): изменение из режима правки заявки — пара и маршрут/зачёт выбираются как при подаче #}
+<div class="page-head">
+  <div>
+    <a class="back" href="{{ back }}">← Заявка №{{ e.application_id }}</a>
+    <h1 class="h1">Изменить выступление</h1>
+    <p class="table__sub">Сейчас: {{ e.athlete_snapshot.name }} — {{ e.horse_snapshot.name }} · {{ e.program_name }}{% if e.height %} · {{ e.height }} см{% endif %} · {{ e.class_name }}</p>
+  </div>
+</div>
+
+{% if pending %}
+  <div class="alert alert--warning">По этому выступлению уже есть изменение на рассмотрении у судьи: {{ pending.describe }}. Новое можно предложить после решения.</div>
+  <p><a class="btn btn--ghost" href="{{ back }}">Вернуться к заявке</a></p>
+{% else %}
+<div class="wizard-grid">
+  <div class="wizard-main">
+    <section class="card pr-pair">
+      <h2 class="h3">Пара</h2>
+      <form method="get" class="form" data-pr-pair>
+        <div class="grid-2">
+          <div class="field"><label class="field__label" for="pr-a">Всадник</label>
+            <select id="pr-a" name="athlete">{% for x in athletes %}<option value="{{ x.pk }}"{% if x.pk == a.pk %} selected{% endif %}>{{ x.full_name }}{% if x.birth_year %} ({{ x.birth_year }}){% endif %}</option>{% endfor %}</select></div>
+          <div class="field"><label class="field__label" for="pr-h">Лошадь</label>
+            <select id="pr-h" name="horse">{% for x in horses %}<option value="{{ x.pk }}"{% if x.pk == h.pk %} selected{% endif %}>{{ x.name }} · {{ x.summary }}</option>{% endfor %}</select></div>
+        </div>
+        <button class="btn btn--ghost btn--sm pr-nojs">Показать зачёты для пары</button>
+      </form>
+    </section>
+
+    <form method="post" class="card pair-form pr-form" id="pr-form">{% csrf_token %}
+      <input type="hidden" name="athlete" value="{{ a.pk }}"><input type="hidden" name="horse" value="{{ h.pk }}">
+      <h2 class="h3">Маршрут и зачёт</h2>
+      {% for row in rows %}
+        <div class="pair-prog">
+          <div class="pair-prog__head">
+            <span class="tag tag--{{ row.p.discipline_color }}">{{ row.p.day|date:"j E" }}{% if row.p.start_time %} · {{ row.p.start_time|time:"H:i" }}{% endif %}</span>
+            <strong>{{ row.p.name }}</strong>
+            <span class="table__sub">{{ row.p.program_type_name }}</span>
+          </div>
+          {% if row.filed %}<p class="table__sub ap-filed">Пара уже заявлена в зачёте {% for n in row.filed %}«{{ n }}»{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+          {% if row.opts %}
+            <div class="opt-grid">
+              {% for o in row.opts %}
+                {% if o.submitted %}
+                  <div class="opt is-off is-filed"><span class="opt__mark" aria-hidden="true">✓</span>
+                    <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">Уже заявлены · заявка №{{ o.submitted.application_id }}</span></span></div>
+                {% else %}
+                  <label class="opt{% if o.why %} is-off{% endif %}"><input type="radio" name="tclass" value="{{ o.c.pk }}"{% if o.checked and not o.why %} checked{% endif %}{% if o.why %} disabled{% endif %}>
+                    <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">{% if o.current %}Сейчас{% if o.why %} · {% endif %}{% endif %}{% if o.why %}{{ o.why|join:"; " }}{% elif not o.current %}{{ o.c.conditions|default:"без ограничений" }}{% endif %}</span></span></label>
+                {% endif %}
+              {% endfor %}
+            </div>
+          {% else %}<p class="table__sub">Зачётов нет.</p>{% endif %}
+        </div>
+      {% endfor %}
+      <p class="table__sub pr-note">Изменение рассматривает судья. До его решения действуют прежние сведения.</p>
+      <div class="pair-form__actions"><button class="btn btn--primary btn--lg">Отправить изменение</button></div>
+    </form>
+    {# ошибка — сразу под кнопкой; вне формы, чтобы общий показ ошибок форм не прятал её #}
+    {% if error %}<div class="alert alert--error ap-pair__err" role="alert" id="pr-err" tabindex="-1">{{ error }}</div>{% endif %}
+  </div>
+</div>
+<script>
+(function () {
+  // выбор другой пары — сразу перестраивает зачёты (без JS — кнопкой «Показать зачёты для пары»)
+  document.querySelectorAll("[data-pr-pair] select").forEach(function (s) {
+    s.addEventListener("change", function () { s.form.submit(); });
+  });
+  var err = document.getElementById("pr-err");
+  if (err) setTimeout(function () { err.scrollIntoView({ block: "center" }); err.focus({ preventScroll: true }); }, 60);
+})();
+</script>
+{% endif %}
 {% endblock %}

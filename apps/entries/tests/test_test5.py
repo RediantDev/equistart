@@ -212,8 +212,8 @@ class MyListsTests(Base):
         self.assertRedirects(self.client.get(reverse("entries:my_starts")), comp, fetch_redirect_response=False)
         page = self.client.get(comp + "?q=Барон").content.decode()
         self.assertIn('value="Барон"', page)  # поиск переносится
-        self.assertIn(f'href="{reverse("core:calendar")}"', page)
-        self.assertIn("Найти соревнования", page)
+        # тест 5.2 (п.47): кнопки-значка «Календарь» в шапке нет
+        self.assertNotIn("mc-find", page)
 
 
 class RankMergeMigrationTests(TransactionTestCase):

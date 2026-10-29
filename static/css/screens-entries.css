@@ -73,6 +73,10 @@
 .ap-pair { padding: 0; overflow: hidden; border-radius: var(--radius-md); }
 .ap-pair.pair--closed { padding: 0; }
 .ap-pair.is-open { border-color: var(--ink); }
+/* Тест 5.2 (п.32): overflow:hidden делал карточку областью прокрутки для закреплённой кнопки
+   «Добавить выбранные» — кнопка держалась на 70px выше низа карточки, под ней оставалось пустое место.
+   Раскрытая карточка не обрезает содержимое — кнопка закрепляется относительно экрана. */
+.ap-pair.is-open { overflow: visible; }
 .ap-pair.is-open .pair-form { padding: 0 var(--space-4) var(--space-3); }
 .ap-pair__head { display: flex; align-items: center; gap: 8px; padding: 8px 4px 8px var(--space-4); min-height: 56px; }
 .ap-pair__title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -117,3 +121,33 @@
   .ap-bar__go .btn { padding: 0 18px; }
 }
 @media (max-width: 720px) { .ap-bar__sum b { font-size: 14px; line-height: 18px; } }
+
+/* Тест 5.2: ошибка выбора зачётов — над кнопкой «Добавить выбранные»; поданные ранее зачёты пары */
+.ap-pair__err { margin: 12px 0 0; scroll-margin: 96px 0 160px; }
+.ap-pair__err ul { margin: 0; padding-left: 1.2em; }
+.ap-pair__err:focus { outline: none; }
+.ap-filed { margin: 0; }
+.opt.is-filed { opacity: 1; background: var(--surface-2); border-style: dashed; cursor: default; }
+.opt.is-filed .opt__mark { color: var(--text-muted); }
+/* Тест 5.2: изменение выступления (п.41/43) */
+.pr-pair { margin-bottom: var(--space-3); }
+.pr-pair .form { margin-top: var(--space-2); }
+.js .pr-nojs { display: none; }
+.pr-form .pair-prog:first-of-type { border-top: 0; }
+.pr-note { margin: 12px 0 0; }
+/* Тест 5.2: заголовок заявки со сводкой справа (п.37), «Изменить» у выступления (п.41/43), карандаш у «Контактов» (п.44) */
+.ae-head__title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+.ae-head__title .app-head__title { margin: 0; }
+.ae-head__chips { margin: 0; }
+.ae-btn--edit { color: var(--text); text-decoration: none; }
+.ae-btn--edit:hover { background: var(--surface-2); color: var(--text); }
+.ae-x:checked ~ .ae-row__side .ae-btn--edit, .ae-x:checked ~ .ae-row__side .ae-pp { display: none; }
+.ae-pp { white-space: nowrap; }
+.ae-row__side:has(.ae-btn--edit, .ae-pp) { flex-direction: row; align-items: center; }
+.ae-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ae-card-head .h3 { margin: 0; }
+.ae-contacts { margin-top: var(--space-3); }
+@media (max-width: 640px) {
+  .ae-row:has(.ae-btn--edit, .ae-pp) .ae-row__side { width: 100%; justify-content: flex-end; }
+  .ae-row:has(.ae-btn--edit, .ae-pp) .ae-row__side .ae-btn { flex: 1 1 0; }
+}
