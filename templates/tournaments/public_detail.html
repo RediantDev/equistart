@@ -4,7 +4,7 @@
 {% block content %}
 {# «Окно соревнования» — по утверждённому макету R2_01 (28.10.2026) #}
 {# Тест 5, п. 3.1 и 4.2: вкладка, день, маршрут — меняют только эту часть страницы #}
-<div id="tview" class="tview" style="view-transition-name: swap-area;">
+<div id="tview" class="tview">
 {% if tab %}
 {# Макет R2_02A: на вкладках протоколов — короткая шапка; карточка турнира — на вкладке «Программа» #}
 <div class="tp-mini" data-swap="#tview"><a class="tp-mini__back" href="?"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span>{{ s.title }}</span></a>
@@ -209,8 +209,7 @@
     {% endfor %}
   {% endfor %}
 </section>
-{# Условия отмены — на экране подачи заявки (тест 5, п. 4.1) #}
-<p class="muted tp-note">Опубликовано {{ t.published_at|date:"j E Y" }}. Сведения проверены модератором СтартЛист. Проверка сервиса не является утверждением федерацией.</p>
+{# Условия отмены — на экране подачи заявки (тест 5, п. 4.1). Строка «Опубликовано …» убрана (тест 5.2, п. 19) #}
 {% endif %}
 </div>
 
@@ -230,6 +229,7 @@
   function sheet() { return document.getElementById("tp-pair"); }
   function close() {
     var s = sheet();
+    document.documentElement.classList.remove("tp-noscroll");  // тест 5.2, п. 18: блокировка прокрутки не «залипает» после перехода
     if (!s || s.hidden) return;
     s.classList.remove("is-open");
     setTimeout(function () { s.hidden = true; s.querySelector(".tp-pair__body").innerHTML = ""; }, 180);

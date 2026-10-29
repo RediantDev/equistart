@@ -1081,8 +1081,7 @@ html.js input[type=date]:not([data-ui]), html.js input[type=time]:not([data-ui])
   html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; height: 0; }
 }
 /* Индикатор загрузки вверху и кнопка «в процессе» */
-html.is-loading::before { content: ""; position: fixed; top: 0; left: 0; height: 3px; width: 100%; z-index: 200; background: linear-gradient(90deg, transparent, var(--accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: sl-load 1s linear infinite; }
-@keyframes sl-load { from { background-position: -50% 0; } to { background-position: 150% 0; } }
+/* Индикатор загрузки — .nprog (тест 5.2, п. 3), см. конец файла */
 .btn.is-loading { position: relative; color: transparent !important; pointer-events: none; }
 .btn.is-loading::after { content: ""; position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; border: 2px solid currentColor; border-color: var(--ink) transparent var(--ink) transparent; animation: sl-spin .7s linear infinite; }
 .btn--dark.is-loading::after { border-color: #fff transparent #fff transparent; }
@@ -1219,7 +1218,7 @@ html.is-loading::before { content: ""; position: fixed; top: 0; left: 0; height:
 .club-tabs { background: var(--bg); }
 .club-tabs .tabs__item { flex: 1; text-align: center; }
 @media (max-width: 720px) {
-  .club-hero { border-radius: 0; border-left: 0; border-right: 0; margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) 0; }
+  .club-hero { border-radius: 0; border-left: 0; border-right: 0; margin: calc(-1 * var(--space-3)) -12px 0; }  /* = отступам .page на телефоне, без сдвига вбок (тест 5.2, п. 3) */
   .club-hero__cover { height: 196px; }
   .club-hero__body { padding: 0 var(--space-4) var(--space-4); }
   .club-tabs .tabs__item { padding: 10px 4px; font-size: 15px; }
@@ -1377,26 +1376,34 @@ html.is-loading::before { content: ""; position: fixed; top: 0; left: 0; height:
 }
 
 /* ===== Тест 5.1: общее (28.10.2026) ===== */
-/* Нижнее меню на телефоне вместо ☰ (п. 12) */
-:root { --bnav-h: 62px; }
+/* Нижнее меню на телефоне вместо ☰ (п. 12).
+   Тест 5.2, п. 4: высота постоянная (--bnav-h) + безопасная зона iPhone снизу; у всех пунктов одна разметка:
+   иконка в «таблетке» 28px (фон только у активного) и подпись в блоке на две строки — меню не «скачет». */
+:root { --bnav-h: 60px; --safe-b: env(safe-area-inset-bottom, 0px); --dock-h: 0px; }
 .bnav { display: none; }
 @media (max-width: 720px) {
-  .bnav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
-    background: var(--surface); border-top: 1px solid var(--border); padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); view-transition-name: bnav; }
-  .bnav__item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 54px; padding: 2px; border-radius: 12px;
-    color: var(--text-muted); text-decoration: none; font-size: 11px; line-height: 1.15; font-weight: 700; text-align: center; }
+  .bnav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    height: calc(var(--bnav-h) + var(--safe-b)); padding: 0 max(4px, env(safe-area-inset-right, 0px)) var(--safe-b) max(4px, env(safe-area-inset-left, 0px));
+    background: var(--surface); box-shadow: 0 -1px 0 var(--border); transform: translateZ(0); contain: layout paint; -webkit-user-select: none; user-select: none; }
+  .bnav__item { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 1px; height: var(--bnav-h); padding: 5px 2px 0; border-radius: 12px;
+    color: var(--text-muted); text-decoration: none; font-size: 11px; line-height: 13px; font-weight: 700; text-align: center; -webkit-touch-callout: none; }
+  .bnav__ico { display: grid; place-items: center; width: 48px; height: 28px; border-radius: 10px; flex: none; transition: background-color .15s, transform .12s; }
+  .bnav__ico .ico { width: 22px; height: 22px; }
+  .bnav__lbl { display: flex; align-items: center; justify-content: center; height: 26px; max-width: 100%; overflow: hidden; pointer-events: none; }
   .bnav__item.is-active { color: var(--text); }
-  .bnav__item.is-active .ico { background: var(--accent); border-radius: 10px; padding: 3px 12px; box-sizing: content-box; width: 22px; }
-  body { padding-bottom: calc(var(--bnav-h) + env(safe-area-inset-bottom)); }
+  .bnav__item.is-active .bnav__ico { background: var(--accent); }
+  .bnav__item:active .bnav__ico { transform: scale(.92); background: var(--surface-2); }
+  .bnav__item.is-active:active .bnav__ico { background: var(--accent-hover, var(--accent)); }
+  body { padding-bottom: calc(var(--bnav-h) + var(--dock-h) + var(--safe-b)); }
   .mnav, .topbar__actions > .btn, .topbar__register { display: none !important; }
+  /* Тест 5.2, п. 21: закреплённые панели прилегают к нижнему меню без зазора */
   form[method=post] .form-actions--sticky, form.form--long > .form-actions:last-child, form.form--long > .form__actions:last-child,
-  .pair-form__actions, .stb-order__bar { bottom: calc(var(--bnav-h) + 8px + env(safe-area-inset-bottom)) !important; }
+  .pair-form__actions, .stb-order__bar { bottom: calc(var(--bnav-h) + var(--safe-b)) !important; }
   .toasts { top: calc(8px + env(safe-area-inset-top)); }
 }
 /* Нет серой вспышки при нажатии (п. 4) */
 html { -webkit-tap-highlight-color: transparent; }
 a, button, summary, label, .btn { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-.btn:active { filter: brightness(.96); }
 /* Иконки вместо эмодзи */
 .ico { display: block; flex: none; }
 .empty-friendly__ico .ico, .hub-tile__icon .ico { width: 28px; height: 28px; }
@@ -1456,7 +1463,6 @@ a, button, summary, label, .btn { -webkit-tap-highlight-color: transparent; touc
 /* «Мои соревнования»: заголовок с маленькой кнопкой, поиск и фильтр на странице, карточка раскрывается */
 .mc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: var(--space-3); }
 .mc-head .h1 { margin: 0; min-width: 0; }
-.mc-find { flex: none; gap: 6px; }
 .mc-tools { display: flex; flex-direction: column; gap: 8px; }
 .mc-search { position: relative; }
 .mc-search .ico { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
@@ -1487,7 +1493,6 @@ a, button, summary, label, .btn { -webkit-tap-highlight-color: transparent; touc
 .mc-none { margin: 8px 0; }
 .mc-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .mc-empty .muted { margin: 0; }
-@media (max-width: 480px) { .mc-find__text { display: none; } .mc-find { width: 40px; min-height: 40px; padding: 0; justify-content: center; } }
 /* Заявка: по дням, внутри дня — по всаднику, плотнее */
 .app-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--space-3); }
 .app-head .back { margin-bottom: 0; }
@@ -1596,3 +1601,101 @@ a, button, summary, label, .btn { -webkit-tap-highlight-color: transparent; touc
   .pf-doc__frame { height: 70vh; min-height: 320px; }
   .pf-row { padding: 6px 6px 6px 12px; }
 }
+
+/* ===== Тест 5.2: общее (29.10.2026) ===== */
+/* п. 9: страница не масштабируется — двойной тап (touch-action) и щипок (gesturestart в smooth.js; meta viewport).
+   Поля ввода на телефоне — не мельче 16px, иначе Safari приближает страницу при фокусе. */
+html { touch-action: manipulation; }
+html, body { overflow-x: clip; }  /* п. 3: никакой прокрутки вбок; clip не ломает position: sticky */
+@media (pointer: coarse) {
+  html input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]), html select, html textarea { font-size: 16px !important; }
+}
+
+/* п. 3: мгновенный отклик на нажатие — только transform/фон, без сдвига вёрстки */
+.btn, .icon-btn, .tabs__item, .chip-link, .tp-route, .tp-act, .mc-filter, .club-chip, .seg2__item, .segmented__item, .dp__day, .dp__nav, .tp__cell, .quick__btn, .mark-key, .club-action {
+  transition: transform .08s ease-out, filter .12s, background-color .12s, border-color .12s, color .12s; }
+.btn:active:not(:disabled):not(.is-inactive):not(.is-loading), .icon-btn:active, .tp-act:active, .club-action:active, .quick__btn:active, .mark-key:active { transform: scale(.97); filter: brightness(.95); }
+.tabs__item:active, .chip-link:active, .tp-route:active, .mc-filter:active, .club-chip:active, .seg2__item:active, .segmented__item:active, .dp__day:active:not(:disabled), .dp__nav:active, .tp__cell:active { transform: scale(.96); }
+/* Строки-ссылки списков и карточки: подсветка фоном */
+a.list__row, a.pf-row__main, a.row-card, a.event-card, a.club-card, a.hub-tile, a.mnav__link, a.club-check__row, a.club-news-row, a.club-links a,
+.tp-prow > summary, .mc-card > summary, .rider-group > summary, .faq > summary, .sel__opt, .sg__item, .pf-row--pick, .tp-sr { transition: background-color .12s; }
+a.list__row:active, a.row-card:active, a.event-card:active, a.club-card:active, a.hub-tile:active, a.mnav__link:active, a.club-check__row:active, a.club-news-row:active, .club-links a:active,
+.tp-prow > summary:active, .mc-card > summary:active, .rider-group > summary:active, .faq > summary:active, .sel__opt:active, .sg__item:active, .pf-row--pick:active, .tp-sr:active { background-color: var(--surface-2); }
+.pf-row:has(> a.pf-row__main:active) { background-color: var(--surface-2); }
+@media (hover: none) { .btn:hover, .icon-btn:hover, .sel__btn:hover { filter: none; } }
+
+/* п. 3, 16: тонкая полоса загрузки сверху; показывается, только если ответ дольше ~150 мс (smooth.js) */
+.nprog { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; right: 0; height: 3px; z-index: 300; pointer-events: none; opacity: 0; transition: opacity .25s .1s; }
+.nprog__bar { height: 100%; background: var(--accent-hover); box-shadow: 0 0 6px var(--accent); transform-origin: 0 50%; transform: scaleX(0); }
+.nprog.is-on { opacity: 1; transition: opacity .1s; }
+.nprog.is-on .nprog__bar { transform: scaleX(.9); transition: transform 6s cubic-bezier(.08,.7,.2,1); }
+.nprog.is-done { opacity: 0; transition: opacity .25s .15s; }
+.nprog.is-done .nprog__bar { transform: scaleX(1); transition: transform .15s ease-out; }
+/* Часть страницы меняется (вкладки, дни, маршруты) — старое чуть гаснет, новое плавно проявляется */
+.is-swapping { opacity: .55; transition: opacity .15s .12s; }
+.swap-in { animation: sl-swap-in .2s ease-out; }
+@keyframes sl-swap-in { from { opacity: .35; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .swap-in { animation: none; } .nprog .nprog__bar { transition: none !important; } }
+
+/* п. 21: внизу страницы — без пустоты перед нижним меню.
+   Закреплённая панель действий — класс .dock (последний блок страницы/формы):
+   на телефоне — во всю ширину, вплотную к нижнему меню; на компьютере — карточкой у нижнего края.
+   .dock--fixed — панель position: fixed (не в потоке); её высоту учитывает отступ body через --dock-h. */
+.dock { position: sticky; bottom: 12px; z-index: 6; display: flex; align-items: center; gap: 12px; margin-top: var(--space-4);
+  padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-card); }
+@media (max-width: 720px) {
+  .page { padding-bottom: var(--space-4); }
+  .dock { bottom: calc(var(--bnav-h) + var(--safe-b)); margin: var(--space-3) -12px 0; padding: 8px 12px; border-width: 1px 0 0; border-radius: 0; box-shadow: none; }
+  .dock--fixed { position: fixed; left: 0; right: 0; margin: 0; z-index: 55; }
+  body:has(.dock--fixed) { --dock-h: 62px; }
+  /* Страница заканчивается закреплённой панелью — нижний отступ страницы не нужен, панель ложится на меню */
+  .page:has(.dock:not(.dock--fixed), .sb-bar, .ae-bar, .stb-order__bar, .pair-form__actions, .form-actions--sticky, form.form--long > .form-actions:last-child, form.form--long > .form__actions:last-child) { padding-bottom: 0; }
+  form[method=post] .form-actions--sticky, form.form--long > .form-actions:last-child, form.form--long > .form__actions:last-child {
+    margin: 12px -12px 0; border-radius: 0; box-shadow: 0 -1px 0 var(--border); padding: 8px 12px; }
+}
+
+/* п. 52, 65: единая шкала текста. Основной — 16px (на телефоне 15px), строка списка — как основной, подписи — 13px.
+   Экраны не задают свои размеры шрифта — берут переменные или общие классы. */
+:root { --fs-body: 16px; --fs-row: 16px; --fs-sub: 13px; --fs-cap: 12px; --lh-row: 1.3; }
+@media (max-width: 720px) { :root { --fs-body: 15px; --fs-row: 15px; } }
+body { font-size: var(--fs-body); }
+.list__row, .pf-row__title, .lrow__title, .mc-card__title, .club-card__name { font-size: var(--fs-row); line-height: var(--lh-row); }
+.table__sub, .cell-sub, .pf-row__meta, .lrow__sub, .opt__sub, .mc-card__meta, .pf-sub, .field__help { font-size: var(--fs-sub); line-height: 1.35; }
+/* Общая строка списка: .lrow (карточка-список .lrows) — заголовок .lrow__title, подпись .lrow__sub, справа — шеврон/иконка */
+.lrows { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+.lrow { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 12px 8px 14px; color: var(--text); text-decoration: none; transition: background-color .12s; }
+.lrow + .lrow { border-top: 1px solid var(--border); }
+a.lrow:active, button.lrow:active { background: var(--surface-2); }
+.lrow__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.lrow__title { font-weight: 700; overflow-wrap: anywhere; }
+.lrow__sub { color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lrow__chev { flex: none; color: var(--text-muted); }
+
+/* п. 44: «Изменить» — карандаш справа от заголовка блока: .card-head > (.h3 | h2) + partials/edit_icon.html */
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 var(--space-2); min-height: 36px; }
+.card-head > .h1, .card-head > .h2, .card-head > .h3, .card-head > h2, .card-head > h3 { margin: 0; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.icon-btn--edit { width: 36px; height: 36px; flex: none; }
+.icon-btn--edit:active { background: var(--accent-soft); }
+
+/* п. 58, 63, 60: списки и календарь — в пределах экрана; на телефоне — шторкой снизу */
+.sel__list { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.dp.is-right .dp__pop, .tp.is-right .tp__pop { left: auto; right: 0; }
+.dp.is-up .dp__pop, .tp.is-up .tp__pop { top: auto; bottom: calc(100% + 6px); }
+.uisheet { position: fixed; inset: 0; z-index: 170; background: rgba(20,20,20,.38); display: flex; align-items: flex-end; justify-content: center; opacity: 0; transition: opacity .18s; overscroll-behavior: contain; }
+.uisheet.is-open { opacity: 1; }
+.uisheet__box { width: min(560px, 100%); max-height: 82dvh; display: flex; flex-direction: column; background: var(--surface); border-radius: 24px 24px 0 0;
+  padding: 8px 12px calc(12px + var(--safe-b)); transform: translateY(32px); transition: transform .2s ease-out; }
+.uisheet.is-open .uisheet__box { transform: none; }
+.uisheet__box .sheet__grip { margin-bottom: 8px; }
+.uisheet__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px 8px; }
+.uisheet__title { font-weight: 800; font-size: 17px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uisheet__x { flex: none; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--text); font-size: 22px; line-height: 1; cursor: pointer; }
+.uisheet .sel__pop, .uisheet .dp__pop, .uisheet .tp__pop { position: static; display: flex; flex-direction: column; min-height: 0; width: auto; border: 0; box-shadow: none; padding: 0; }
+.uisheet .sel__list { max-height: none; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.uisheet .sel__opt { min-height: 48px; padding: 12px; }
+.uisheet .dp__day { height: 44px; }
+.uisheet .dp__sel { height: 40px; }
+.uisheet .dp__sel:first-child { width: 132px; }
+.uisheet .dp__sel:last-child { width: 92px; }
+@media (min-width: 721px) { .uisheet { align-items: center; } .uisheet__box { border-radius: 24px; padding-bottom: 16px; } }
+.dp__input[readonly] { caret-color: transparent; -webkit-user-select: none; user-select: none; }

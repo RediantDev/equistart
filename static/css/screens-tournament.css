@@ -41,9 +41,10 @@ a.tp-tile:hover { filter: brightness(.97); }
 .tp-bar__text small { font-size: 12px; line-height: 16px; color: var(--warning); font-weight: 600; }
 .tp-bar__btn { flex: 1; min-height: 44px; }
 @media (max-width: 720px) {
-  .tp-bar { position: fixed; left: 0; right: 0; bottom: calc(var(--bnav-h) + env(safe-area-inset-bottom)); z-index: 55;
-    border-top: 1px solid var(--border); padding: 10px 16px; }
-  body:has(.tp-bar) { padding-bottom: calc(var(--bnav-h) + 66px + env(safe-area-inset-bottom)); }
+  /* Тест 5.2, п. 21: вплотную к нижнему меню; высота панели — в --dock-h (отступ body в app.css) */
+  .tp-bar { position: fixed; left: 0; right: 0; bottom: calc(var(--bnav-h) + var(--safe-b)); z-index: 55; height: 64px;
+    border-top: 1px solid var(--border); padding: 0 16px; }
+  body:has(.tp-bar) { --dock-h: 64px; }
 }
 @media (min-width: 721px) {
   .tp-card { padding: var(--space-6); }
@@ -63,7 +64,7 @@ a.tp-tile:hover { filter: brightness(.97); }
 }
 
 /* Вкладки — переключатель-«таблетка» (механизм прежний: .tabs + data-swap) */
-.tabs.tp-seg { display: flex; gap: 2px; padding: 3px; margin: var(--space-3) 0 10px; border: 0; border-radius: var(--radius-pill); background: var(--surface-2); }
+.tabs.tp-seg { display: flex; gap: 2px; height: 44px; box-sizing: border-box; padding: 3px; margin: var(--space-3) 0 10px; border: 0; border-radius: var(--radius-pill); background: var(--surface-2); }
 .tabs--sticky.tp-seg { top: 64px; box-shadow: 0 0 0 6px var(--bg); }
 @media (max-width: 720px) { .tabs--sticky.tp-seg { top: 60px; } }
 .tp-seg .tabs__item { flex: 1 1 0; height: 38px; display: flex; align-items: center; justify-content: center; padding: 0 4px; margin: 0; border: 0; border-radius: var(--radius-pill);
