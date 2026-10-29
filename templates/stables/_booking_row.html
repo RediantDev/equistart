@@ -1,10 +1,10 @@
-{# Тест 5.2, вариант A (R3_04A): компактная строка брони — значок, «Денник», даты, статус; действия в меню «⋯» #}
+{# Тест 5.3, п. 24: статус — второй строкой под названием, «⋯» справа. Тест 5.2, вариант A (R3_04A): компактная строка брони — значок, «Денник», даты, статус; действия в меню «⋯» #}
 <li class="sb-row" id="b{{ b.pk }}"{% if b.state == "pending" and open %} data-edit-bk="{{ b.pk }}" data-arrive="{{ b.arrive|date:'Y-m-d' }}" data-depart="{{ b.depart|date:'Y-m-d' }}" data-cat="{{ b.category_id }}" data-hname="{{ b.horse_name }}"{% endif %}>
   <span class="sb-row__ico" aria-hidden="true">{% include "partials/icon.html" with name="stable" size=18 %}</span>
   <div class="sb-row__main"><span><b>{% if show_horse %}{{ b.horse_name }} · {% endif %}Денник</b> <span class="sb-m">{{ b.short }} · {{ b.category.name }}</span></span>
+    <span class="sb-row__chips"><span class="chip{% if b.state == 'confirmed' %} chip--success{% elif b.state == 'pending' %} chip--warning{% elif b.state == 'rejected' %} chip--danger{% endif %}">{{ b.get_state_display }}</span>{% if b.box_number %}<span class="chip chip--info">№ {{ b.box_number }}</span>{% endif %}</span>
     {% if b.required %}<span class="sb-m">Без денника выступления невозможны{% if b.state == "pending" or b.state == "rejected" %} — выступления лошади ждут подтверждения брони{% endif %}</span>{% endif %}
     {% if b.reason and b.state != "pending" %}<span class="sb-m">Причина: {{ b.reason }}</span>{% endif %}</div>
-  <span class="sb-row__chips"><span class="chip{% if b.state == 'confirmed' %} chip--success{% elif b.state == 'pending' %} chip--warning{% elif b.state == 'rejected' %} chip--danger{% endif %}">{{ b.get_state_display }}</span>{% if b.box_number %}<span class="chip chip--info">№ {{ b.box_number }}</span>{% endif %}</span>
   {% if b.is_holding and open %}<details class="sb-menu" data-menu>
     <summary class="sb-menu__btn" aria-label="Действия с денником: {{ b.horse_name }}"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle class="sb-dot" cx="5" cy="12" r="1.7"/><circle class="sb-dot" cx="12" cy="12" r="1.7"/><circle class="sb-dot" cx="19" cy="12" r="1.7"/></svg></summary>
     <div class="sb-menu__pop" role="menu">

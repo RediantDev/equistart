@@ -138,6 +138,19 @@
     if (m && e.target.closest(".sb-menu__item") && !e.target.closest("[data-confirm]")) m.open = false;
   });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenus(null); });
+  // Тест 5.3, п. 23: меню не уходит за край экрана — если снизу (над панелью «Заказать» и нижним меню) места нет, открывается вверх
+  document.querySelectorAll("details[data-menu]").forEach(function (m) {
+    m.addEventListener("toggle", function () {
+      if (!m.open) return;
+      m.classList.remove("is-up");
+      var pop = m.querySelector(".sb-menu__pop"), r = pop.getBoundingClientRect(), bottom = window.innerHeight;
+      document.querySelectorAll(".sb-bar, .bnav").forEach(function (el) {
+        var cs = getComputedStyle(el);
+        if (cs.display !== "none" && (cs.position === "fixed" || cs.position === "sticky")) bottom = Math.min(bottom, el.getBoundingClientRect().top);
+      });
+      if (r.bottom > bottom - 8 && m.getBoundingClientRect().top - r.height - 8 > 60) m.classList.add("is-up");
+    });
+  });
   // «Другая категория»: открывает форму изменения брони под строкой
   form.addEventListener("click", function (e) {
     var b = e.target.closest("[data-edit-form]");
