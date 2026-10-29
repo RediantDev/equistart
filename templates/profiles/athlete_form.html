@@ -12,7 +12,8 @@
         {% include "partials/field.html" with field=form.first_name %}
         {% include "partials/field.html" with field=form.middle_name %}
       </div>
-      <div class="grid-2">
+      {# Тест 5.3, п. 38: дата рождения и разряд — одной строкой и на телефоне #}
+      <div class="ps-g2">
         {% include "partials/field.html" with field=form.birth_date %}
         {% include "partials/field.html" with field=form.rank %}
       </div>

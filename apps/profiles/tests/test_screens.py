@@ -36,6 +36,22 @@ class AthletesScreenTests(Base):
         self.client.force_login(mkuser("+79990001790"))
         self.assertNotContains(self.client.get(reverse("profiles:athletes")), "Орлов")
 
+    def test_search_field_always_shown(self):
+        """Тест 5.3, п. 41: поле поиска видно сразу даже при одном спортсмене."""
+        Athlete.objects.create(last_name="Один", first_name="Единственный", manager=self.other)
+        self.client.force_login(self.other)
+        self.assertContains(self.client.get(reverse("profiles:athletes")), 'data-ps-filter="#ps-athletes"')
+
+    def test_form_birth_and_rank_in_one_row(self):
+        """Тест 5.3, п. 38: дата рождения и разряд — в одной строке из двух полей."""
+        self.client.force_login(self.coach)
+        page = self.client.get(reverse("profiles:athlete_new")).content.decode()
+        row = page[page.index('<div class="ps-g2">'):]
+        self.assertLess(row.index('name="birth_date"'), row.index('name="rank"'))
+        self.assertLess(row.index('name="rank"'), row.index('name="club"'))
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("profiles:athlete_new")).status_code, 302)
+
     def test_detail_edit_is_pencil_for_manager_only(self):
         """Тест 5.2, п. 50: «Изменить» — карандаш справа от имени; делегату, чужому и гостю — нет."""
         url = reverse("profiles:athlete", args=[self.a1.pk])
@@ -70,6 +86,9 @@ class MyHorsesScreenTests(Base):
         self.assertIn('<h1 class="h1 ps-h1">Мои лошади</h1>', page)
         self.assertIn("управляет Тест Юзер", page)
         self.assertIn('data-horse-filter', page)
+        # Тест 5.3, п. 41: поле поиска видно сразу, без кнопки-иконки
+        self.assertNotIn("data-ps-toggle", page)
+        self.assertNotIn("data-open", page)
         # документы в списке не показываем
         self.assertNotIn("Документ", page)
 

@@ -61,7 +61,6 @@ html.js .ps-nojs { display: none !important; }
 .ps-srch { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border: 1px solid var(--control-border); border-radius: 999px; background: var(--surface); margin: 0; }
 .ps-srch input, .ps-srch input[type="search"] { flex: 1; min-width: 0; height: 100%; border: 0 !important; outline: 0; background: transparent; font-size: 16px; padding: 0; box-shadow: none !important; }
 .ps-srch:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
-html.js .ps-hsearch:not([data-open]) { display: none; }
 .ps-hsearch { margin: 0; }
 .ps-groups { display: flex; flex-direction: column; gap: 8px; }
 .ps-group { display: flex; flex-direction: column; gap: 8px; }
