@@ -2,26 +2,52 @@
 {% load tournaments %}
 {% block title %}{{ p.name }} — проведение — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    {% url 'conduct:overview' t.pk as ov %}{% include "partials/crumbs.html" with mid="Проведение" mid_url=ov here=p.name %}
-    <h1 class="h1">{{ p.name }}</h1>
-    <p class="muted">{{ p.day|date:"l, j E" }}{% if p.start_time %} · начало {{ p.start_time|time:"H:i" }}{% endif %} · {{ p.program_type_name }}{% if p|heights_extra %} · {{ p|heights_extra }}{% endif %}{% if p.article_label %} · {{ p.article_label }}{% endif %}</p>
-    <div class="chips" style="margin-top: 6px;">{% if published %}<span class="chip chip--info">Стартовый протокол опубликован · v{{ published.version }} · {{ published.published_at|date:"j E H:i" }}</span>{% else %}<span class="chip">Стартовый протокол не опубликован</span>{% endif %}</div>
-  </div>
+{# Тест 6, п. 32: название со стрелкой — смена маршрута; вкладки по порядку работы; «Экран судьи» — одна заметная кнопка;
+   параметры и объединение зачётов — в меню «три точки»; «Как видят участники» — иконка #}
+{% url 'conduct:overview' t.pk as ov %}{% include "partials/crumbs.html" with mid="Проведение" mid_url=ov here=p.name %}
+<div class="rhead">
+  <details class="rswitch">
+    <summary class="rswitch__sum">
+      <h1 class="rswitch__title">{{ p.name }}</h1>
+      <span class="rswitch__chev" aria-hidden="true">{% include "partials/icon.html" with name="chevron-down" size=22 %}</span>
+    </summary>
+    <div class="rswitch__panel" role="menu" aria-label="Маршруты и езды турнира">
+      {% regroup all_programs by day as rdays %}
+      {% for d in rdays %}
+        <div class="rswitch__day">{{ d.grouper|date:"D, j E"|capfirst }}</div>
+        {% for o in d.list %}<a class="rswitch__item{% if o.pk == p.pk %} is-current{% endif %}" role="menuitem" href="{% url 'conduct:program' t.pk o.pk %}{% if tab != 'order' %}?tab={{ tab }}{% endif %}"><span class="num">{{ o.start_time|time:"H:i"|default:"—" }}</span>{{ o.name }}</a>{% endfor %}
+      {% endfor %}
+    </div>
+  </details>
+  <a class="icon-btn" href="{% url 'tournaments:public' t.pk %}?tab=results#prog-{{ p.pk }}" aria-label="Как видят участники" title="Как видят участники">{% include "partials/icon.html" with name="eye" size=20 %}</a>
+  <details class="kebab">
+    <summary aria-label="Ещё действия">{% include "partials/icon.html" with name="dots" size=20 %}</summary>
+    <div class="kebab__menu">
+      {% for k, label in more_tabs %}<a href="?tab={{ k }}">{{ label }}</a>{% endfor %}
+      <a href="{% url 'tournaments:public' t.pk %}">Программа турнира</a>
+      <a href="{% url 'entries:manage' t.pk %}">Все заявки турнира</a>
+      <a href="{% url 'tournaments:hub' t.pk %}">Панель турнира</a>
+    </div>
+  </details>
+</div>
+<p class="muted rhead__sub">{{ p.day|date:"D, j E"|capfirst }}{% if p.start_time %} · {{ p.start_time|time:"H:i" }}{% endif %} · {{ p.program_type_name }}{% if p|heights_extra %} · {{ p|heights_extra }}{% endif %}</p>
+<p class="rhead__state"><span class="dot {% if published %}dot--ok{% else %}dot--wait{% endif %}" aria-hidden="true"></span>{% if published %}Стартовый протокол опубликован · v{{ published.version }} · {{ published.published_at|date:"j E H:i" }}{% else %}Стартовый протокол не опубликован{% endif %}</p>
+
+<div class="rjudge">
+  {% if has_panel %}
+    {% for l in my_letters %}<a class="btn btn--primary" href="{% url 'conduct:judge_sheet' t.pk p.pk l %}">{% include "partials/icon.html" with name="flag" size=20 %}Мой лист · {{ l }}</a>{% endfor %}
+    {% if is_scorer or user.pk == t.owner_id %}<a class="btn {% if my_letters %}btn--ghost{% else %}btn--primary{% endif %}" href="{% url 'conduct:scorer' t.pk p.pk %}">Итоги езды</a>{% endif %}
+  {% else %}
+    <a class="btn btn--primary" href="{% url 'conduct:live' t.pk p.pk %}">{% include "partials/icon.html" with name="flag" size=20 %}Экран судьи</a>
+  {% endif %}
 </div>
 
-<div class="start-layout">
-  <aside class="start-layout__nav" data-start-drop>
-    {# На телефоне меню старта свёрнуто в одну кнопку (решение 26.10.2026) #}
-    <button type="button" class="start-drop__btn" aria-expanded="false" aria-controls="start-nav-{{ p.pk }}">
-      <span class="start-drop__cap">Раздел</span>
-      <span class="start-drop__val">{% for k, label in tabs %}{% if tab == k %}{{ label }}{% endif %}{% endfor %}</span>
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-    <div id="start-nav-{{ p.pk }}" class="start-drop__body">{% include "conduct/_start_nav.html" %}</div>
-  </aside>
-  <div class="start-layout__main">
+<nav class="rtabs" aria-label="Работа с маршрутом">
+  {% for k, label in main_tabs %}<a class="rtabs__item{% if tab == k %} is-active{% endif %}" href="?tab={{ k }}"{% if tab == k %} aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
+  {% for k, label in more_tabs %}{% if tab == k %}<a class="rtabs__item is-active" href="?tab={{ k }}" aria-current="page">{{ label }}</a>{% endif %}{% endfor %}
+</nav>
+
+<div class="rmain">
 
 {% if tab == "order" %}
   <section class="card">
@@ -32,7 +58,7 @@
         <form method="post" action="{% url 'conduct:action' t.pk p.pk 'draw' %}">{% csrf_token %}<button class="btn btn--dark btn--sm"{% if slots %} data-confirm="Перемешать порядок пар, которые ещё не выступили?"{% endif %}>Жеребьёвка</button></form>
       </div>
     </div>
-    <p class="table__sub" style="margin: 0 0 var(--space-3);">Жеребьёвка случайно перемешивает пары, которые ещё не выступили. Принятые позже встают в конец автоматически. Порядок меняется стрелками.</p>
+    <details class="hint-i"><summary>Как работает порядок</summary><p>Жеребьёвка случайно перемешивает пары, которые ещё не выступили. Принятые позже встают в конец автоматически. Порядок меняется стрелками, пару и статус старта — нажатием на строку.</p></details>
 
     {% if p.is_dressage %}
     <form method="post" action="{% url 'conduct:action' t.pk p.pk 'timing' %}" class="timing-row" data-dirty-guard>{% csrf_token %}
@@ -44,14 +70,14 @@
     {% endif %}
 
     {% if slots %}
-    <ol class="order">
+    <ol class="order order--compact">
       {% for s in slots %}
         <li class="order__row{% if s.is_off %} is-off{% endif %}{% if s.locked %} is-done{% endif %}" id="slot-{{ s.pk }}">
           <span class="order__n">{{ s.position }}</span>
           {% if p.timed_starts %}<span class="order__time num">{{ s.start_time|time:"H:i"|default:"—" }}</span>{% endif %}
           <div class="order__who">
-            <strong>{{ s.entry.athlete_snapshot.name }}</strong><span class="table__sub">{{ s.entry.athlete_snapshot.birth_year|default:"" }}{% if s.entry.athlete_snapshot.rank %} · {{ s.entry.athlete_snapshot.rank }}{% endif %}{% if s.entry.athlete_snapshot.club %} · {{ s.entry.athlete_snapshot.club }}{% endif %}</span>
-            <span class="order__horse">{{ s.entry.horse_snapshot.name }}<span class="table__sub" style="display: inline;"> · {{ s.entry.class_name }}{% if s.entry.height and p.heights|length > 1 %} · {{ s.entry.height }} см{% endif %}</span></span>
+            <a class="order__link" href="{% url 'conduct:pair_edit' t.pk p.pk s.entry_id %}"><strong>{{ s.entry.athlete_snapshot.name }}</strong>
+            <span class="order__horse">{{ s.entry.horse_snapshot.name }}<span class="table__sub" style="display: inline;"> · {{ s.entry.class_name }}{% if s.entry.height and p.heights|length > 1 %} · {{ s.entry.height }} см{% endif %}</span></span></a>
             {% for c in s.conflicts %}<span class="order__warn{% if s.exception_reason %} is-ok{% endif %}">! {{ c }}</span>{% endfor %}
             {% if s.conflicts %}<details class="order__exc"><summary class="table__sub">{% if s.exception_reason %}Исключение: {{ s.exception_reason }}{% else %}Оставить как исключение…{% endif %}</summary>
               <form method="post" action="{% url 'conduct:action' t.pk p.pk 'exception' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="slot" value="{{ s.pk }}"><input name="reason" value="{{ s.exception_reason }}" placeholder="Причина" aria-label="Причина исключения"><button class="btn btn--ghost btn--sm">Сохранить</button></form></details>{% endif %}
@@ -69,11 +95,10 @@
           <div class="order__move">
             {% if not s.locked %}
               <form method="post" action="{% url 'conduct:action' t.pk p.pk 'move' %}" class="order-ctl">{% csrf_token %}<input type="hidden" name="slot" value="{{ s.pk }}">
-                <button class="icon-btn" name="position" value="{{ s.position|add:'-1' }}" aria-label="Выше"{% if forloop.first %} disabled{% endif %}>↑</button>
-                <button class="icon-btn" name="position" value="{{ s.position|add:'1' }}" aria-label="Ниже"{% if forloop.last %} disabled{% endif %}>↓</button>
+                <button class="order__arr" name="position" value="{{ s.position|add:'-1' }}" aria-label="Выше"{% if forloop.first %} disabled{% endif %}>{% include "partials/icon.html" with name="chevron-up" size=16 %}</button>
+                <button class="order__arr" name="position" value="{{ s.position|add:'1' }}" aria-label="Ниже"{% if forloop.last %} disabled{% endif %}>{% include "partials/icon.html" with name="chevron-down" size=16 %}</button>
               </form>
             {% endif %}
-            <a class="btn btn--ghost btn--sm" href="{% url 'conduct:pair_edit' t.pk p.pk s.entry_id %}">Изменить</a>
           </div>
         </li>
       {% endfor %}
@@ -99,7 +124,7 @@
       </div>
     {% endif %}
 
-    <div class="publish-bar">
+    <div class="publish-bar publish-bar--sticky">
       <div><strong>Стартовый протокол</strong><span class="table__sub">{% if published %}Опубликована версия {{ published.version }}. Изменения порядка увидят после новой публикации.{% else %}Участники увидят порядок только после публикации.{% endif %}</span></div>
       <form method="post" action="{% url 'conduct:action' t.pk p.pk 'publish' %}">{% csrf_token %}<button class="btn btn--primary"{% if not slots %} disabled{% endif %}>{% if published %}Опубликовать новую версию{% else %}Опубликовать протокол{% endif %}</button></form>
     </div>
@@ -117,7 +142,7 @@
           <li class="entry-line">
             <div class="entry-line__who"><strong>{{ e.athlete_snapshot.name }}</strong><span class="table__sub">{{ e.athlete_snapshot.birth_date|isodate|default:"" }}{% if e.athlete_snapshot.rank %} · {{ e.athlete_snapshot.rank }}{% endif %}{% if e.athlete_snapshot.club %} · {{ e.athlete_snapshot.club }}{% endif %}</span></div>
             <div class="entry-line__horse"><strong>{{ e.horse_snapshot.name }}</strong><span class="table__sub">{{ e.class_name }}</span></div>
-            <div class="entry-line__app"><a href="{% url 'entries:application' e.application_id %}">Заявка №{{ e.application_id }}</a><span class="table__sub">{{ e.application.contact_name }}</span></div>
+            <div class="entry-line__app"><a href="{% url 'entries:application' e.application_id %}">Заявка №{{ e.application.number }}</a><span class="table__sub">{{ e.application.contact_name }}</span></div>
             <div class="entry-line__act">
               {% if e.decision == "pending" or e.decision == "rejected" %}
                 <form method="post" action="{% url 'entries:decide' t.pk %}">{% csrf_token %}<input type="hidden" name="confirm" value="1"><input type="hidden" name="action" value="accept"><input type="hidden" name="items" value="{{ e.pk }}:{{ e.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn--primary btn--sm">Принять</button></form>
@@ -243,6 +268,5 @@
     </ul>
   </section>
 {% endif %}
-  </div>
 </div>
 {% endblock %}

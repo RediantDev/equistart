@@ -2,7 +2,7 @@
 import datetime
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -18,7 +18,7 @@ class AthletesScreenTests(Base):
         Athlete.objects.create(last_name="Петров", first_name="Пётр", manager=self.other, birth_date=datetime.date(2001, 1, 1), rank="none")
         self.client.force_login(self.other)
         page = self.client.get(reverse("profiles:athletes")).content.decode()
-        me, mine, trusted = page.index("Это я"), page.index("Мои · 1"), page.index("Мне доверили · 1")
+        me, mine, trusted = page.index("Это я"), page.index(">Мои<"), page.index(">Мне доверили<")
         self.assertLess(me, page.index("Ким Алина"))
         self.assertLess(mine, page.index("Петров Пётр"))
         self.assertLess(trusted, page.index("Орлов Дима"))
@@ -36,6 +36,87 @@ class AthletesScreenTests(Base):
         self.client.force_login(mkuser("+79990001790"))
         self.assertNotContains(self.client.get(reverse("profiles:athletes")), "Орлов")
 
+    def test_search_field_always_shown(self):
+        """Тест 5.3, п. 41: поле поиска видно сразу даже при одном спортсмене."""
+        Athlete.objects.create(last_name="Один", first_name="Единственный", manager=self.other)
+        self.client.force_login(self.other)
+        self.assertContains(self.client.get(reverse("profiles:athletes")), 'data-ps-filter="#ps-athletes"')
+
+    def test_form_birth_and_rank_in_one_row(self):
+        """Тест 5.3, п. 38: дата рождения и разряд — в одной строке из двух полей."""
+        self.client.force_login(self.coach)
+        page = self.client.get(reverse("profiles:athlete_new")).content.decode()
+        row = page[page.index('<div class="ps-g2">'):]
+        self.assertLess(row.index('name="birth_date"'), row.index('name="rank"'))
+        self.assertLess(row.index('name="rank"'), row.index('name="club"'))
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("profiles:athlete_new")).status_code, 302)
+
+    def test_form_variant_b_steps_and_edit_page(self):
+        """Тест 5.3, п. 39: новый — два шага «Кто это» / «Клуб и номера»; изменение — одна страница с теми же блоками."""
+        self.client.force_login(self.coach)
+        page = self.client.get(reverse("profiles:athlete_new")).content.decode()
+        self.assertIn("data-steps", page)
+        self.assertIn("Кто это", page)
+        self.assertIn("Клуб и номера", page)
+        self.assertIn("Без разряда — выберите «б/р».", page)
+        self.assertIn("data-step-next", page)
+        self.assertIn("Пропустить", page)
+        p1, p2 = page.index('data-pane="1"'), page.index('data-pane="2"')
+        for name in ("last_name", "first_name", "middle_name", "birth_date", "rank"):
+            self.assertTrue(p1 < page.index(f'name="{name}"') < p2, name)
+        for name in ("club", "region", "fksr_number", "fei_id", "coach_name"):
+            self.assertGreater(page.index(f'name="{name}"'), p2, name)
+        page = self.client.get(reverse("profiles:athlete_edit", args=[self.a1.pk])).content.decode()
+        self.assertNotIn("data-steps", page)
+        self.assertNotIn("Пропустить", page)
+        self.assertIn('<h2 class="h3 ps-card__h ps-card__h--in">Кто это</h2>', page)
+        self.assertIn('value="Смирнова"', page)
+
+    def test_form_variant_b_saves_validates_and_returns(self):
+        self.client.force_login(self.coach)
+        base = {"last_name": "Дудко", "first_name": "Леся", "birth_date": "2012-03-14", "rank": "none"}
+        r = self.client.post(reverse("profiles:athlete_new"), {**base, "fksr_number": "12"})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "field--error")
+        self.assertFalse(Athlete.objects.filter(last_name="Дудко").exists())
+        r = self.client.post(reverse("profiles:athlete_new"), {**base, "last_name": ""})
+        self.assertEqual(r.status_code, 200)
+        nxt = "/t/1/apply/"
+        r = self.client.post(reverse("profiles:athlete_new"), {**base, "next": nxt})
+        a = Athlete.objects.get(last_name="Дудко")
+        self.assertEqual(a.manager, self.coach)
+        self.assertRedirects(r, f"{nxt}?athlete={a.pk}#add", fetch_redirect_response=False)
+
+    def test_form_variant_b_foreign_and_guest(self):
+        edit = reverse("profiles:athlete_edit", args=[self.a1.pk])
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get(edit).status_code, 403)
+        self.assertEqual(self.client.post(edit, {"last_name": "Взлом", "first_name": "X", "birth_date": "2012-03-14", "rank": "none"}).status_code, 403)
+        self.client.logout()
+        self.assertEqual(self.client.get(edit).status_code, 302)
+        self.assertEqual(self.client.get(reverse("profiles:athlete_new")).status_code, 302)
+        self.a1.refresh_from_db()
+        self.assertEqual(self.a1.last_name, "Смирнова")
+
+    def test_detail_edit_is_pencil_for_manager_only(self):
+        """Тест 5.2, п. 50: «Изменить» — карандаш справа от имени; делегату, чужому и гостю — нет."""
+        url = reverse("profiles:athlete", args=[self.a1.pk])
+        edit = reverse("profiles:athlete_edit", args=[self.a1.pk])
+        self.client.force_login(self.coach)
+        page = self.client.get(url).content.decode()
+        self.assertIn(f'class="ps-ib ps-ib--o" href="{edit}" aria-label="Изменить сведения спортсмена"', page)
+        self.assertNotIn(">Изменить</a>", page)
+        AthleteDelegate.objects.create(athlete=self.a1, user=self.other, granted_by=self.coach)
+        self.client.force_login(self.other)
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, edit)
+        self.client.force_login(mkuser("+79990001791"))
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)
+
 
 @override_settings(MEDIA_ROOT=TMP)
 class MyHorsesScreenTests(Base):
@@ -44,12 +125,17 @@ class MyHorsesScreenTests(Base):
         Horse.objects.create(name="Пуговка", birth_year=2016, color="bay", sex="mare", breed="уэльский", manager=self.coach, is_pony=True)
         self.client.force_login(self.coach)
         page = self.client.get(reverse("profiles:horses")).content.decode()
-        self.assertIn("Все <small>3</small>", page)
-        self.assertIn("Мои <small>2</small>", page)
-        self.assertIn("С доступом <small>1</small>", page)
-        self.assertIn("Пони <small>1</small>", page)
+        # Тест 5.2, п. 54: без счётчиков после слов
+        self.assertIn('data-f="all" aria-pressed="true">Все</button>', page)
+        self.assertIn('data-f="mine" aria-pressed="false">Мои</button>', page)
+        self.assertIn('data-f="shared" aria-pressed="false">С доступом</button>', page)
+        self.assertIn('data-f="pony" aria-pressed="false">Пони</button>', page)
+        self.assertIn('<h1 class="h1 ps-h1">Мои лошади</h1>', page)
         self.assertIn("управляет Тест Юзер", page)
         self.assertIn('data-horse-filter', page)
+        # Тест 5.3, п. 41: поле поиска видно сразу, без кнопки-иконки
+        self.assertNotIn("data-ps-toggle", page)
+        self.assertNotIn("data-open", page)
         # документы в списке не показываем
         self.assertNotIn("Документ", page)
 
@@ -91,13 +177,14 @@ class HorseTabsTests(Base):
                              state=Offer.State.DECLINED, responded_at=timezone.now())
         self.client.force_login(self.coach)
         page = self.client.get(self.url("access")).content.decode()
-        self.assertIn("Ожидает подтверждения · 1", page)
+        self.assertIn(">Ожидает подтверждения</h3>", page)
         self.assertIn("+7 916 ***-**-45", page)
-        self.assertIn("Есть доступ · 1", page)
+        self.assertIn(">Есть доступ</h3>", page)
         self.assertIn("Закрыть доступ", page)
-        self.assertIn("Отклонено · 1", page)
+        self.assertIn(">Отклонено</h3>", page)
         self.assertIn("+7 903 ***-**-12", page)
-        self.assertIn("Доступ 2", page)
+        self.assertIn('aria-current="page">Доступ</a>', page)
+        self.assertNotIn("Доступ 2", page)
         self.assertIn("Отправить приглашение", page)
 
     def test_actions_return_to_tab(self):
@@ -118,7 +205,10 @@ class HorseTabsTests(Base):
         self.assertIn("Срок истёк", page)
         self.assertIn("Истекает", page)
         self.assertIn("Действует", page)
-        self.assertIn("Документы 3", page)
+        # Тест 5.2, п. 54: ни во вкладке, ни в заголовке нет числа документов
+        self.assertIn('aria-current="page">Документы</a>', page)
+        self.assertIn('<h2 class="h3 ps-h2">Документы</h2>', page)
+        self.assertNotIn("Документы 3", page)
         self.assertIn("Сохранить документ", page)
 
     def test_foreign_and_guest_get_info_only(self):
@@ -197,3 +287,18 @@ class HorseFormScreenTests(Base):
         self.assertIn("login", self.client.get(reverse("profiles:horse_new"))["Location"])
         self.client.force_login(self.other)
         self.assertEqual(self.client.post(reverse("profiles:horse_edit", args=[self.h1.pk]), self.data()).status_code, 403)
+
+
+class FksrSixDigitsTests(TestCase):
+    """Решение 26.10.2026: номер ФКСР — ровно 6 цифр."""
+
+    def test_validation(self):
+        from apps.profiles.forms import AthleteForm
+        from apps.profiles.models import fksr_valid
+
+        self.assertTrue(fksr_valid(""))
+        self.assertTrue(fksr_valid("000 700"))
+        self.assertFalse(fksr_valid("12345"))
+        self.assertFalse(fksr_valid("12345A"))
+        f = AthleteForm({"last_name": "Ким", "first_name": "Алина", "birth_date": "2012-03-04", "rank": "none", "fksr_number": "123"})
+        self.assertIn("fksr_number", f.errors)

@@ -27,7 +27,7 @@ class EndToEndTests(Base):
         # денники и услуги
         cat = StableCategory.objects.create(tournament=t, name="Конюшня", available_from=self.start - datetime.timedelta(days=1),
                                             available_to=self.start + datetime.timedelta(days=1), capacity=5)
-        sawdust = Service.objects.create(tournament=t, name="Опилки", unit="мешок")
+        sawdust = Service.objects.create(tournament=t, name="Опилки", unit="брикет")
         # групповая заявка тренера
         app = self.submit(self.coach, [es.Line(self.a1, self.h1, self.c_kids), es.Line(self.a2, self.h1, self.c_open)])
         e1, e2 = app.entries.order_by("pk")

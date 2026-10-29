@@ -22,6 +22,7 @@ urlpatterns = [
     path("organizer/t/<int:pk>/programs/<int:program_id>/classes/<int:class_id>/save/", views.class_save, name="class_save"),
     path("organizer/t/<int:pk>/programs/<int:program_id>/classes/<int:class_id>/delete/", views.class_delete, name="class_delete"),
     path("organizer/t/<int:pk>/delete/", views.delete, name="delete"),
+    path("organizer/t/<int:pk>/withdraw/", views.withdraw, name="withdraw"),
     path("organizer/t/<int:pk>/cancel/", views.cancel, name="cancel"),
     path("organizer/t/<int:pk>/regulation.pdf", views.regulation_working, name="regulation_working"),
     path("organizer/t/<int:pk>/team/", views.team, name="team"),

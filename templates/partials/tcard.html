@@ -1,0 +1,10 @@
+{# Карточка соревнования в списке — вариант A (тест 5.2, макет R3_02A); тест 5.3, п. 7 — ярче: цветной блок даты по состоянию приёма, цветные точки дисциплин, статус цветной плашкой. Параметр c — словарь _card() #}
+<a class="tcard tcard--{{ c.status_kind }}{% if c.t.publication == 'cancelled' %} is-cancelled{% endif %}" href="{% url 'tournaments:public' c.t.pk %}">
+  <span class="tcard__date tcard__date--{{ c.date_kind }}"><b class="num">{{ c.days }}</b><small>{{ c.date_sub }}</small></span>
+  <span class="tcard__body">
+    <span class="tcard__title">{{ c.t.pub_title }}</span>
+    <span class="tcard__sub">{{ c.venue.name }}{% for d in c.disciplines %}<span class="tcard__disc tcard__disc--{{ d.2|default:'lemon' }}">{{ d.1|lower }}</span>{% endfor %}</span>
+    <span class="tcard__st tcard__st--{{ c.status_kind }}">{{ c.status_text }}</span>
+  </span>
+  <span class="tcard__chev">{% include "partials/icon.html" with name="chevron-right" size=18 %}</span>
+</a>

@@ -111,10 +111,10 @@ class ProfileTests(Base):
 
     def test_horse_fksr_unique_and_similar_warning(self):
         self.client.force_login(self.coach)
-        data = {"name": "Гром", "birth_year": 2015, "color": "grey", "sex": "stallion", "breed": "орловская", "fksr_number": "ab 123"}
+        data = {"name": "Гром", "birth_year": 2015, "color": "grey", "sex": "stallion", "breed": "орловская", "fksr_number": "001 234"}
         self.client.post(reverse("profiles:horse_new"), data)
-        self.assertEqual(Horse.objects.get(name="Гром").fksr_number, "AB123")
-        resp = self.client.post(reverse("profiles:horse_new"), {**data, "name": "Гром-2", "fksr_number": "AB-123"})
+        self.assertEqual(Horse.objects.get(name="Гром").fksr_number, "001234")
+        resp = self.client.post(reverse("profiles:horse_new"), {**data, "name": "Гром-2", "fksr_number": "001-234"})
         self.assertContains(resp, "уже есть в сервисе")
         resp = self.client.post(reverse("profiles:horse_new"), {**data, "fksr_number": ""})
         self.assertContains(resp, "с такой кличкой и тем же годом рождения")
@@ -393,17 +393,17 @@ class UniqueNumbersTests(Base):
     """Решение 14.10.2026: дублей нет, если совпадают номера ФКСР или FEI."""
 
     def test_athlete_fksr_and_fei_unique(self):
-        self.a1.fksr_number, self.a1.fei_id = "rus 001", "10012345"
+        self.a1.fksr_number, self.a1.fei_id = "000 001", "10012345"
         self.a1.save()
         self.client.force_login(self.other)
         base = {"last_name": "Новая", "first_name": "Запись", "birth_date": "2000-01-01", "rank": "none"}
-        r = self.client.post(reverse("profiles:athlete_new"), {**base, "fksr_number": "RUS-001"})
+        r = self.client.post(reverse("profiles:athlete_new"), {**base, "fksr_number": "000-001"})
         self.assertContains(r, "уже есть в сервисе")
         r = self.client.post(reverse("profiles:athlete_new"), {**base, "fei_id": "10012345"})
         self.assertContains(r, "уже есть в сервисе")
         self.assertFalse(Athlete.objects.filter(last_name="Новая").exists())
-        self.client.post(reverse("profiles:athlete_new"), {**base, "fksr_number": "RUS-002", "fei_id": "10099999"})
-        self.assertTrue(Athlete.objects.filter(last_name="Новая", fksr_number="RUS002").exists())
+        self.client.post(reverse("profiles:athlete_new"), {**base, "fksr_number": "000-002", "fei_id": "10099999"})
+        self.assertTrue(Athlete.objects.filter(last_name="Новая", fksr_number="000002").exists())
 
     def test_horse_fei_unique(self):
         self.h1.fei_id = "104AB12"

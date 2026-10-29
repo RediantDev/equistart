@@ -5,7 +5,7 @@
 {% with f=form %}
 <div class="ps-screen ps-hform">
   <a class="ps-back" href="{% if next %}{{ next }}{% elif horse %}{% url 'profiles:horse' horse.pk %}{% else %}{% url 'profiles:horses' %}{% endif %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>{% if next %}Вернуться к заявке{% elif horse %}{{ horse.name }}{% else %}Мои лошади{% endif %}</a>
-  <h1 class="ps-h1">{% if horse %}Изменить лошадь{% else %}Новая лошадь{% endif %}</h1>
+  <h1 class="h1 ps-h1">{% if horse %}Изменить лошадь{% else %}Новая лошадь{% endif %}</h1>
   {% if not horse %}
   <ol class="ps-steps ps-js" aria-label="Шаги" data-steps-nav>
     <li class="ps-st" data-step-dot="1"><span class="ps-sn"><span class="ps-sn__n">1</span><svg class="ps-sn__ok" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Основное</li>
@@ -63,7 +63,7 @@
       </button>
       {% endif %}
       <div class="ps-card ps-card--form">
-        {% if horse %}<h2 class="ps-card__h ps-card__h--in">Дополнительно</h2>{% endif %}
+        {% if horse %}<h2 class="h3 ps-card__h ps-card__h--in">Дополнительно</h2>{% endif %}
         <div class="ps-extra" data-extra="sire">
           <div class="ps-extra__row">{% include "partials/field.html" with field=f.sire %}
             {% if not horse %}<button class="ps-ib ps-extra__x ps-js" type="button" aria-label="Убрать поле «Отец»" data-extra-off="sire"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>{% endif %}</div>

@@ -28,10 +28,14 @@
     toastBox().appendChild(t);
     requestAnimationFrame(function () { t.classList.add("is-in"); });
     function hide() { t.classList.remove("is-in"); setTimeout(function () { t.remove(); }, 250); }
+    t._hide = hide;
     x.onclick = hide;
     t.addEventListener("click", hide);
-    setTimeout(hide, kind === "error" ? 7000 : 4000);
+    // Тест 5.3, п. 33: текст ошибки — только в этом сообщении (в форме — подсветка поля), поэтому оно не исчезает само:
+    // закрывается нажатием или при следующей отправке/переходе
+    if (kind !== "error") setTimeout(hide, 4000);
   }
+  function clearErrorToasts() { document.querySelectorAll(".toast--error").forEach(function (t) { if (t._hide) t._hide(); }); }
   // Сообщения Django (успех/ошибка после действия) — всплывают поверх страницы
   function messagesToToasts(scope) {
     (scope || document).querySelectorAll(".messages .alert").forEach(function (a) {
@@ -46,16 +50,45 @@
     var l = f.querySelector("label, .field__label, legend");
     return l ? l.textContent.replace(/\s*(необязательно|обязательно)\s*$/i, "").trim() : "";
   }
-  function goToError() {
-    var err = document.querySelector(".field--error, form .alert--error, .form-errors");
-    if (!err || err.closest(".messages")) return false;
-    var name = err.classList.contains("field--error") ? fieldLabel(err) : "";
-    var msg = err.querySelector(".field__error");
-    if (name && name.length > 40) name = name.slice(0, 38) + "…";
-    var isClient = msg && msg.classList.contains("field__error--client");
-    toast(name ? "Проверьте поле «" + name + "»" + (msg && !isClient ? ": " + msg.textContent.replace(/^!\s*/, "").trim() : "") : (err.textContent.trim().slice(0, 140) || "Проверьте форму"), "error");
-    // Тест 5.1, п. 8: общая ошибка формы — только сообщением вверху, без дубля над полями
-    if (err.classList.contains("alert--error")) err.hidden = true;
+  // Тест 5.2, п. 34: ошибка после отправки видна сразу — сообщением поверх страницы и переходом к месту ошибки.
+  // Общая ошибка формы (.alert--error не у поля, вне .messages) — её текст во всплывающем сообщении;
+  // если есть и ошибки полей — переходим к первому полю.
+  function alertText(a) {
+    var items = a.querySelectorAll("li");
+    var t = items.length ? Array.prototype.map.call(items, function (li) { return li.textContent.trim(); }).join(" ") : a.textContent;
+    t = t.replace(/\s+/g, " ").trim();
+    return t.length > 220 ? t.slice(0, 218) + "…" : t;
+  }
+  // posted — страница/фрагмент — ответ на отправку формы без перенаправления (ошибка), тогда и общий блок ошибок вне формы
+  function goToError(scope, posted) {
+    scope = scope || document;
+    var field = null, inForm = null, outer = null;
+    scope.querySelectorAll(".field--error").forEach(function (f) { if (!field && !f.closest("[hidden]")) field = f; });
+    scope.querySelectorAll(".alert--error, .form-errors").forEach(function (a) {
+      if (a.closest(".messages") || a.hidden || a.closest("[hidden], template, .toasts")) return;
+      if (a.closest("form")) { inForm = inForm || a; } else if (posted) outer = outer || a;
+    });
+    var alert = inForm || (field ? null : outer);
+    var err = field || alert;
+    if (!err) return false;
+    var text;
+    // Тест 5.3, п. 33: одна ошибка — в одном месте. Текст — во всплывающем сообщении; общий блок ошибки в форме
+    // скрывается (не дублируется), у полей остаются красная рамка и короткая подпись поля.
+    if (alert) text = alertText(alert);
+    else {
+      var n = 0; scope.querySelectorAll(".field--error").forEach(function (f) { if (!f.closest("[hidden]")) n++; });
+      var name = fieldLabel(field);
+      if (name && name.length > 40) name = name.slice(0, 38) + "…";
+      text = n > 1 ? "Проверьте поля, отмеченные красным" : name ? "Проверьте поле «" + name + "»" : "Проверьте форму";
+    }
+    clearErrorToasts();
+    toast(text || "Проверьте форму", "error");
+    if (alert) {
+      scope.querySelectorAll(".alert--error, .form-errors").forEach(function (a) {
+        if (!a.closest(".messages") && alertText(a) === text) { a.hidden = true; a.setAttribute("data-toasted", ""); }
+      });
+      if (!field) err = alert.closest("form") || alert.parentElement;
+    }
     setTimeout(function () {
       err.scrollIntoView({ behavior: "smooth", block: "center" });
       var ctl = err.querySelector("input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, .sel__btn");
@@ -98,7 +131,11 @@
     if (f.classList.contains("is-busy")) { e.preventDefault(); e.stopImmediatePropagation(); return; }
     if (!f.hasAttribute("novalidate-client") && !precheck(f)) { e.preventDefault(); e.stopImmediatePropagation(); return; }
     // Обычная (не htmx) отправка: блокируем кнопки после того, как браузер взял значение нажатой
-    if (!f.hasAttribute("hx-boost") && !f.hasAttribute("hx-post")) setTimeout(function () { busy(f, true); }, 0);
+    if (!f.hasAttribute("hx-boost") && !f.hasAttribute("hx-post") && !f.hasAttribute("data-live")) {
+      setTimeout(function () { busy(f, true); }, 0);
+      if (!f.target) progStart();
+      if ((f.method || "").toLowerCase() === "post") { try { sessionStorage.setItem("sl-posted", JSON.stringify({ path: new URL(f.action || location.href, location.href).pathname, at: Date.now() })); } catch (err) {} }
+    }
   }, true);
   // Вернулись «Назад» из кэша браузера — кнопки снова активны
   window.addEventListener("pageshow", function (e) {
@@ -109,7 +146,7 @@
   function boostForms(scope) {
     if (!window.htmx) return;
     scope.querySelectorAll("form").forEach(function (f) {
-      if (f.hasAttribute("hx-boost") || f.hasAttribute("hx-post") || f.hasAttribute("hx-get") || f.hasAttribute("data-no-boost") || f.target) return;
+      if (f.hasAttribute("hx-boost") || f.hasAttribute("hx-post") || f.hasAttribute("hx-get") || f.hasAttribute("data-no-boost") || f.hasAttribute("data-live") || f.target) return;
       var action = f.getAttribute("action") || "";
       if (/^https?:/.test(action) && action.indexOf(location.origin) !== 0) return;
       f.setAttribute("hx-boost", "true");
@@ -122,18 +159,101 @@
     var t = document.querySelector("[name=csrfmiddlewaretoken]");
     if (t) e.detail.headers["X-CSRFToken"] = t.value;
   });
+
+  /* ---------- Полоса загрузки (тест 5.2, п. 3): только если ответ дольше ~150 мс ---------- */
+  var prog = null, progTimer = null, progN = 0, progHide = null;
+  function progEl() {
+    if (!prog || !document.documentElement.contains(prog)) {
+      prog = el("div", "nprog"); prog.setAttribute("aria-hidden", "true"); prog.appendChild(el("div", "nprog__bar"));
+      document.documentElement.appendChild(prog);  // вне body: замена body при переходе её не удаляет
+    }
+    return prog;
+  }
+  function progStart() {
+    progN++;
+    if (progTimer || (prog && prog.classList.contains("is-on"))) return;
+    progTimer = setTimeout(function () {
+      progTimer = null;
+      var p = progEl(); clearTimeout(progHide);
+      p.classList.remove("is-done"); void p.offsetWidth; p.classList.add("is-on");
+    }, 150);
+  }
+  function progDone(all) {
+    progN = all ? 0 : Math.max(0, progN - 1);
+    if (progN) return;
+    clearTimeout(progTimer); progTimer = null;
+    if (prog && prog.classList.contains("is-on")) {
+      prog.classList.add("is-done"); prog.classList.remove("is-on");
+      progHide = setTimeout(function () { prog.classList.remove("is-done"); }, 500);
+    }
+  }
+  window.addEventListener("pageshow", function () { progDone(true); });
+  // Загрузка файлов: полоса показывает, сколько отправлено (тест 5.3, п. 19)
+  document.addEventListener("htmx:xhr:progress", function (e) {
+    var d = e.detail; if (!d || !d.lengthComputable || !d.total || d.total < 200000) return;
+    var p = progEl(), bar = p.firstChild; clearTimeout(progTimer); progTimer = null;
+    p.classList.remove("is-done"); p.classList.add("is-on");
+    bar.style.transition = "transform .2s"; bar.style.transform = "scaleX(" + Math.min(.95, d.loaded / d.total) + ")";
+  });
+  document.addEventListener("htmx:afterRequest", function () { var b = prog && prog.firstChild; if (b) { b.style.transition = ""; b.style.transform = ""; } });
+  // Обычный переход по ссылке или отправка формы без htmx — та же полоса
+  document.addEventListener("click", function (e) {
+    if (e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest && e.target.closest("a[href]");
+    if (!a || a.target || a.hasAttribute("download") || a.hasAttribute("hx-get") || a.hasAttribute("hx-boost") || a.hasAttribute("data-share")) return;
+    var href = a.getAttribute("href") || "";
+    if (!href || href.charAt(0) === "#" || /^(mailto|tel|viber|javascript):/i.test(href)) return;
+    if (a.origin && a.origin !== location.origin) return;
+    if (a.pathname === location.pathname && a.search === location.search && a.hash) return;
+    progStart();
+    setTimeout(function () { progDone(true); }, 15000);  // файл скачался, страница осталась — полоса уходит
+  });
+  function background(elt) {
+    var trig = (elt && elt.getAttribute && elt.getAttribute("hx-trigger")) || "";
+    return /every|load|revealed|intersect/.test(trig) || (elt && elt.closest && elt.closest("[data-no-progress]"));
+  }
+
+  /* ---------- Часть страницы меняется без «прыжков» (тест 5.2, п. 16, 18) ---------- */
+  var swapCtx = null;
+  function anchorOf(elt, box) {
+    // Опора — блок, в котором нажали (вкладки, дни, маршруты), или вкладки раздела
+    var c = elt.closest("[data-swap]");
+    var key = c && (c.id ? "#" + c.id : (c.getAttribute("aria-label") ? '[aria-label="' + c.getAttribute("aria-label").replace(/"/g, "") + '"]' : null));
+    return { key: key, tabs: box.querySelector(".tabs--sticky") ? ".tabs--sticky" : null, el: c };
+  }
+  function maxScroll() { return Math.max(0, document.documentElement.scrollHeight - window.innerHeight); }
+  // iOS Safari: если документ стал короче текущей прокрутки, фиксированные панели «всплывают» и под нижним меню
+  // появляется пустая полоса. Прокрутку всегда возвращаем в пределы документа.
+  function clampScroll() { var m = maxScroll(); if (window.scrollY > m) window.scrollTo(0, m); }
+  function samePath(a, b) { try { return new URL(a, location.href).pathname === new URL(b, location.href).pathname; } catch (err) { return false; } }
+  function wasPosted(d) {
+    var rc = d.requestConfig || {}, xhr = d.xhr;
+    return (rc.verb || "").toLowerCase() === "post" && xhr && xhr.responseURL ? samePath(xhr.responseURL, rc.path || location.href) : false;
+  }
+
   document.addEventListener("htmx:beforeRequest", function (e) {
-    var f = e.detail.elt && e.detail.elt.closest ? e.detail.elt.closest("form") : null;
+    var elt = e.detail.elt, f = elt && elt.closest ? elt.closest("form") : null;
+    if (f || e.detail.boosted) clearErrorToasts();
+    if (!background(elt)) { e.detail.xhr._sl = true; progStart(); }
     if (e.detail.boosted) {
       before = { path: location.pathname, y: window.scrollY };
       if (f) busy(f, true);
-      document.documentElement.classList.add("is-loading");
+      swapCtx = null;
+      return;
     }
+    var sel = elt && elt.getAttribute && elt.getAttribute("hx-target");
+    var box = sel && elt.closest("[data-swap]") ? document.querySelector(sel) : null;
+    if (box) {
+      var an = anchorOf(elt, box), ref = an.el && document.contains(an.el) ? an.el : (an.tabs ? box.querySelector(an.tabs) : box);
+      swapCtx = { sel: sel, an: an, top: ref.getBoundingClientRect().top };
+      box.classList.add("is-swapping");
+    } else swapCtx = null;
   });
   document.addEventListener("htmx:afterRequest", function (e) {
     var f = e.detail.elt && e.detail.elt.closest ? e.detail.elt.closest("form") : null;
     if (f && document.contains(f)) busy(f, false);
-    document.documentElement.classList.remove("is-loading");
+    if (e.detail.xhr && e.detail.xhr._sl) progDone();
+    if (swapCtx && !e.detail.successful) { var b = document.querySelector(swapCtx.sel); if (b) b.classList.remove("is-swapping"); swapCtx = null; }
     if (e.detail.failed && !e.detail.xhr.status) toast("Нет связи с сервером. Проверьте интернет и повторите.", "error");
   });
   document.addEventListener("htmx:beforeSwap", function (e) {
@@ -143,17 +263,66 @@
     if (xhr.status >= 400 && xhr.status < 500 && ct.indexOf("text/html") >= 0) { e.detail.shouldSwap = true; e.detail.isError = false; }
     if (xhr.status >= 500) { e.detail.shouldSwap = false; toast("Что-то пошло не так на сервере. Мы уже знаем — попробуйте ещё раз через минуту.", "error"); }
   });
-  document.addEventListener("htmx:afterSettle", function (e) {
-    if (!e.detail.boosted) return;
-    afterPage();
-    if (goToError()) return;
-    if (location.hash.length > 1) {
-      var t = document.getElementById(location.hash.slice(1));
-      if (t) { t.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+  // Прокрутка — сразу после замены, в том же кадре: страница не успевает «прыгнуть»
+  document.addEventListener("htmx:afterSwap", function (e) {
+    if (e.detail.boosted) {
+      var to = e.detail.xhr && e.detail.xhr.responseURL ? e.detail.xhr.responseURL : location.href;
+      if (before && samePath(to, before.path)) window.scrollTo(0, Math.min(before.y, maxScroll()));
+      else window.scrollTo(0, 0);
+      document.documentElement.classList.remove("is-loading");
+      return;
     }
-    if (before && before.path === location.pathname) window.scrollTo(0, before.y);
-    else window.scrollTo(0, 0);
+    var ctx = swapCtx; swapCtx = null;
+    if (!ctx) { clampScroll(); return; }
+    var box = document.querySelector(ctx.sel);
+    if (!box) { clampScroll(); return; }
+    box.classList.remove("is-swapping");
+    var ref = (ctx.an.key && box.querySelector(ctx.an.key)) || (ctx.an.tabs && box.querySelector(ctx.an.tabs));
+    if (ref) {
+      // Опорный блок (вкладки) остаётся на том же месте экрана; если места нет — плавно доезжает
+      var now = ref.getBoundingClientRect().top;
+      window.scrollTo(0, Math.max(0, Math.min(maxScroll(), window.scrollY + now - ctx.top)));
+      var left = ref.getBoundingClientRect().top - ctx.top;
+      if (Math.abs(left) > 2 && ref.animate) ref.animate([{ transform: "translateY(" + (-left) + "px)" }, { transform: "none" }], { duration: 220, easing: "cubic-bezier(.2,.7,.2,1)" });
+    } else {
+      var bar = document.querySelector(".topbar"), off = bar ? bar.getBoundingClientRect().bottom : 60, top = box.getBoundingClientRect().top;
+      if (top < off) window.scrollTo(0, window.scrollY + top - off);
+      clampScroll();
+    }
+    box.classList.add("swap-in");
+    box.addEventListener("animationend", function () { box.classList.remove("swap-in"); }, { once: true });
   });
+  document.addEventListener("htmx:afterSettle", function (e) {
+    // Событие приходит на каждый заменённый элемент (в т.ч. hx-select-oob) — обрабатываем ответ один раз
+    var xhr = e.detail.xhr;
+    if (xhr) { if (xhr._slSettled) return; xhr._slSettled = true; }
+    var posted = wasPosted(e.detail);
+    if (e.detail.boosted) {
+      afterPage();
+      clampScroll();
+      if (goToError(document, posted)) return;
+      if (location.hash.length > 1) {
+        var t = document.getElementById(location.hash.slice(1));
+        if (t) t.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      return;
+    }
+    var a = e.detail.requestConfig && e.detail.requestConfig.elt;
+    var box = a && a.getAttribute ? document.querySelector(a.getAttribute("hx-target") || "x") : null;
+    if (box) afterPage(box);
+    clampScroll();
+    if (posted) goToError(box || e.detail.target || document, true);
+  });
+  window.addEventListener("resize", clampScroll);
+
+  /* ---------- Без масштабирования страницы (тест 5.2, п. 9) ---------- */
+  // iOS Safari не выполняет user-scalable=no — щипок и масштаб жестом гасим сами
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) { if (e.scale !== undefined && e.scale !== 1) e.preventDefault(); }, { passive: false });
+  // Без этого iOS не показывает состояние :active при нажатии
+  document.addEventListener("touchstart", function () {}, { passive: true });
 
   /* ---------- Часть страницы: вкладки, даты, маршруты, езды ---------- */
   function swapLinks(scope) {
@@ -171,27 +340,12 @@
         a.setAttribute("hx-get", a.getAttribute("href"));
         a.setAttribute("hx-select", target);
         a.setAttribute("hx-target", target);
-        a.setAttribute("hx-swap", "outerHTML transition:true show:none");
+        a.setAttribute("hx-swap", "outerHTML show:none");  // без View Transition: в iOS Safari оставляла фиксированные панели не на месте
         a.setAttribute("hx-push-url", "true");
         htmx.process(a);
       });
     });
   }
-  document.addEventListener("htmx:afterSettle", function (e) {
-    if (e.detail.boosted) return;
-    var a = e.detail.requestConfig && e.detail.requestConfig.elt;
-    if (!a || !a.closest) return;
-    var box = document.querySelector(a.getAttribute("hx-target") || "x");
-    if (box) {
-      afterPage(box);
-      // Вкладки остаются под шапкой: начало раздела — сразу под ними, без прыжков (тест 5.1, п. 4.1)
-      var bar = document.querySelector(".topbar");
-      var off = bar ? bar.getBoundingClientRect().bottom : 60;
-      var top = box.getBoundingClientRect().top;
-      if (top < off) window.scrollTo({ top: window.scrollY + top - off, behavior: "auto" });
-    }
-  });
-
   /* ---------- Поделиться ---------- */
   // Знаки мессенджеров и соцсетей (тест 5.1, п. 3.2)
   var LOGOS = {
@@ -212,7 +366,7 @@
       ["Одноклассники", "https://connect.ok.ru/offer?url=" + enc + "&title=" + txt, "ok"],
       ["Почта", "mailto:?subject=" + txt + "&body=" + txt + "%0A" + enc, "mail"]
     ];
-    var back = el("div", "sheet"), box = el("div", "sheet__box");
+    var back = el("div", "sheet sheet--modal"), box = el("div", "sheet__box");
     box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "Поделиться");
     box.appendChild(el("div", "sheet__grip"));
     box.appendChild(el("p", "sheet__title", "Поделиться"));
@@ -305,10 +459,54 @@
     });
   }
 
+  /* ---------- Поиск по мере ввода (тест 5.3, п. 6, 26): form[data-live="#список,#…"] ----------
+     Ввод — запрос через ~300 мс, Enter и «Применить» — сразу; меняются только блоки из data-live, адрес — без перезагрузки. */
+  var liveSeq = 0;
+  function liveUrl(f) {
+    var u = new URL(f.getAttribute("action") || location.pathname, location.href), fd = new FormData(f);
+    fd.forEach(function (v, k) { if (typeof v === "string" && v.trim() !== "") u.searchParams.append(k, v.trim()); });
+    return u.pathname + (u.searchParams.toString() ? "?" + u.searchParams.toString() : "");
+  }
+  function liveLoad(f) {
+    var url = liveUrl(f), seq = ++liveSeq, sels = (f.getAttribute("data-live") || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+    progStart();
+    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" }, credentials: "same-origin" }).then(function (r) { return r.text(); }).then(function (html) {
+      progDone();
+      if (seq !== liveSeq) return;  // пришёл ответ на устаревший запрос
+      var doc = new DOMParser().parseFromString(html, "text/html");
+      sels.forEach(function (sel) {
+        var old = document.querySelector(sel), neu = doc.querySelector(sel);
+        if (!old || !neu) return;
+        if (old.tagName === "SCRIPT") { old.textContent = neu.textContent; return; }
+        var imp = document.importNode(neu, true);
+        old.replaceWith(imp);
+        if (window.htmx) htmx.process(imp);
+        if (window.SL && SL.init) SL.init(imp);
+        afterPage(imp);
+      });
+      try { history.replaceState(history.state, "", url); } catch (err) {}
+      clampScroll();
+      f.dispatchEvent(new CustomEvent("live:updated", { bubbles: true, detail: { url: url } }));
+    }, function () { progDone(); toast("Нет связи с сервером. Проверьте интернет и повторите.", "error"); });
+  }
+  document.addEventListener("input", function (e) {
+    var i = e.target, f = i.form;
+    if (!f || !f.hasAttribute("data-live") || !i.matches || !i.matches("input[type=search], input[type=text]")) return;
+    clearTimeout(f._live); f._live = setTimeout(function () { liveLoad(f); }, 300);
+  });
+  document.addEventListener("submit", function (e) {
+    var f = e.target;
+    if (!f.hasAttribute || !f.hasAttribute("data-live")) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    clearTimeout(f._live); liveLoad(f);
+    f.querySelectorAll("details[open]").forEach(function (d) { d.removeAttribute("open"); });
+    var a = document.activeElement; if (a && a.type === "search" && TOUCH) a.blur();  // Enter на телефоне — убрать клавиатуру
+  });
+
   /* Стёрли запрос — список сразу обновляется (тест 5.1, п. 16) */
   document.addEventListener("input", function (e) {
     var i = e.target;
-    if (!i.matches || !i.matches('form[role=search] input[type=search]') || i.value !== "") return;
+    if (!i.matches || !i.matches('form[role=search] input[type=search]') || i.value !== "" || (i.form && i.form.hasAttribute("data-live"))) return;
     var params = new URLSearchParams(location.search);
     if (!params.get(i.name)) return;
     clearTimeout(i._clr);
@@ -398,6 +596,8 @@
       var initial = state();
       function sync() { var same = state() === initial; btn.disabled = same; btn.classList.toggle("is-inactive", same); }
       d.addEventListener("change", sync); d.addEventListener("input", sync); sync();
+      var lf = d.closest("form[data-live]");  // применили без перезагрузки — новое состояние становится исходным
+      if (lf) lf.addEventListener("live:updated", function () { initial = state(); sync(); });
     });
   }
 
@@ -440,6 +640,9 @@
   window.SL.share = shareSheet;
   document.addEventListener("DOMContentLoaded", function () {
     afterPage(document);
-    if (!document.querySelector(".messages .alert--error")) goToError();
+    var nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0], posted = false;
+    try { var ps = JSON.parse(sessionStorage.getItem("sl-posted") || "null"); sessionStorage.removeItem("sl-posted");
+      posted = !!ps && ps.path === location.pathname && Date.now() - ps.at < 30000 && !(nav && nav.redirectCount); } catch (err) {}
+    if (!document.querySelector(".messages .alert--error")) goToError(document, posted);
   });
 })();

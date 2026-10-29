@@ -16,7 +16,6 @@
   // Телефон: календарь и списки открываются без клавиатуры (тест 5, п. 13.1, 21.3)
   var TOUCH = window.matchMedia && matchMedia("(pointer: coarse)").matches;
   function focusSoft(x) { if (!TOUCH && x) x.focus(); }
-  function toTop(root) { if (window.innerWidth < 720) root.scrollIntoView({ behavior: "smooth", block: "start" }); }
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -45,8 +44,59 @@
     if (openPopup) { openPopup.close(); openPopup = null; }
   }
   document.addEventListener("mousedown", function (e) {
-    if (openPopup && !openPopup.root.contains(e.target)) closePopup();
+    if (openPopup && !openPopup.root.contains(e.target) && !(openPopup.host && openPopup.host.contains(e.target))) closePopup();
   });
+
+  /* Тест 5.2, п. 58, 60, 63: список и календарь не уходят за экран.
+     Телефон, а также поле внутри шторки/окна (контейнер обрезает содержимое) — отдельной шторкой снизу (.uisheet);
+     компьютер — выпадающей панелью вниз или вверх, где больше места, высота списка — по доступному месту. */
+  function asSheet(root) {
+    if (window.innerWidth < 720) return true;
+    for (var n = root.parentElement; n && n !== document.body; n = n.parentElement) {
+      var cs = getComputedStyle(n);
+      if (cs.position === "fixed" || /(auto|scroll|hidden)/.test(cs.overflowY + cs.overflowX)) return true;
+    }
+    return false;
+  }
+  function fieldTitle(root) {
+    var ctl = root.querySelector("[id]"), l = ctl ? document.querySelector('label[for="' + ctl.id + '"]') : null;
+    var f = root.closest(".field, .ps-f");
+    if (!l && f) l = f.querySelector("label, .field__label, .ps-f__l, legend");
+    return l ? l.textContent.replace(/\s*(необязательно|обязательно)\s*$/i, "").trim() : "";
+  }
+  // Свободное место над и под элементом: без шапки сверху и нижнего меню/закреплённых панелей снизу
+  function room(r) {
+    var vv = window.visualViewport, h = vv ? vv.height : window.innerHeight;
+    var bar = document.querySelector(".topbar"), top = bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+    var bn = document.querySelector(".bnav"), bottom = h;
+    if (bn && getComputedStyle(bn).display !== "none") bottom = Math.min(bottom, bn.getBoundingClientRect().top);
+    return { below: bottom - r.bottom - 12, above: r.top - top - 12 };
+  }
+  function openSheet(pop, title, onClose) {
+    var back = el("div", "uisheet"), box = el("div", "uisheet__box");
+    box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true");
+    if (title) box.setAttribute("aria-label", title);
+    box.appendChild(el("div", "sheet__grip"));
+    var head = el("div", "uisheet__head"), x = el("button", "uisheet__x", "×");
+    x.type = "button"; x.setAttribute("aria-label", "Закрыть"); x.addEventListener("click", onClose);
+    head.appendChild(el("span", "uisheet__title", title || "Выберите")); head.appendChild(x);
+    box.appendChild(head); box.appendChild(pop); back.appendChild(box);
+    document.body.appendChild(back);
+    back.addEventListener("click", function (e) { if (e.target === back) onClose(); });
+    // Прокручивается только список внутри шторки, страница под ней — нет
+    back.addEventListener("touchmove", function (e) {
+      var sc = e.target.closest && e.target.closest(".sel__list");
+      if (!sc || sc.scrollHeight <= sc.clientHeight) e.preventDefault();
+    }, { passive: false });
+    requestAnimationFrame(function () { back.classList.add("is-open"); });
+    return { back: back, box: box };
+  }
+  function closeSheet(sh, pop, root) {
+    if (!sh) return;
+    root.appendChild(pop);
+    sh.back.classList.remove("is-open");
+    setTimeout(function () { sh.back.remove(); }, 180);
+  }
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePopup(); });
 
   function placeholderFor(input) {
@@ -134,26 +184,39 @@
       i = Math.max(0, Math.min(vis.length - 1, i));
       items.forEach(function (li) { li.classList.remove("is-active"); });
       vis[i].classList.add("is-active");
-      vis[i].scrollIntoView({ block: "nearest" });
+      var ul = vis[i].parentNode, o = vis[i].offsetTop - ul.offsetTop;  // прокручиваем только список, не страницу
+      if (o < ul.scrollTop) ul.scrollTop = o;
+      else if (o + vis[i].offsetHeight > ul.scrollTop + ul.clientHeight) ul.scrollTop = o + vis[i].offsetHeight - ul.clientHeight;
       active = i;
     }
+    var sheet = null;
     function open() {
       if (btn.disabled) return;
       closePopup();
       build();
       pop.hidden = false;
       root.classList.add("is-open");
-      var r = btn.getBoundingClientRect();
-      if (window.innerWidth < 720) { root.classList.remove("is-up"); if (window.innerHeight - r.bottom < 300) toTop(root); }  // тест 5, п. 15.1: поле поднимается, список — под ним
-      else root.classList.toggle("is-up", window.innerHeight - r.bottom < 280 && r.top > 300);
-      openPopup = { root: root, close: close };
+      var list = pop.querySelector(".sel__list");
+      if (asSheet(root)) {
+        sheet = openSheet(pop, fieldTitle(root) || btn.getAttribute("aria-label") || "", close);
+        list.style.maxHeight = "";
+      } else {
+        var r = btn.getBoundingClientRect(), sp = room(r);
+        var extra = (filter ? 52 : 0) + 14;  // поиск и отступы панели
+        var want = Math.min(360, list.scrollHeight) + extra;
+        var up = sp.below < want && sp.above > sp.below;
+        root.classList.toggle("is-up", up);
+        list.style.maxHeight = Math.max(140, Math.min(360, (up ? sp.above : sp.below) - extra)) + "px";
+      }
+      openPopup = { root: root, close: close, host: sheet && sheet.box };
       var vis = items.filter(function (li) { return !li.hidden; });
       highlight(Math.max(0, vis.indexOf(items[sel.selectedIndex])));
       if (filter) focusSoft(filter);
     }
     function close() {
       pop.hidden = true;
-      root.classList.remove("is-open");
+      root.classList.remove("is-open", "is-up");
+      if (sheet) { closeSheet(sheet, pop, root); sheet = null; }
       if (openPopup && openPopup.root === root) openPopup = null;
     }
     function keys(e) {
@@ -186,7 +249,10 @@
     var vis = el("input", "dp__input");
     vis.type = "text";
     vis.autocomplete = "off";
-    vis.inputMode = "numeric";
+    // Тест 5.2, п. 60: на телефоне дата выбирается только календарём — без клавиатуры
+    var typing = !TOUCH && window.innerWidth >= 720;
+    vis.inputMode = typing ? "numeric" : "none";
+    if (!typing) vis.readOnly = true;
     if (input.id) { vis.id = input.id; input.removeAttribute("id"); }
     vis.placeholder = placeholderFor(input) || "выберите дату";
     if (input.getAttribute("aria-describedby")) vis.setAttribute("aria-describedby", input.getAttribute("aria-describedby"));
@@ -263,24 +329,39 @@
       }
       pop.appendChild(foot);
     }
+    var sheet = null;
     function open() {
+      if (!pop.hidden) return;
       closePopup();
       view = parseIso(input.value) || new Date();
       view = new Date(view.getFullYear(), view.getMonth(), 1);
       render();
       pop.hidden = false;
       root.classList.add("is-open");
-      openPopup = { root: root, close: close };
-      var r = root.getBoundingClientRect();
-      if (window.innerHeight - r.bottom < 360) toTop(root);
+      if (asSheet(root)) {
+        if (document.activeElement === vis) vis.blur();
+        sheet = openSheet(pop, fieldTitle(root) || "Дата", close);
+      } else {
+        // Панель — в пределах экрана: вправо/влево и вверх/вниз по свободному месту
+        var r = root.getBoundingClientRect(), sp = room(r), w = pop.offsetWidth || 304, h = pop.offsetHeight || 380;
+        root.classList.toggle("is-right", r.left + w > document.documentElement.clientWidth - 8 && r.right - w >= 8);
+        root.classList.toggle("is-up", sp.below < h && sp.above > sp.below);
+      }
+      openPopup = { root: root, close: close, host: sheet && sheet.box };
     }
-    function close() { pop.hidden = true; root.classList.remove("is-open"); if (openPopup && openPopup.root === root) openPopup = null; }
+    function close() {
+      pop.hidden = true;
+      root.classList.remove("is-open", "is-up", "is-right");
+      if (sheet) { closeSheet(sheet, pop, root); sheet = null; }
+      if (openPopup && openPopup.root === root) openPopup = null;
+    }
     vis.addEventListener("click", open);
-    icon.addEventListener("click", function () { if (pop.hidden) { open(); focusSoft(vis); } else close(); });
+    icon.addEventListener("click", function () { if (pop.hidden) { open(); if (!sheet) focusSoft(vis); } else close(); });
     vis.addEventListener("keydown", function (e) { if (e.key === "ArrowDown") { e.preventDefault(); open(); } if (e.key === "Enter") { e.preventDefault(); vis.blur(); } });
-    vis.addEventListener("focus", function () { var d = parseIso(input.value); if (d) vis.value = pad(d.getDate()) + "." + pad(d.getMonth() + 1) + "." + d.getFullYear(); });
+    vis.addEventListener("focus", function () { if (!typing) return; var d = parseIso(input.value); if (d) vis.value = pad(d.getDate()) + "." + pad(d.getMonth() + 1) + "." + d.getFullYear(); });
     // Тест 5.1, п. 22.6: при вводе с клавиатуры точки ставятся сами — дд.мм.гггг
-    vis.placeholder = vis.placeholder === "Необязательно" || !vis.placeholder ? "дд.мм.гггг" : vis.placeholder;
+    if (typing) vis.placeholder = vis.placeholder === "Необязательно" || !vis.placeholder ? "дд.мм.гггг" : vis.placeholder;
+    else if (vis.placeholder === "Необязательно") vis.placeholder = "выберите дату";
     vis.addEventListener("input", function (e) {
       if (e.inputType && e.inputType.indexOf("delete") === 0) return;
       var d = vis.value.replace(/\D/g, "").slice(0, 8), out = d.slice(0, 2);
@@ -289,6 +370,7 @@
       vis.value = out;
     });
     vis.addEventListener("blur", function () {
+      if (!typing) return;
       var raw = vis.value.trim();
       if (!raw) { set(null); return; }
       var d = parseRu(raw);
@@ -308,6 +390,9 @@
     vis.autocomplete = "off";
     vis.inputMode = "numeric";
     vis.placeholder = placeholderFor(input) || "чч:мм";
+    // Тест 6, п. 13: на телефоне время выбирается только в окне — клавиатура не открывается и не закрывает окно
+    var touch = TOUCH || window.innerWidth < 720;
+    if (touch) { vis.readOnly = true; vis.inputMode = "none"; vis.classList.add("tp__input--pick"); }
     if (input.id) { vis.id = input.id; input.removeAttribute("id"); }
     input.type = "hidden";
     root.appendChild(vis);
@@ -339,22 +424,37 @@
       for (var m = 0; m < 60; m += 5) (function (m) {
         var b = el("button", "tp__cell", pad(m)); b.type = "button";
         if (c[1] === m) b.classList.add("is-selected");
-        b.onclick = function () { set(c[0] === null ? 10 : c[0], m); close(); focusSoft(vis); };
+        b.onclick = function () { set(c[0] === null ? 10 : c[0], m); close(); if (!touch) focusSoft(vis); };
         mg.appendChild(b);
       })(m);
       hc.appendChild(hg); mc.appendChild(mg);
       cols.appendChild(hc); cols.appendChild(mc);
       pop.appendChild(cols);
       var foot = el("div", "dp__foot");
-      var hint = el("span", "tp__hint", "Можно ввести вручную, например 9:40");
-      foot.appendChild(hint);
+      if (!touch) foot.appendChild(el("span", "tp__hint", "Можно ввести вручную, например 9:40"));
+      else { var ok = el("button", "btn btn--primary btn--sm", "Готово"); ok.type = "button"; ok.onclick = function () { close(); }; foot.appendChild(ok); }
       if (!input.required) { var clear = el("button", "dp__link", "Очистить"); clear.type = "button"; clear.onclick = function () { set(null); close(); }; foot.appendChild(clear); }
       pop.appendChild(foot);
     }
-    function open() { closePopup(); render(); pop.hidden = false; root.classList.add("is-open"); openPopup = { root: root, close: close }; }
-    function close() { pop.hidden = true; root.classList.remove("is-open"); if (openPopup && openPopup.root === root) openPopup = null; }
+    var sheet = null;
+    function open() {
+      if (!pop.hidden) return;
+      closePopup(); render(); pop.hidden = false; root.classList.add("is-open");
+      if (asSheet(root)) sheet = openSheet(pop, fieldTitle(root) || "Время", close);
+      else {
+        var r = root.getBoundingClientRect(), sp = room(r);
+        root.classList.toggle("is-right", r.left + pop.offsetWidth > document.documentElement.clientWidth - 8 && r.right - pop.offsetWidth >= 8);
+        root.classList.toggle("is-up", sp.below < pop.offsetHeight && sp.above > sp.below);
+      }
+      openPopup = { root: root, close: close, host: sheet && sheet.box };
+    }
+    function close() {
+      pop.hidden = true; root.classList.remove("is-open", "is-up", "is-right");
+      if (sheet) { closeSheet(sheet, pop, root); sheet = null; }
+      if (openPopup && openPopup.root === root) openPopup = null;
+    }
     vis.addEventListener("click", open);
-    vis.addEventListener("focus", function () { setTimeout(function () { vis.select(); }, 0); });  // ввод заменяет «23:59», а не дописывается
+    vis.addEventListener("focus", function () { if (touch) { open(); return; } setTimeout(function () { vis.select(); }, 0); });  // ввод заменяет «23:59», а не дописывается
     icon.addEventListener("click", function () { if (pop.hidden) { open(); focusSoft(vis); } else close(); });
     vis.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); vis.blur(); close(); } });
     vis.addEventListener("blur", function () {
@@ -386,21 +486,33 @@
     accept.split(",").forEach(function (a) { var h = map[a.trim().toLowerCase()]; if (h && out.indexOf(h) < 0) out.push(h); });
     return out.join(", ");
   }
+  // Тест 6, пп. 5, 20, 21: выбор файла — плитка «+». Фото — плитки в сетке, файл — карточка
+  // с именем, размером и корзиной. data-autosubmit — отправить форму сразу после выбора.
   function enhanceFile(input) {
     if (input.dataset.ui) return;
     input.dataset.ui = "1";
-    var root = el("div", "file");
+    var imgOnly = /^(image\/|\.(jpe?g|png|webp|heic))/i.test((input.accept || "").trim()) && !/pdf/i.test(input.accept || "");
+    var root = el("div", "file " + (imgOnly ? "file--tiles" : "file--doc"));
     input.parentNode.insertBefore(root, input);
     root.appendChild(input);
     input.classList.add("file__native");
-    var imgOnly = /^(image\/|\.(jpe?g|png|webp|heic))/i.test((input.accept || "").trim()) && !/pdf/i.test(input.accept || "");
-    var btn = el("label", "btn btn--ghost btn--sm file__btn", input.multiple ? (imgOnly ? "Добавить фото" : "Выбрать файлы") : (imgOnly ? "Выбрать фото" : "Выбрать файл"));
     if (!input.id) input.id = "f" + Math.random().toString(36).slice(2);
-    btn.setAttribute("for", input.id);
-    var name = el("span", "file__name", input.multiple ? "Файлы не выбраны" : "Файл не выбран");
-    var clear = el("button", "file__clear", "×"); clear.type = "button"; clear.hidden = true; clear.setAttribute("aria-label", "Убрать файл");
+    var label = input.getAttribute("data-plus-label") || (imgOnly ? "Фото" : (/pdf/i.test(input.accept || "") ? "Файл PDF" : "Файл"));
     var thumbs = el("div", "file__thumbs"); thumbs.hidden = true;
-    root.appendChild(btn); root.appendChild(name); root.appendChild(clear); root.appendChild(thumbs);
+    var plus = el("label", "file__plus");
+    plus.setAttribute("for", input.id);
+    plus.innerHTML = '<span class="file__plus-ico" aria-hidden="true">+</span>';
+    plus.appendChild(el("span", "file__plus-text", label));
+    var card = el("div", "file__card"); card.hidden = true;
+    var cardIco = el("span", "file__card-ico", "PDF"); cardIco.setAttribute("aria-hidden", "true");
+    var cardTxt = el("span", "file__card-txt");
+    var name = el("span", "file__name"), meta = el("span", "file__meta");
+    cardTxt.appendChild(name); cardTxt.appendChild(meta);
+    var clear = el("button", "file__clear"); clear.type = "button"; clear.setAttribute("aria-label", "Убрать файл");
+    clear.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
+    card.appendChild(cardIco); card.appendChild(cardTxt); card.appendChild(clear);
+    if (imgOnly) { thumbs.appendChild(plus); root.appendChild(thumbs); thumbs.hidden = false; }
+    else { root.appendChild(plus); root.appendChild(card); }
     var err = el("p", "field__error"); err.hidden = true; err.setAttribute("role", "alert"); root.appendChild(err);
     function size(f) { return f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + " КБ" : (f.size / 1048576).toFixed(1).replace(".", ",") + " МБ"; }
     function removeAt(idx) {
@@ -409,7 +521,7 @@
         Array.prototype.forEach.call(input.files, function (f, i) { if (i !== idx) dt.items.add(f); });
         input.files = dt.files;
       } catch (e) { input.value = ""; }
-      sync(); fire(input, "change");
+      fire(input, "change");
     }
     function sync() {
       var files = Array.prototype.slice.call(input.files || []);
@@ -422,30 +534,37 @@
       err.innerHTML = bad ? '<span aria-hidden="true">!</span> ' : ""; err.appendChild(document.createTextNode(bad)); err.hidden = !bad;
       var f0 = root.closest(".field"); if (f0) f0.classList.toggle("field--error", !!bad);
       if (bad) { input.value = ""; files = []; if (window.SL && SL.toast) SL.toast(bad, "error"); }
-      thumbs.innerHTML = "";
-      var imgs = files.filter(function (f) { return /^image\//.test(f.type) && !/heic/i.test(f.type); });
-      thumbs.hidden = !imgs.length;
-      files.forEach(function (f, i) {
-        if (!/^image\//.test(f.type) || /heic/i.test(f.type)) return;
-        var t = el("div", "file__thumb");
-        var im = el("img"); im.alt = f.name; im.src = URL.createObjectURL(f); im.onload = function () { URL.revokeObjectURL(im.src); };
-        var x = el("button", "file__thumb-x", "×"); x.type = "button"; x.setAttribute("aria-label", "Убрать " + f.name);
-        x.onclick = function () { removeAt(i); };
-        t.appendChild(im); t.appendChild(x); thumbs.appendChild(t);
-      });
-      var others = files.filter(function (f) { return imgs.indexOf(f) < 0; });
-      name.textContent = !files.length ? (input.multiple ? "Файлы не выбраны" : "Файл не выбран")
-        : others.length ? others.map(function (f) { return f.name + " · " + size(f); }).join(", ") + (imgs.length ? " и фото: " + imgs.length : "")
-        : (imgs.length > 1 ? "Фото: " + imgs.length : "");
       root.classList.toggle("has-file", files.length > 0);
-      root.classList.toggle("has-thumbs", imgs.length > 0);
-      clear.hidden = !files.length || (imgs.length > 0 && !others.length);
+      if (imgOnly) {
+        thumbs.querySelectorAll(".file__thumb").forEach(function (t) { t.remove(); });
+        files.forEach(function (f, i) {
+          var t = el("div", "file__thumb");
+          if (/^image\//.test(f.type) && !/heic/i.test(f.type)) {
+            var im = el("img"); im.alt = f.name; im.src = URL.createObjectURL(f); im.onload = function () { URL.revokeObjectURL(im.src); };
+            t.appendChild(im);
+          } else { t.appendChild(el("span", "file__thumb-name", f.name)); }
+          var x = el("button", "file__thumb-x", "×"); x.type = "button"; x.setAttribute("aria-label", "Убрать " + f.name);
+          x.onclick = function () { removeAt(i); };
+          t.appendChild(x); thumbs.insertBefore(t, plus);
+        });
+        plus.hidden = !input.multiple && files.length > 0;
+      } else {
+        var f = files[0];
+        card.hidden = !f; plus.hidden = !!f;
+        if (f) { name.textContent = f.name; meta.textContent = size(f); cardIco.textContent = (f.name.split(".").pop() || "").slice(0, 4).toUpperCase() || "ФАЙЛ"; }
+      }
+      return files.length > 0 && !bad;
     }
-    input.addEventListener("change", function (e) { if (e.isTrusted !== false || !root._syncing) sync(); });
-    clear.addEventListener("click", function () { input.value = ""; sync(); fire(input, "change"); });
+    input.addEventListener("change", function (e) {
+      var ok = sync();
+      if (e.isTrusted && ok && input.hasAttribute("data-autosubmit") && input.form) {
+        if (input.form.requestSubmit) input.form.requestSubmit(); else input.form.submit();
+      }
+    });
+    clear.addEventListener("click", function () { input.value = ""; fire(input, "change"); });
     root.addEventListener("dragover", function (e) { e.preventDefault(); root.classList.add("is-drag"); });
     root.addEventListener("dragleave", function () { root.classList.remove("is-drag"); });
-    root.addEventListener("drop", function (e) { e.preventDefault(); root.classList.remove("is-drag"); if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; sync(); fire(input, "change"); } });
+    root.addEventListener("drop", function (e) { e.preventDefault(); root.classList.remove("is-drag"); if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; fire(input, "change"); } });
     sync();
   }
 
@@ -582,6 +701,16 @@
     if ((f.method || "").toLowerCase() !== "post" || f.hasAttribute("data-no-keep-scroll")) return;
     try { sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ path: location.pathname, y: window.scrollY, at: Date.now() })); } catch (err) {}
   });
+  // Тест 6, п. 33: «Сохранить и добавить ещё» — экран наверх, курсор в первое поле (адрес с ?top=1)
+  function toTop() {
+    if (!/[?&]top=1(&|$)/.test(location.search)) return false;
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    window.scrollTo(0, 0);
+    var f = document.querySelector("[data-autofocus]");
+    if (f && !TOUCH) f.focus({ preventScroll: true });
+    return true;
+  }
+  document.addEventListener("htmx:afterSettle", function h() { document.removeEventListener("htmx:afterSettle", h); setTimeout(function () { if (toTop()) try { history.replaceState(history.state, "", location.href.replace(/([?&])top=1&?/, "$1").replace(/[?&]$/, "")); } catch (e) {} }, 0); });
   function restoreScroll() {
     try {
       var s = JSON.parse(sessionStorage.getItem(SCROLL_KEY) || "null");
@@ -589,6 +718,7 @@
       // Ошибка в форме — плавно к первому полю с ошибкой (тест 4.2, п. 34)
       var err = document.querySelector(".field--error, .alert--error");
       if (err && !err.closest(".messages")) return;  // к ошибке ведёт smooth.js
+      if (toTop()) return;
       // Ссылка ведёт к блоку (#…) — плавно к нему, а не на прежнее место
       if (location.hash.length > 1) {
         var target = document.getElementById(location.hash.slice(1));
@@ -732,6 +862,123 @@
     if (e.key !== "Escape") return;
     document.querySelectorAll("details[data-mnav][open]").forEach(function (d) { d.removeAttribute("open"); d.querySelector("summary").focus(); });
   });
+
+  // Тест 6, п. 5: плитка «+» без обёртки (data-ui="raw") — форма отправляется сразу после выбора
+  document.addEventListener("change", function (e) {
+    var inp = e.target;
+    if (!inp.matches || !inp.matches('input[type="file"][data-autosubmit][data-ui="raw"]') || !inp.files || !inp.files.length) return;
+    var max = (+inp.getAttribute("data-max-mb") || 0) * 1048576;
+    for (var i = 0; i < inp.files.length; i++) {
+      if (max && inp.files[i].size > max) {
+        var msg = "«" + inp.files[i].name + "» больше " + inp.getAttribute("data-max-mb") + " МБ — уменьшите файл и выберите снова.";
+        if (window.SL && SL.toast) SL.toast(msg, "error"); else alert(msg);
+        inp.value = ""; return;
+      }
+    }
+    var tile = inp.form && inp.form.querySelector(".file__plus");
+    if (tile) tile.classList.add("is-busy");
+    if (inp.form.requestSubmit) inp.form.requestSubmit(); else inp.form.submit();
+  });
+
+  // Тест 6, п. 18: пока открыта клавиатура, нижнее меню скрыто (не поднимается вместе с ней)
+  (function () {
+    var root = document.documentElement, vv = window.visualViewport, t = null;
+    function typing(el) {
+      if (!el || !el.matches) return false;
+      if (el.matches("textarea, [contenteditable=true]")) return !el.readOnly;
+      return el.matches("input") && !el.readOnly && !/^(checkbox|radio|file|button|submit|reset|range|color|hidden)$/i.test(el.type) && el.inputMode !== "none";
+    }
+    function sync() {
+      var on = typing(document.activeElement);
+      if (vv && !on) on = vv.height < window.innerHeight * 0.72;
+      root.classList.toggle("kb-open", on && window.innerWidth < 720);
+    }
+    document.addEventListener("focusin", sync);
+    document.addEventListener("focusout", function () { clearTimeout(t); t = setTimeout(sync, 60); });
+    if (vv) vv.addEventListener("resize", function () { clearTimeout(t); t = setTimeout(sync, 60); });
+  })();
+
+  // Тест 6, п. 6: поле текста растёт по мере ввода
+  function grow(ta) { ta.style.height = "auto"; ta.style.height = Math.max(ta.scrollHeight + 2, 96) + "px"; }
+  document.addEventListener("input", function (e) { if (e.target.matches && e.target.matches("textarea[data-autogrow]")) grow(e.target); });
+  function growAll() { document.querySelectorAll("textarea[data-autogrow]").forEach(grow); }
+  document.addEventListener("DOMContentLoaded", growAll);
+  document.addEventListener("htmx:afterSettle", growAll);
+
+  // Меню «три точки» (тест 6): закрыть по клику вне и по Escape; открыто только одно
+  document.addEventListener("click", function (e) {
+    document.querySelectorAll("details.kebab[open], details.rswitch[open], details.msearch__filter[open]").forEach(function (d) { if (!d.contains(e.target)) d.removeAttribute("open"); });
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") document.querySelectorAll("details.kebab[open], details.rswitch[open], details.msearch__filter[open]").forEach(function (d) { d.removeAttribute("open"); });
+  });
+
+  // Тест 6, п. 8: автосохранение черновика турнира (формы с data-autosave). Кнопки «Сохранить черновик» нет:
+  // поля сохраняются сами через ~1 с после ввода, а при уходе со страницы (назад, другой раздел) — сразу.
+  (function () {
+    var form = null, timer = null, dirty = false, busy = false;
+    function status(text) { var el = document.querySelector("[data-autosave-status]"); if (el) el.textContent = text; }
+    function data(keep) {
+      var fd = new FormData(form);
+      Array.from(fd.keys()).forEach(function (k) { fd.getAll(k).forEach(function (v) { if (typeof v !== "string") fd.delete(k); }); });
+      fd.set("autosave", "1");
+      return fd;
+    }
+    var pending = null;
+    function apply(j) {
+      if (!j || !j.ok) { status(j && j.reason === "conflict" ? "Данные изменились в другой вкладке — обновите страницу" : j && j.reason === "title" ? "" : "Черновик не сохранён"); return; }
+      var rev = form.querySelector("[name=revision]"), key = form.querySelector("[name=create_key]");
+      if (rev) rev.value = j.revision;
+      if (key && j.url) {
+        // первый автосейв нового турнира: дальше работаем с созданным черновиком
+        var inp = document.createElement("input"); inp.type = "hidden"; inp.name = "revision"; inp.value = j.revision;
+        form.appendChild(inp); key.remove();
+        form.setAttribute("action", j.url);
+        try { history.replaceState(history.state, "", j.url); } catch (e) {}
+      }
+      status("Черновик сохранён в " + j.at);
+    }
+    function save(keep) {
+      if (!form || !dirty) return;
+      var title = form.querySelector("[name=title]");
+      if (title && !title.value.trim()) return;  // черновик появляется, когда есть название
+      if (busy && !keep) { clearTimeout(timer); timer = setTimeout(save, 800); return; }
+      if (busy && keep && form.querySelector("[name=create_key]")) return;  // первый черновик ещё создаётся — второй не нужен
+      dirty = false; busy = true;
+      var url = form.getAttribute("action") || location.href;
+      var opts = { method: "POST", body: data(), credentials: "same-origin", headers: { "X-Requested-With": "fetch", "Accept": "application/json" } };
+      var t = document.querySelector("[name=csrfmiddlewaretoken]"); if (t) opts.headers["X-CSRFToken"] = t.value;
+      if (keep) opts.keepalive = true;
+      status("Сохраняем черновик…");
+      pending = fetch(url, opts).then(function (r) { return r.json().catch(function () { return null; }); }).then(function (j) { busy = false; pending = null; apply(j); })
+        .catch(function () { busy = false; pending = null; dirty = true; status("Черновик не сохранён — проверьте связь"); });
+    }
+    function bind(scope) {
+      var f = (scope || document).querySelector("form[data-autosave]");
+      if (!f || f === form) return;
+      form = f; dirty = false;
+      form.addEventListener("input", function (e) { if (e.target.type === "file") return; dirty = true; clearTimeout(timer); timer = setTimeout(save, 1200); });
+      form.addEventListener("change", function (e) { if (e.target.type === "file") return; dirty = true; clearTimeout(timer); timer = setTimeout(save, 600); });
+      form.addEventListener("submit", function (e) {
+        clearTimeout(timer); dirty = false;
+        // автосохранение ещё идёт: дождаться новой версии, иначе обычная отправка получит конфликт версий
+        if (pending) {
+          e.preventDefault(); e.stopImmediatePropagation();
+          var btn = e.submitter, f = form;
+          pending.then(function () { if (f.requestSubmit) f.requestSubmit(btn || undefined); else f.submit(); });
+        }
+      }, true);
+    }
+    document.addEventListener("DOMContentLoaded", function () { bind(document); });
+    document.addEventListener("htmx:afterSettle", function () { bind(document); });
+    // уход со страницы: ссылка, «назад», закрытие вкладки
+    document.addEventListener("click", function (e) {
+      var a = e.target.closest && e.target.closest("a[href]");
+      if (a && form && dirty && !form.contains(a)) save(true);
+    }, true);
+    window.addEventListener("pagehide", function () { save(true); });
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") save(true); });
+  })();
 
   // «Раздел: …» в «Проведении»
   document.addEventListener("click", function (e) {

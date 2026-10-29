@@ -145,3 +145,21 @@ def card(t):
     from apps.tournaments.views import _card
 
     return _card(t)
+
+
+@register.filter
+def tpl_years(tpl, year):
+    """Тест 6, п. 16: подпись под чипом готового зачёта — годы рождения для года турнира."""
+    try:
+        y = int(year)
+    except (TypeError, ValueError):
+        return ""
+    d = tpl.for_year(y)
+    a, b = d.get("birth_year_from"), d.get("birth_year_to")
+    if a and b:
+        return f"{a}–{b} г.р."
+    if a:
+        return f"{a} г.р. и старше"
+    if b:
+        return f"{b} г.р. и моложе"
+    return "без ограничений по возрасту"

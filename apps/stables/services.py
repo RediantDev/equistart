@@ -20,8 +20,12 @@ class Conflict(Exception):
     pass
 
 
+# Решение 29.10.2026 (тест 6, п. 38): денники и услуги ведут организатор, судья и клуб (приглашённый как «конюшня»)
+ACCESS_ROLES = STABLE_ROLES | {TeamMember.Role.JUDGE}
+
+
 def can_stable(user, tournament) -> bool:
-    return bool(roles_of(user, tournament) & STABLE_ROLES)
+    return bool(roles_of(user, tournament) & ACCESS_ROLES)
 
 
 def require_stable(user, tournament):
@@ -325,9 +329,11 @@ def cancel_booking(user, booking_id, reason="") -> Booking:
     if b.state not in Booking.HOLDING:
         raise Conflict("Бронь уже закрыта.")
     reason = (reason or "").strip()
-    if staff and b.requested_by_id != user.pk and not reason:
+    own = b.requested_by_id == user.pk
+    if staff and not own and not reason:
         raise ValueError("Укажите причину отмены.")
-    b.state, b.reason = Booking.State.CANCELLED, (reason or "Отменено представителем")[:300]
+    # тест 5.2, п. 26: участник отменяет свою бронь без причины — в журнал пишем «Отменено участником»
+    b.state, b.reason = Booking.State.CANCELLED, (reason or "Отменено участником")[:300]
     b.revision += 1
     b.save()
     audit(user, "booking.cancel", b, reason=b.reason)
@@ -515,6 +521,7 @@ def cancel_order(user, order_id, reason="") -> ServiceOrder:
         raise ValueError("Часть заказа уже выдана — отменить нельзя.")
     o.state = ServiceOrder.State.CANCELLED
     o.save(update_fields=["state"])
+    reason = (reason or "").strip() or ("Отменено участником" if o.ordered_by_id == user.pk else "")
     audit(user, "service_order.cancel", o, reason=reason)
     return o
 

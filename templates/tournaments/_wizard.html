@@ -23,23 +23,25 @@
   <div class="alert alert--error" role="alert" style="margin-bottom: var(--space-4);"><strong>Замечания модератора:</strong> {{ t.moderation_comment|linebreaksbr }}</div>
 {% endif %}
 {% if t.status == "rejected" %}
-  <div class="alert alert--error" role="alert" style="margin-bottom: var(--space-4);"><strong>Соревнование отклонено модератором:</strong> {{ t.moderation_comment|linebreaksbr }}<br>Повторно отправить его нельзя. Черновик можно удалить на шаге 4.</div>
+  <div class="alert alert--error" role="alert" style="margin-bottom: var(--space-4);"><strong>Соревнование отклонено модератором:</strong> {{ t.moderation_comment|linebreaksbr }}<br>Повторно отправить его нельзя. Черновик можно удалить в «Мои соревнования».</div>
 {% elif t.is_locked %}
-  <div class="alert alert--warning" style="margin-bottom: var(--space-4);">Турнир на проверке у модератора. Редактирование откроется после решения.</div>
+  <div class="alert alert--warning" style="margin-bottom: var(--space-4);">Турнир на проверке у модератора — ниже сводка только для просмотра. Чтобы исправить, нажмите «Отозвать и изменить».</div>
 {% elif t.is_published and t.status != "approved" %}
   <div class="alert alert--warning" style="margin-bottom: var(--space-4);">Участники видят прежнюю опубликованную версию. Изменения появятся в календаре после проверки модератором.</div>
 {% endif %}
 
-<ol class="stepper" aria-label="Шаги">
-  {% for s in steps %}
-    <li class="stepper__item{% if s.current %} is-current{% elif s.done %} is-done{% endif %}"{% if s.current %} aria-current="step"{% endif %}>
-      {% if t and s.reachable and not s.current %}<a href="{% url 'tournaments:step' t.pk s.n %}">{% endif %}
-        <span class="caption">Шаг {{ s.n }}{% if s.done and not s.current %} · готово{% endif %}</span>
-        <span class="label">{{ s.name }}</span>
-      {% if t and s.reachable and not s.current %}</a>{% endif %}
-    </li>
-  {% endfor %}
-</ol>
+{# Тест 6, п. 9 (вариант Б): четыре кружка в линию, пройденные — с галочкой, подпись — у текущего шага #}
+<nav class="steps2" aria-label="Шаги">
+  <ol class="steps2__row">
+    {% for s in steps %}
+      <li class="steps2__item{% if s.current %} is-current{% elif s.done %} is-done{% endif %}"{% if s.current %} aria-current="step"{% endif %}>
+        {% if t and s.reachable and not s.current %}<a class="steps2__dot" href="{% url 'tournaments:step' t.pk s.n %}" aria-label="Шаг {{ s.n }}: {{ s.name }}{% if s.done %}, готово{% endif %}">{% else %}<span class="steps2__dot" aria-label="Шаг {{ s.n }}: {{ s.name }}{% if s.done and not s.current %}, готово{% endif %}">{% endif %}{% if s.done and not s.current %}{% include "partials/icon.html" with name="check" size=16 %}{% else %}{{ s.n }}{% endif %}{% if t and s.reachable and not s.current %}</a>{% else %}</span>{% endif %}
+        {% if s.current %}<span class="steps2__name">{{ s.name }}</span>{% else %}<span class="steps2__name steps2__name--side">{{ s.name }}</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ol>
+  {% if not t.is_locked %}<p class="steps2__save" data-autosave-status>{% if t %}Черновик сохраняется автоматически{% endif %}</p>{% endif %}
+</nav>
 
 {% block step %}{% endblock %}
 {% endblock %}

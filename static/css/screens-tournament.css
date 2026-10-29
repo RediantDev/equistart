@@ -9,7 +9,7 @@
 
 .tp-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .tp-tile { display: flex; flex-direction: column; min-width: 0; background: var(--surface-2); border-radius: 10px; padding: 8px 10px; color: var(--text); text-decoration: none; }
-a.tp-tile:hover { filter: brightness(.97); }
+@media (hover: hover) { a.tp-tile:hover { filter: brightness(.97); } }
 .tp-tile__cap { font-size: 11px; line-height: 14px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); margin: 0; }
 .tp-tile b { display: block; font-size: 15px; line-height: 20px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tp-tile b a { color: inherit; text-decoration: none; }
@@ -26,7 +26,7 @@ a.tp-tile:hover { filter: brightness(.97); }
 .tp-acts { display: flex; gap: 6px; }
 .tp-act { height: 44px; padding: 0 12px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: var(--surface); color: var(--text);
   font: inherit; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; white-space: nowrap; cursor: pointer; flex: 1 1 0; min-width: 0; }
-.tp-act:hover { border-color: var(--control-border); color: var(--text); }
+@media (hover: hover) { .tp-act:hover { border-color: var(--control-border); color: var(--text); } }
 .tp-act--wide { flex-grow: 1.4; }
 .tp-act--icon { flex: 0 0 44px; width: 44px; padding: 0; }
 .tp-act svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
@@ -41,9 +41,10 @@ a.tp-tile:hover { filter: brightness(.97); }
 .tp-bar__text small { font-size: 12px; line-height: 16px; color: var(--warning); font-weight: 600; }
 .tp-bar__btn { flex: 1; min-height: 44px; }
 @media (max-width: 720px) {
-  .tp-bar { position: fixed; left: 0; right: 0; bottom: calc(var(--bnav-h) + env(safe-area-inset-bottom)); z-index: 55;
-    border-top: 1px solid var(--border); padding: 10px 16px; }
-  body:has(.tp-bar) { padding-bottom: calc(var(--bnav-h) + 66px + env(safe-area-inset-bottom)); }
+  /* Тест 5.2, п. 21: вплотную к нижнему меню; высота панели — в --dock-h (отступ body в app.css) */
+  .tp-bar { position: fixed; left: 0; right: 0; bottom: calc(var(--bnav-h) + var(--safe-b)); z-index: 55; height: 64px;
+    border-top: 1px solid var(--border); padding: 0 16px; }
+  body:has(.tp-bar) { --dock-h: 64px; }
 }
 @media (min-width: 721px) {
   .tp-card { padding: var(--space-6); }
@@ -56,16 +57,21 @@ a.tp-tile:hover { filter: brightness(.97); }
   .tp-staff { align-self: flex-start; width: auto; padding-left: 24px; padding-right: 24px; }
   .tp-staff__note, .tp-reg { text-align: left; margin-top: -4px; }
 }
-@media (min-width: 1000px) {
-  .tp-card:has(.tp-bar) { grid-template-columns: minmax(0, 1fr) 280px; align-items: start; }
-  .tp-bar { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); }
-  .tp-bar__btn { flex: none; }
+/* Тест 5.3, п. 45: на компьютере «Заявки до / Подать заявку» — в ряду плиток, той же высоты */
+@media (min-width: 721px) {
+  .tp-row { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 8px; align-items: stretch; }
+  .tp-row:not(:has(.tp-bar)) { grid-template-columns: minmax(0, 1fr); }
+  .tp-bar { flex-direction: column; align-items: stretch; justify-content: space-between; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--ink); color: #fff; }
+  .tp-bar__text b { color: #fff; }
+  .tp-bar__text small { color: var(--accent); }
+  .tp-bar__btn { flex: none; min-height: 40px; }
 }
 
 /* Вкладки — переключатель-«таблетка» (механизм прежний: .tabs + data-swap) */
-.tabs.tp-seg { display: flex; gap: 2px; padding: 3px; margin: var(--space-3) 0 10px; border: 0; border-radius: var(--radius-pill); background: var(--surface-2); }
-.tabs--sticky.tp-seg { top: 64px; box-shadow: 0 0 0 6px var(--bg); }
-@media (max-width: 720px) { .tabs--sticky.tp-seg { top: 60px; } }
+.tabs.tp-seg { display: flex; gap: 2px; height: 44px; box-sizing: border-box; padding: 3px; margin: var(--space-3) 0 10px; border: 0; border-radius: var(--radius-pill); background: var(--surface-2); }
+/* Тест 5.3, п. 18: при закреплении — зазор под шапкой (фон страницы закрывает прокручиваемое под ним) */
+.tabs--sticky.tp-seg { top: 70px; box-shadow: 0 0 0 6px var(--bg), 0 -6px 0 4px var(--bg); }
+@media (max-width: 720px) { .tabs--sticky.tp-seg { top: 67px; } }
 .tp-seg .tabs__item { flex: 1 1 0; height: 38px; display: flex; align-items: center; justify-content: center; padding: 0 4px; margin: 0; border: 0; border-radius: var(--radius-pill);
   font-size: 13px; font-weight: 600; color: var(--text-muted); }
 .tp-seg .tabs__item.is-active { background: var(--ink); color: #fff; border: 0; }
@@ -80,7 +86,7 @@ a.tp-tile:hover { filter: brightness(.97); }
 .tp-prog__day + .tp-prow { border-top: 1px solid var(--border); }
 .tp-prow > summary { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 9px 12px; cursor: pointer; list-style: none; }
 .tp-prow > summary::-webkit-details-marker { display: none; }
-.tp-prow > summary:hover { background: var(--bg); }
+@media (hover: hover) { .tp-prow > summary:hover { background: var(--bg); } }
 .tp-prow__time { flex: none; width: 44px; font-weight: 700; }
 .tp-prow__name { flex: 1; min-width: 0; }
 .tp-prow__chev { flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
@@ -110,7 +116,7 @@ a.tp-tile:hover { filter: brightness(.97); }
 .tp-sr-li + .tp-sr-li { border-top: 1px solid var(--border); }
 .tp-sr { width: 100%; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; min-height: 56px;
   border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
-.tp-sr:hover { background: var(--bg); }
+@media (hover: hover) { .tp-sr:hover { background: var(--bg); } }
 .tp-sr:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
 .tp-sr__n { font-size: 22px; line-height: 26px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
 .tp-sr__main { min-width: 0; display: flex; flex-direction: column; }
@@ -140,7 +146,7 @@ a.tp-tile:hover { filter: brightness(.97); }
 .tp-pair__box { position: relative; max-height: 88dvh; overflow-y: auto; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
 @media (min-width: 721px) { .sheet.tp-pair { justify-content: center; } .tp-pair__box { margin-top: 0; padding: 24px 28px; } .tp-pair .sheet__grip { display: none; } }
 .tp-pair__x { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--text); cursor: pointer; display: grid; place-items: center; }
-.tp-pair__x:hover { background: var(--surface-2); }
+@media (hover: hover) { .tp-pair__x:hover { background: var(--surface-2); } }
 .tp-pair__x svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .tp-pair__kicker { margin: 0 48px 2px 0; font-size: 12px; line-height: 16px; font-weight: 700; color: var(--text-muted); }
 .tp-pair .sheet__title { margin-right: 44px; font-size: 19px; line-height: 25px; overflow-wrap: anywhere; }
@@ -173,3 +179,24 @@ html.tp-noscroll, html.tp-noscroll body { overflow: hidden; }
 @media print { .tp-mini__back svg { display: none; } .tp-mini__back { font-size: 14pt; font-weight: 800; } }
 @media (min-width: 721px) { .tp-tile b, .tp-tile small { white-space: normal; overflow-wrap: anywhere; } }
 @media (max-width: 720px) { .tp-tile:last-child:nth-child(odd) { grid-column: span 2; } }
+
+/* ===== Тест 5.3, п. 44: насыщеннее — плитки, чипы и кнопки в цветах палитры (как карточка календаря) ===== */
+.tp-tile--dates { background: var(--sky-soft); }
+.tp-tile--dates .tp-tile__cap, .tp-tile--dates small { color: var(--sky); }
+.tp-tile--place { background: var(--mint-soft); }
+.tp-tile--place .tp-tile__cap, .tp-tile--place small { color: var(--mint); }
+.tp-tile--deadline { background: var(--surface-2); }
+.tp-tile--due { background: var(--accent); }
+.tp-tile--due .tp-tile__cap, .tp-tile--due small { color: var(--on-accent); }
+.tp-tile--org { background: var(--lilac-soft); }
+.tp-tile--org .tp-tile__cap, .tp-tile--org small { color: var(--lilac); }
+.tp-tile--place .tp-tile__link { text-decoration-color: var(--mint); }
+.tp-card .chips .chip--info { background: var(--info); color: #fff; }
+.tp-card .chips .chip--info::before { background: #fff; }
+.tp-card .chips .tag--sky { background: var(--sky); color: #fff; }
+.tp-card .chips .tag--mint { background: var(--mint); color: #fff; }
+.tp-card .chips .tag--lilac { background: var(--lilac); color: #fff; }
+.tp-card .chips .tag--peach { background: var(--peach); color: #fff; }
+.tp-card .chips .tag--pink { background: var(--pink); color: #fff; }
+.tp-act { background: var(--accent-soft); border-color: var(--accent-hover); font-weight: 700; }
+.tp-act:active { background: var(--accent); }

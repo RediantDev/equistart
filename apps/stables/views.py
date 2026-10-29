@@ -150,6 +150,53 @@ def period_label(arrive, depart):
     return f"{dates} · {n} {_plural(n, 'ночь', 'ночи', 'ночей')}"
 
 
+def dates_label(arrive, depart):
+    """«20–22 ноября»: даты заезда и выезда без числа ночей."""
+    if arrive.month == depart.month:
+        return f"{arrive.day}–{depart.day} {MONTHS[depart.month - 1]}"
+    return f"{arrive.day} {MONTHS[arrive.month - 1]} – {depart.day} {MONTHS[depart.month - 1]}"
+
+
+MONTHS_SHORT = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"]
+UNIT_FORMS = {"мешок": ("мешок", "мешка", "мешков"), "тюк": ("тюк", "тюка", "тюков"), "сутки": ("сутки", "суток", "суток"),
+              "брикет": ("брикет", "брикета", "брикетов"), "штука": ("штука", "штуки", "штук"), "кипа": ("кипа", "кипы", "кип"),
+              "рулон": ("рулон", "рулона", "рулонов"), "ночь": ("ночь", "ночи", "ночей"), "час": ("час", "часа", "часов"),
+              "раз": ("раз", "раза", "раз"), "день": ("день", "дня", "дней")}
+
+
+def qty_label(n, unit):
+    """«2 тюка»; незнакомая единица — как её записал организатор: «2 × ведро»."""
+    forms = UNIT_FORMS.get((unit or "").strip().lower())
+    return f"{n} {_plural(n, *forms)}" if forms else f"{n} × {unit}"
+
+
+def short_dates(arrive, depart):
+    """«20–21 ноя» — для компактной строки брони."""
+    if arrive.month == depart.month:
+        return f"{arrive.day}–{depart.day} {MONTHS_SHORT[depart.month - 1]}"
+    return f"{arrive.day} {MONTHS_SHORT[arrive.month - 1]} – {depart.day} {MONTHS_SHORT[depart.month - 1]}"
+
+
+SHORT_STATE = {"pending": "ожидает", "confirmed": "подтверждена", "rejected": "отклонена", "cancelled": "отменена"}
+
+
+def mine_summary(bookings, orders):
+    """Строка-итог свёрнутого списка броней и услуг лошади: «Денник 20–22 ноября · ожидает · 2 услуги» (тест 5.2, п. 23)."""
+    parts = []
+    holding = [b for b in bookings if b.is_holding]
+    for b in holding:
+        parts.append(f"Денник {dates_label(b.arrive, b.depart)} · {SHORT_STATE[b.state]}" + (f" · № {b.box_number}" if b.box_number else ""))
+    if not holding and bookings:
+        last = bookings[-1]
+        parts.append(f"Бронь {SHORT_STATE[last.state]}")
+    active = sum(1 for o in orders if o.state == ServiceOrder.State.ORDERED)
+    if active:
+        parts.append(f"{active} {_plural(active, 'услуга', 'услуги', 'услуг')}")
+    elif orders and not parts:
+        parts.append(f"Отменённых заказов: {len(orders)}")
+    return " · ".join(parts)
+
+
 def _contiguous(nights):
     return all((b - a).days == 1 for a, b in zip(nights, nights[1:]))
 
@@ -164,28 +211,34 @@ def _render_cart(request, t, cats, svcs, horses, my_bookings, my_orders, post=No
     default_cat = str(cats[0].pk) if cats else ""
     for b in my_bookings:
         b.period = period_label(b.arrive, b.depart)
+        b.short = short_dates(b.arrive, b.depart)
+    for o in my_orders:
+        o.qty = qty_label(o.quantity, o.service.unit)
     cards, shown = [], set()
+    open_ = services.booking_open(t)
     for h in horses:
         bks = [b for b in my_bookings if b.horse_id == h.pk]
-        busy = {d for b in bks if b.is_holding for d in services._days(b.arrive, b.depart)}
+        busy = {d: b for b in bks if b.is_holding for d in services._days(b.arrive, b.depart)}
         chosen = set(post.getlist(f"n-{h.pk}")) if post else set()
         cat = post.get(f"c-{h.pk}", default_cat) if post else default_cat
         nights = [{"d": d, "iso": d.isoformat(), "wd": f"{WEEKDAYS[d.weekday()]} → {WEEKDAYS[(d.weekday() + 1) % 7]}",
-                   "busy": d in busy, "on": d.isoformat() in chosen and d not in busy,
+                   "busy": d in busy, "on": d.isoformat() in chosen and d not in busy, "bk": busy[d].pk if d in busy else "",
                    "cats": " ".join(str(c.pk) for c in cats if c.available_from <= d < c.available_to)} for d in days]
         on = [n["d"] for n in nights if n["on"]]
         holding = [b for b in bks if b.is_holding]
         empty = "; ".join(b.period for b in holding) if holding else "без денника"
         summary = period_label(on[0], on[-1] + datetime.timedelta(days=1)) if on else empty
         counters = [{"s": s, "name": f"q-{s.pk}-{h.pk}", "value": post.get(f"q-{s.pk}-{h.pk}", "") if post else ""} for s in horse_svcs]
+        h_orders = [o for o in my_orders if o.horse_id == h.pk]
         cards.append({"h": h, "nights": nights, "cat": cat, "bookings": bks, "summary": summary, "empty": empty, "selected": bool(on),
-                      "orders": [o for o in my_orders if o.horse_id == h.pk], "counters": counters})
+                      "orders": h_orders, "counters": counters, "mine": mine_summary(bks, h_orders),
+                      "editable": open_ and any(b.state == Booking.State.PENDING for b in bks)})
         shown.add(h.pk)
     others = [{"s": s, "name": f"q-{s.pk}", "value": post.get(f"q-{s.pk}", "") if post else "", "trailer": post.get(f"trailer-{s.pk}", "") if post else ""}
               for s in other_svcs]
     cols = min(len(days), 4) or 1
     return render(request, "stables/book.html", {
-        "t": t, "cats": cats, "cards": cards, "others": others, "open": services.booking_open(t), "errors": errors or [],
+        "t": t, "cats": cats, "cards": cards, "others": others, "open": open_, "errors": errors or [],
         "key": post.get("key") if post else uuid.uuid4().hex,
         "extra_bookings": [b for b in my_bookings if b.horse_id not in shown],
         "extra_orders": [o for o in my_orders if o.horse_id not in shown],
@@ -376,8 +429,16 @@ def my_edit(request, booking_id):
         raise PermissionDenied
     back = reverse("stables:book", args=[b.tournament_id])  # тест 5.1: экран открывается сверху, итог — в сообщении
     arrive, depart = _date(request.POST.get("arrive")), _date(request.POST.get("depart"))
+    raw = request.POST.getlist("nights")
+    if raw:
+        # тест 5.2, вариант A: правка ночей с ленты присылает итоговый набор ночей — они должны идти подряд
+        nights = sorted({d for d in (_date(x) for x in raw) if d})
+        if len(nights) != len(set(raw)) or not _contiguous(nights):
+            messages.error(request, "Ночи одной брони должны идти подряд — бронь осталась прежней.")
+            return redirect(back)
+        arrive, depart = nights[0], nights[-1] + datetime.timedelta(days=1)
     try:
-        services.update_booking(request.user, b.pk, request.POST.get("category") or 0, arrive, depart, request.POST.get("revision"))
+        services.update_booking(request.user, b.pk, request.POST.get("category") or b.category_id, arrive, depart, request.POST.get("revision"))
         messages.success(request, f"Бронь «{b.horse_name}» изменена. Она снова ждёт подтверждения конюшни.")
     except (ValueError, services.Conflict) as e:
         messages.error(request, str(e))
@@ -426,13 +487,15 @@ def my_cancel(request, kind, obj_id):
 
 # ---------------- конюшня ----------------
 
-TABS = [("bookings", "Брони"), ("grid", "Занятость"), ("orders", "Заказы услуг"), ("setup", "Категории и услуги")]
+TABS = [("bookings", "Брони"), ("orders", "Услуги"), ("setup", "Денники")]  # тест 6, пп. 37, 39: три вкладки помещаются, не прыгают
 
 
 @login_required
 def manage(request, pk):
     t = _staff_tournament(request, pk)
     tab = request.GET.get("tab", "bookings")
+    if tab == "grid":
+        tab = "setup"  # занятость — теперь внутри вкладки «Денники»
     if tab not in dict(TABS):
         tab = "bookings"
     ctx = {"t": t, "tab": tab, "tabs": TABS, "manage": can_manage(request.user, t)}
@@ -450,13 +513,6 @@ def manage(request, pk):
         elif state in Booking.State.values:
             qs = qs.filter(state=state)
         ctx.update({"bookings": qs, "state": state, "states": Booking.State.choices, "pending": pending, "nobox": nobox})
-    elif tab == "grid":
-        grid = []
-        for c in cats:
-            occ = services.occupancy(c)
-            nights = c.nights()
-            grid.append({"c": c, "cells": [(d, occ.get(d, 0), c.capacity) for d in nights]})
-        ctx["grid"] = grid
     elif tab == "orders":
         show = request.GET.get("show", "open")
         qs = ServiceOrder.objects.filter(tournament=t).select_related("service", "ordered_by").prefetch_related("deliveries")
@@ -464,8 +520,12 @@ def manage(request, pk):
             qs = [o for o in qs.filter(state=ServiceOrder.State.ORDERED) if o.delivered < o.quantity]
         ctx.update({"orders": qs, "show": show})
     else:
+        grid = []
         for c in cats:
             c.used = sum(1 for b in c.bookings.all() if b.is_holding)
+            occ = services.occupancy(c)
+            grid.append({"c": c, "cells": [(d, occ.get(d, 0), c.capacity) for d in c.nights()]})
+        ctx["grid"] = grid
         for s in ctx["svcs"]:
             s.used = services.ordered_total(s)
     return render(request, "stables/manage.html", ctx)
@@ -501,6 +561,16 @@ def manage_action(request, pk, action):
     return redirect(back)
 
 
+def _back_to(request, t):
+    """Тест 6, п. 38: после добавления денников или услуги из «Брони за участника» — обратно туда."""
+    from django.utils.http import url_has_allowed_host_and_scheme
+
+    nxt = request.POST.get("next") or request.GET.get("next") or ""
+    if nxt.startswith("/") and url_has_allowed_host_and_scheme(nxt, {request.get_host()}, request.is_secure()):
+        return nxt
+    return reverse("stables:manage", args=[t.pk]) + "?tab=setup"
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def category_edit(request, pk, cat_id=None):
@@ -512,11 +582,11 @@ def category_edit(request, pk, cat_id=None):
         data = {f: form.cleaned_data[f] for f in CategoryForm.Meta.fields}
         try:
             services.save_category(request.user, t, data, c)
-            messages.success(request, "Категория сохранена.")
-            return redirect(reverse("stables:manage", args=[t.pk]) + "?tab=setup")
+            messages.success(request, "Денники сохранены.")
+            return redirect(_back_to(request, t))
         except ValueError as e:
             form.add_error(None, str(e))
-    return render(request, "stables/form.html", {"t": t, "form": form, "title": "Категория денников" if not c else c.name})
+    return render(request, "stables/form.html", {"t": t, "form": form, "title": "Новый вид денника" if not c else c.name, "next": _back_to(request, t)})
 
 
 @login_required
@@ -536,5 +606,5 @@ def service_edit(request, pk, svc_id=None):
 
             audit(request.user, "service.save", obj, name=obj.name)
             messages.success(request, "Услуга сохранена.")
-            return redirect(reverse("stables:manage", args=[t.pk]) + "?tab=setup")
-    return render(request, "stables/form.html", {"t": t, "form": form, "title": "Услуга" if not s else s.name})
+            return redirect(_back_to(request, t))
+    return render(request, "stables/form.html", {"t": t, "form": form, "title": "Новая услуга" if not s else s.name, "next": _back_to(request, t)})

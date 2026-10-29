@@ -45,13 +45,8 @@
           <a class="ap-ed" href="?{% if late %}late=1&amp;{% endif %}open={{ pair.a.pk }}-{{ pair.h.pk }}#pair-{{ pair.a.pk }}-{{ pair.h.pk }}"
              hx-get="{{ apply_url }}{% if late %}&amp;{% else %}?{% endif %}open={{ pair.a.pk }}-{{ pair.h.pk }}" hx-target="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-select="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-swap="outerHTML transition:true show:top" hx-push-url="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>{% if pair.count %}Маршруты и зачёты{% else %}Выбрать маршруты и зачёты{% endif %}</a>
         {% else %}
-          <form method="post" action="{{ apply_url }}" class="pair-form" hx-post="{{ apply_url }}" hx-target="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-select="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-select-oob="#apply-count,#apply-submit,#apply-warnings" hx-swap="outerHTML transition:true show:top" hx-push-url="false">
+          <form method="post" action="{{ apply_url }}#pair-err-{{ pair.a.pk }}-{{ pair.h.pk }}" class="pair-form" hx-post="{{ apply_url }}" hx-target="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-select="#pair-{{ pair.a.pk }}-{{ pair.h.pk }}" hx-select-oob="#apply-count,#apply-submit,#apply-warnings" hx-swap="outerHTML transition:true show:top" hx-push-url="false">
             {% csrf_token %}<input type="hidden" name="late" value="{{ late|yesno:'1,0' }}"><input type="hidden" name="a" value="{{ pair.a.pk }}"><input type="hidden" name="h" value="{{ pair.h.pk }}"><input type="hidden" name="open" value="{{ pair.a.pk }}-{{ pair.h.pk }}">
-            {% if pair.errors %}
-              <div class="alert alert--error" role="alert">
-                <ul style="margin: 0; padding-left: 1.2em;">{% for e in pair.errors %}<li>{{ e }}</li>{% endfor %}</ul>
-              </div>
-            {% endif %}
             {% for row in pair.programs %}
               <div class="pair-prog">
                 <div class="pair-prog__head">
@@ -60,6 +55,7 @@
                   {# тест 5: высота уже в названии маршрута — не повторяем её в подписи #}
                   <span class="table__sub">{{ row.p.program_type_name }}{% if row.p.heights and row.p.heights_label not in row.p.name %} · {{ row.p.heights_label }}{% endif %}</span>
                 </div>
+                {% if row.filed %}<p class="table__sub ap-filed">Пара уже заявлена в зачёте {% for n in row.filed %}«{{ n }}»{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
                 {% for key, l in row.added %}
                   <div class="pair-prog__added"><span class="chip chip--success">✓ {{ l.tclass.label }}{% if l.height and not l.tclass.height %} · {{ l.height }} см{% endif %}</span>
                     <button class="btn btn--ghost btn--sm" name="remove" value="{{ key }}" aria-label="Убрать {{ l.tclass.label }}">Убрать</button></div>
@@ -71,6 +67,9 @@
                         <div class="opt is-added"><span class="opt__mark" aria-hidden="true">✓</span>
                           <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">В заявке</span></span>
                           <button class="btn btn--ghost btn--sm opt__remove" name="remove" value="{{ o.remove }}" aria-label="Убрать {{ o.label }}">Убрать</button></div>
+                      {% elif o.submitted %}
+                        <div class="opt is-off is-filed"><span class="opt__mark" aria-hidden="true">✓</span>
+                          <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">Уже заявлены · заявка №{{ o.submitted.application.number }}</span></span></div>
                       {% else %}
                         <label class="opt{% if o.why %} is-off{% endif %}"><input type="checkbox" name="sel_{{ row.p.pk }}" value="{{ o.value }}"{% if o.why %} disabled{% endif %}>
                           <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">{% if o.why %}{{ o.why|join:"; " }}{% else %}{{ o.conditions|default:"без ограничений" }}{% endif %}</span></span></label>
@@ -85,6 +84,12 @@
                 {% else %}<p class="table__sub">Зачётов нет.</p>{% endif %}
               </div>
             {% endfor %}
+            {# тест 5.2 (п.34): ошибка — рядом с кнопкой, к ней прокручивается экран (и без JS — по якорю формы) #}
+            {% if pair.errors %}
+              <div class="alert alert--error ap-pair__err" role="alert" id="pair-err-{{ pair.a.pk }}-{{ pair.h.pk }}" tabindex="-1">
+                <ul>{% for e in pair.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+              </div>
+            {% endif %}
             <div class="pair-form__actions"><button class="btn btn--primary btn--lg" name="action" value="add_many" data-add-many>Добавить выбранные</button></div>
           </form>
         {% endif %}
@@ -186,6 +191,14 @@
   document.addEventListener("htmx:afterSettle", sync);
   if (!window.__applyInit) {
     window.__applyInit = true;
+    // Тест 5.2 (п.34): после «Добавить выбранные» с ошибкой экран переходит к ошибке у кнопки
+    document.addEventListener("htmx:afterSettle", function (e) {
+      var t = e.detail && e.detail.target;  // при outerHTML это старый узел — ищем новый по id
+      t = t && t.id ? document.getElementById(t.id) : null;
+      var err = t && t.querySelector(".ap-pair__err");
+      if (!err) return;
+      setTimeout(function () { err.scrollIntoView({ behavior: "smooth", block: "center" }); err.focus({ preventScroll: true }); }, 60);
+    });
     // Тест 5.1: «+ Добавить комментарий» открывает поле
     document.addEventListener("click", function (e) {
       var b = e.target.closest && e.target.closest("[data-reveal]");

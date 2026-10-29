@@ -1,0 +1,15 @@
+{% comment %}Календарь-лента/месяц (тест 5.2, вариант B: R3_01B1/B2, R3_03B). Общий компонент, логика — static/js/calendar.js.
+  key — ключ sessionStorage для «свёрнут/развёрнут» (у каждого раздела свой);
+  src — id json_script с датами: {"ГГГГ-ММ-ДД": число турниров} или {"upcoming": [...], "past": [...]};
+  selected — выбранная дата ГГГГ-ММ-ДД (необязательно); start — какой месяц/неделю показать сначала (по умолчанию — выбранная дата или сегодня); label — подпись для экранного диктора.
+  Выбор даты — событие "cal:select" (detail.date: строка или null) на элементе .cal.{% endcomment %}
+<section class="cal" data-cal data-cal-key="{{ key }}" data-cal-src="{{ src }}" data-cal-today="{% now 'Y-m-d' %}"{% if selected %} data-cal-selected="{{ selected }}"{% endif %}{% if start %} data-cal-start="{{ start }}"{% endif %} aria-label="{{ label|default:'Календарь' }}">
+  <div class="cal__head">
+    <b class="cal__title" aria-live="polite"></b>
+    <button type="button" class="cal__ib" data-cal-prev aria-label="Назад">{% include "partials/icon.html" with name="chevron-left" size=18 %}</button>
+    <button type="button" class="cal__ib" data-cal-next aria-label="Вперёд">{% include "partials/icon.html" with name="chevron-right" size=18 %}</button>
+    <button type="button" class="cal__toggle" data-cal-toggle aria-expanded="true"><span data-cal-toggle-text>Неделя</span><span class="cal__toggle-ico">{% include "partials/icon.html" with name="chevron-up" size=16 %}</span></button>
+  </div>
+  <div class="cal__wd" aria-hidden="true"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span class="is-we">Сб</span><span class="is-we">Вс</span></div>
+  <div class="cal__grid" data-cal-grid></div>
+</section>

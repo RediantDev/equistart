@@ -11,19 +11,42 @@
 </div>
 <div class="wizard-grid">
   <div class="wizard-main">
-    <div class="list-cards">
-      {% for r in programs %}
-        <article class="row-card">
-          <span class="prog-row__time">{{ r.p.start_time|time:"H:i"|default:"—" }}</span>
-          <div style="flex: 1 1 260px; min-width: 0;">
-            <a class="h3 row-card__title" href="{% url 'conduct:program' t.pk r.p.pk %}">{{ r.p.name }}</a>
-            <div class="table__sub">{{ r.p.day|date:"j E" }} · принято {{ r.accepted }} · готовы к старту {{ r.ready }} · в порядке {{ r.slots }}</div>
-          </div>
-          <div class="chips">{% if r.published %}<span class="chip chip--info">Протокол v{{ r.published.version }}</span>{% else %}<span class="chip">Протокол не опубликован</span>{% endif %}</div>
-          <div class="row-actions"><a class="btn btn--ghost btn--sm" href="{% url 'conduct:live' t.pk r.p.pk %}">Экран судьи</a><a class="btn btn--dark btn--sm" href="{% url 'conduct:program' t.pk r.p.pk %}">Открыть</a></div>
-        </article>
-      {% empty %}<div class="card empty"><h2 class="h3">В турнире нет программ</h2></div>{% endfor %}
+    {# Тест 6, п. 31 (вариант Б): чипы дней — как в программе и результатах; строки маршрутов выбранного дня #}
+    {% regroup programs by p.day as days %}
+    {% if days|length > 1 %}
+    <div class="dchips" aria-label="Дни турнира" data-oday-chips data-today="{% now 'Y-m-d' %}">
+      {% for d in days %}<button type="button" class="dchips__item" data-oday="{{ d.grouper|date:'Y-m-d' }}" aria-pressed="false">{{ d.grouper|date:"D, j E"|capfirst }} <span class="dchips__n">· {{ d.list|length }}</span></button>{% endfor %}
     </div>
+    {% endif %}
+    {% for d in days %}
+      <div class="nav-rows oday-pane" data-oday-pane="{{ d.grouper|date:'Y-m-d' }}">
+        {% for r in d.list %}
+          <div class="nav-row nav-row--prog">
+            <a class="nav-row__link" href="{% url 'conduct:program' t.pk r.p.pk %}">
+              <span class="prog-row__time">{{ r.p.start_time|time:"H:i"|default:"—" }}</span>
+              <span class="nav-row__body"><span class="nav-row__title">{{ r.p.name }}</span><span class="nav-row__text"><span class="dot {% if r.published %}dot--ok{% elif r.accepted %}dot--wait{% endif %}" aria-hidden="true"></span>принято {{ r.accepted }} · к старту {{ r.ready }} · {% if r.published %}протокол v{{ r.published.version }}{% else %}протокол не опубл.{% endif %}</span></span>
+            </a>
+            <a class="icon-btn" href="{% url 'conduct:live' t.pk r.p.pk %}" aria-label="Экран судьи: {{ r.p.name }}" title="Экран судьи">{% include "partials/icon.html" with name="flag" size=20 %}</a>
+          </div>
+        {% endfor %}
+      </div>
+    {% empty %}<div class="card empty"><h2 class="h3">В турнире нет программ</h2></div>{% endfor %}
+    <p class="oday-legend"><span><span class="dot dot--wait"></span>протокол не опубликован</span><span><span class="dot dot--ok"></span>опубликован</span><span><span class="dot"></span>заявок нет</span></p>
+    <script>
+    (function () {
+      var box = document.querySelector("[data-oday-chips]"); if (!box) return;
+      var chips = box.querySelectorAll("[data-oday]"), panes = document.querySelectorAll("[data-oday-pane]");
+      function pick(day) {
+        chips.forEach(function (c) { var on = c.dataset.oday === day; c.classList.toggle("is-active", on); c.setAttribute("aria-pressed", on ? "true" : "false"); });
+        panes.forEach(function (p) { p.hidden = p.dataset.odayPane !== day; });
+        try { sessionStorage.setItem("st-oday-{{ t.pk }}", day); } catch (e) {}
+      }
+      chips.forEach(function (c) { c.addEventListener("click", function () { pick(c.dataset.oday); }); });
+      var saved = null; try { saved = sessionStorage.getItem("st-oday-{{ t.pk }}"); } catch (e) {}
+      var today = box.dataset.today, has = function (d) { return d && box.querySelector('[data-oday="' + d + '"]'); };
+      pick(has(saved) ? saved : has(today) ? today : chips[0].dataset.oday);
+    })();
+    </script>
   </div>
   <aside class="wizard-aside">
     <section class="card">

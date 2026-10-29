@@ -3,9 +3,10 @@
 {% block title %}Мои соревнования — СтартЛист{% endblock %}
 {% block content %}
 {# Вариант А (решение 27.10.2026), тест 5.1: вкладки «Предстоящие / Прошедшие», поиск и фильтр — на этой же странице #}
+{# Тест 5.3, п. 52: на компьютере — «назад» (на телефоне есть нижнее меню); smooth.js ведёт туда, откуда пришли #}
+<a class="back back--desk" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
 <div class="mc-head">
   <h1 class="h1">Мои соревнования</h1>
-  <a class="btn btn--ghost btn--sm mc-find" href="{% url 'core:calendar' %}" aria-label="Найти соревнования" title="Найти соревнования">{% include "partials/icon.html" with name="calendar" size=18 %}<span class="mc-find__text">Найти соревнования</span></a>
 </div>
 
 <div class="mc-tools" data-mc-tools>
@@ -14,13 +15,21 @@
   <div class="mc-filters" role="group" aria-label="Решение по выступлению">{% for v, l in status_filters %}<button type="button" class="mc-filter{% if not v %} is-active{% endif %}" data-mc-status="{{ v }}" aria-pressed="{% if v %}false{% else %}true{% endif %}">{{ l }}</button>{% endfor %}</div>
 </div>
 
-<div id="mc-view" style="view-transition-name: swap-area;">
+{# Тест 5.2 (вариант B, R3_03B): общий календарь; даты пользователя — предстоящие точкой, прошедшие кольцом; дата отбирает карточки #}
+{% include "partials/cal.html" with key="cal-mine" src="mc-dates" label="Мои соревнования по датам" start=cal_start %}
+<div class="mc-datebar" data-mc-datebar hidden><b data-mc-datebar-text></b><button type="button" data-mc-date-all>Все соревнования</button></div>
+
+<div id="mc-view">
 <nav class="tabs tabs--sticky mc-tabs" aria-label="Мои соревнования" data-swap="#mc-view">
   <a class="tabs__item{% if tab == 'upcoming' %} is-active{% endif %}" href="?tab=upcoming">Предстоящие{% if counts.upcoming %} · {{ counts.upcoming }}{% endif %}</a>
   <a class="tabs__item{% if tab == 'past' %} is-active{% endif %}" href="?tab=past">Прошедшие{% if counts.past %} · {{ counts.past }}{% endif %}</a>
 </nav>
 {% include "entries/_competition_cards.html" %}
+{# Даты каждой карточки — в том же порядке, что и карточки (для отбора по дате в календаре) #}
+<script type="application/json" id="mc-card-days">[{% for c in cards %}["{{ c.t.pub_starts_on|default:c.t.starts_on|date:'Y-m-d' }}","{{ c.t.pub_ends_on|default:c.t.ends_on|default:c.t.pub_starts_on|date:'Y-m-d' }}"]{% if not forloop.last %},{% endif %}{% endfor %}]</script>
 </div>
+{# тест 5.2 (п.48): даты для раскрывающегося календаря — подключится, когда заказчик выберет вид #}
+{{ calendar_dates|json_script:"mc-dates" }}
 <script>
 (function () {
   // Тест 5.1: поиск и фильтр по решению — на странице, без запросов к серверу. «ё» = «е», регистр не важен.
@@ -63,9 +72,40 @@
       });
       apply();
     });
-    document.addEventListener("htmx:afterSettle", apply);  // переключили вкладку — фильтр остаётся
+    document.addEventListener("htmx:afterSettle", function () { apply(); byDate(); });  // переключили вкладку — фильтр остаётся
+    // Тест 5.2: дата в календаре — только соревнования, идущие в этот день
+    document.addEventListener("cal:select", function (e) {
+      if (e.target.getAttribute("data-cal-key") !== "cal-mine") return;
+      var tab = document.querySelector(".mc-tabs .tabs__item.is-active"), want = e.detail.kind === "past" ? "past" : e.detail.kind === "up" ? "upcoming" : "";
+      if (want && tab && (tab.getAttribute("href") || "").indexOf("tab=" + want) < 0) {
+        var other = document.querySelector('.mc-tabs a[href*="tab=' + want + '"]');
+        if (other) { other.click(); return; }  // byDate() — после смены вкладки
+      }
+      byDate();
+    });
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest || !e.target.closest("[data-mc-date-all]")) return;
+      var cal = document.querySelector('[data-cal-key="cal-mine"]');
+      if (cal && cal._cal) cal._cal.select(null);
+    });
+  }
+  function byDate() {
+    var cal = document.querySelector('[data-cal-key="cal-mine"]'), d = cal ? cal.getAttribute("data-cal-selected") : null;
+    var cards = document.querySelectorAll("[data-mc-list] [data-mc-card]"), days = [];
+    try { days = JSON.parse((document.getElementById("mc-card-days") || {}).textContent || "[]"); } catch (err) { days = []; }
+    cards.forEach(function (c, i) { var r = days[i]; c.classList.toggle("is-date-off", !!d && !!r && !(r[0] <= d && d <= r[1])); });
+    var bar = document.querySelector("[data-mc-datebar]");
+    if (bar) {
+      bar.hidden = !d;
+      if (d) {
+        var p = d.split("-"), M = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+        var n = Array.prototype.filter.call(cards, function (c) { return !c.classList.contains("is-date-off"); }).length;
+        bar.querySelector("[data-mc-datebar-text]").textContent = (+p[2]) + " " + M[+p[1] - 1] + (n ? "" : " — соревнований нет");
+      }
+    }
   }
   apply();
+  byDate();
 })();
 </script>
 {% endblock %}

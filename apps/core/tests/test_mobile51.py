@@ -44,10 +44,10 @@ class PublicPageTests(Base):
     def test_bottom_menu_for_guest_and_user(self):
         r = self.client.get(reverse("core:calendar"))
         self.assertContains(r, 'class="bnav"')
-        self.assertContains(r, "<span>Войти</span>")
+        self.assertContains(r, '<span class="bnav__lbl">Войти</span>')
         self.client.force_login(self.coach)
         r = self.client.get(reverse("core:calendar"))
-        self.assertContains(r, "<span>Кабинет</span>")
+        self.assertContains(r, '<span class="bnav__lbl">Кабинет</span>')
         self.assertContains(r, reverse("entries:competitions"))
 
     def test_moderator_sees_pult_in_cabinet(self):

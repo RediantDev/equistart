@@ -48,6 +48,8 @@
         <div style="text-align: right;">
           {% if c.free_total > 0 %}<span class="chip chip--success">свободно на весь период: {{ c.free_total }}</span>{% else %}<span class="chip chip--warning">на весь период мест нет — проверьте свои даты</span>{% endif %}</div>
       </article>{% endfor %}</div>
+    {% elif staff %}{# Тест 6, п. 38: организатор, судья и клуб добавляют денники прямо отсюда #}
+      <div class="card empty-add"><h3 class="h3">Денников пока нет</h3><p class="muted">Добавьте виды денников — после этого их можно бронировать за участников.</p><a class="btn btn--primary btn--sm" href="{% url 'stables:category_new' t.pk %}?next={{ request.path|urlencode }}">+ Добавить денники</a></div>
     {% else %}<div class="card empty"><h3 class="h3">Организатор пока не добавил денники</h3></div>{% endif %}
 
     <h2 class="h2 stb-h" id="services">Услуги</h2>
@@ -70,6 +72,8 @@
         </article>{% endwith %}{% endfor %}</div>
       {% if open %}<div class="stb-order__bar"><span class="stb-order__count" data-order-count>Ничего не выбрано</span><button class="btn btn--primary" data-order-submit>Заказать</button></div>{% endif %}
     </form>
+    {% elif staff %}
+      <div class="card empty-add"><h3 class="h3">Услуг пока нет</h3><p class="muted">Например, опилки или сено.</p><a class="btn btn--ghost btn--sm" href="{% url 'stables:service_new' t.pk %}?next={{ request.path|urlencode }}">+ Добавить услугу</a></div>
     {% else %}<p class="muted">Услуг нет.</p>{% endif %}
   </div>
 

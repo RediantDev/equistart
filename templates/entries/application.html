@@ -1,30 +1,33 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Заявка №{{ app.pk }} — СтартЛист{% endblock %}
+{% block title %}Заявка №{{ app.number }} — СтартЛист{% endblock %}
 {% block content %}
 {# Макет 28.10.2026 (R2_03B): просмотр по дням; «Изменить заявку» — режим правки с отменой строк и решением по денникам #}
 <div class="app-head ae-head">
-  <a class="back" href="{% if owner %}{% url 'entries:competitions' %}{% else %}{% url 'entries:manage' t.pk %}{% endif %}">← {% if owner %}Мои соревнования{% else %}Заявки турнира{% endif %}</a>
+  {# тест 5.3 (п.35): в режиме правки «назад» ведёт на просмотр заявки; отдельной «Выйти из правки» нет #}
+  {% if edit %}<a class="back" href="{% url 'entries:application' app.pk %}">← Заявка №{{ app.number }}</a>
+  {% else %}<a class="back" href="{% if owner %}{% url 'entries:competitions' %}{% else %}{% url 'entries:manage' t.pk %}{% endif %}">← {% if owner %}Мои соревнования{% else %}Заявки турнира{% endif %}</a>{% endif %}
   <div class="ae-head__row">
     <div class="ae-head__text">
-      <h1 class="h2 app-head__title">Заявка №{{ app.pk }}{% if edit %} <span class="chip ae-head__mode">правка</span>{% endif %}</h1>
+      {# тест 5.2 (п.37): сводка решений — в одной строке с заголовком, справа #}
+      <div class="ae-head__title">
+        <h1 class="h2 app-head__title">Заявка №{{ app.number }}{% if edit %} <span class="chip ae-head__mode">правка</span>{% endif %}</h1>
+        {% if not edit %}<div class="chips ae-head__chips">{% for label, n, color in summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>{% endif %}
+      </div>
       <p class="ae-head__t">{% if owner and t.publication == "published" %}<a href="{% url 'tournaments:public' t.pk %}">{{ t.pub_title }}</a>{% else %}{{ t.pub_title }}{% endif %}</p>
       <p class="table__sub">{% if app.is_group %}Групповая{% else %}Индивидуальная{% endif %} · подана {{ app.created_at|date:"j E в H:i" }}{% if app.late %} · внесена судьёй{% endif %}</p>
     </div>
-    {% if edit %}
-      <a class="btn btn--ghost btn--sm ae-head__btn" href="{% url 'entries:application' app.pk %}">Выйти из правки</a>
-    {% elif can_edit %}
+    {% if can_edit and not edit %}
       <a class="btn btn--dark ae-head__btn" href="?edit=1" data-ae-edit>Изменить заявку</a>
     {% endif %}
   </div>
-  {% if not edit %}<div class="chips">{% for label, n, color in summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>{% endif %}
 </div>
 
 <div class="wizard-grid">
   <div class="wizard-main">
     {% if edit %}<form method="post" action="{% url 'entries:cancel' app.pk %}" class="ae-form" id="entries-form" data-ae-form>
       {% csrf_token %}<input type="hidden" name="edit" value="1">
-      <p class="table__sub ae-lead">Нажмите «Отменить» у выступлений, которые нужно снять. До сохранения всё можно вернуть.</p>
+      <p class="table__sub ae-lead">«Изменить» — другая лошадь, всадник, маршрут или зачёт: изменение рассматривает судья, до решения действуют прежние сведения. «Отменить» — снять выступление; до сохранения всё можно вернуть.</p>
     {% endif %}
     <section class="ae-card" aria-label="Выступления · {{ entries|length }}">
       {% for g in groups %}
@@ -55,10 +58,12 @@
             </div>
             <div class="ae-row__side">
               {% if edit %}
-                {% if e.cancellable %}<label class="ae-btn ae-btn--x" for="x-{{ e.pk }}">Отменить</label><label class="ae-btn ae-btn--back" for="x-{{ e.pk }}">Вернуть</label>{% endif %}
+                {% if e.cancellable %}
+                  {% if e.pending_proposal %}<span class="table__sub ae-pp">Изменение у судьи</span>{% else %}<a class="ae-btn ae-btn--edit" href="{% url 'entries:propose' e.pk %}">Изменить</a>{% endif %}
+                  <label class="ae-btn ae-btn--x" for="x-{{ e.pk }}">Отменить</label><label class="ae-btn ae-btn--back" for="x-{{ e.pk }}">Вернуть</label>
+                {% endif %}
               {% else %}
                 {% if e.program.is_dressage and e.program.test_snapshot and e.result %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:my_sheets' e.pk %}">Листы судей</a>{% endif %}
-                {% if owner and e.is_active and not e.is_started and not e.pending_proposal %}<a class="btn btn--ghost btn--sm" href="{% url 'entries:propose' e.pk %}">Предложить замену</a>{% endif %}
               {% endif %}
             </div>
           </article>
@@ -116,19 +121,20 @@
 
   <aside class="wizard-aside">
     {% if show_contacts %}
-    <section class="card app-card">
-      <h2 class="h3">Контакты</h2>
+    <section class="card app-card" id="contacts">
+      {# тест 5.2 (п.44): «Изменить» — карандаш справа от заголовка #}
+      <div class="ae-card-head"><h2 class="h3">Контакты</h2>{% if owner and not edit_contacts %}{% include "partials/edit_icon.html" with href="?contacts=1#contacts" label="Изменить контакты" %}{% endif %}</div>
+      {% if not edit_contacts %}
       <p style="margin: 6px 0 0;"><strong>{{ app.contact_name }}</strong><br><span class="num">{{ app.contact_phone|phone }}</span></p>
       {% if app.comment %}<p class="muted" style="margin-top: var(--space-2);">{{ app.comment|linebreaksbr }}</p>{% endif %}
-      {% if owner %}
-        <details class="inline-form"><summary class="btn btn--ghost btn--sm">Изменить</summary>
-          <form method="post" action="{% url 'entries:contacts' app.pk %}" class="form">{% csrf_token %}
+      {% endif %}
+      {% if owner and edit_contacts %}
+          <form method="post" action="{% url 'entries:contacts' app.pk %}" class="form ae-contacts">{% csrf_token %}
             <div class="field"><label class="field__label" for="cn">Контактное лицо</label><input id="cn" name="contact_name" value="{{ app.contact_name }}"></div>
             <div class="field"><label class="field__label" for="cp">Телефон</label><input id="cp" name="contact_phone" type="tel" value="{{ app.contact_phone }}"></div>
             <div class="field"><label class="field__label" for="cm">Комментарий</label><textarea id="cm" name="comment" rows="3">{{ app.comment }}</textarea></div>
-            <button class="btn btn--dark btn--sm">Сохранить</button>
+            <div class="form-actions"><button class="btn btn--dark btn--sm">Сохранить</button><a class="btn btn--ghost btn--sm" href="{% url 'entries:application' app.pk %}">Отмена</a></div>
           </form>
-        </details>
       {% endif %}
     </section>
     {% endif %}

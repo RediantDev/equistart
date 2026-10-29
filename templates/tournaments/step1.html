@@ -1,9 +1,10 @@
 {% extends "tournaments/_wizard.html" %}
 {% block step %}
-<form method="post" novalidate class="card form" style="margin-top: 0;">
+{# Тест 6, п. 8: «Сохранить черновик» нет — черновик сохраняется сам (data-autosave), начиная с названия #}
+<form method="post" novalidate class="card form" style="margin-top: 0;" data-autosave{% if t %} action="{% url 'tournaments:step' t.pk 1 %}"{% endif %}>
   {% csrf_token %}
   {% if t %}<input type="hidden" name="revision" value="{{ t.revision }}">{% else %}<input type="hidden" name="create_key" value="{{ create_key }}">
-  <div class="alert alert--info">Понадобятся: даты и место, маршруты или езды с зачётами, срок приёма заявок и <strong>положение о соревновании в PDF</strong> (до 20 МБ) — без него турнир не отправить на проверку. Черновик можно сохранить и вернуться позже.</div>{% endif %}
+  <p class="muted" style="margin: 0;">Понадобятся даты и место, маршруты с зачётами и положение в PDF.</p>{% endif %}
   {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
 
   <div class="form__group">
@@ -45,7 +46,6 @@
   </div>
 
   <div class="form-actions">
-    <button type="submit" name="save" class="btn btn--ghost"{% if t.is_locked %} disabled{% endif %}>Сохранить черновик</button>
     <button type="submit" name="next" class="btn btn--primary"{% if t.is_locked %} disabled{% endif %}>Далее: программа</button>
   </div>
 </form>

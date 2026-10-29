@@ -6,6 +6,7 @@ ACTION_LABELS = {
     "tournament.create": "Создан черновик",
     "tournament.edit": "Изменены сведения",
     "tournament.submit": "Отправлен на проверку",
+    "tournament.withdraw": "Снят с проверки для правок",
     "tournament.approve": "Опубликован модератором",
     "tournament.return": "Возвращён с замечаниями",
     "tournament.reject": "Отклонён модератором",
