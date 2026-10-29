@@ -424,7 +424,7 @@
       for (var m = 0; m < 60; m += 5) (function (m) {
         var b = el("button", "tp__cell", pad(m)); b.type = "button";
         if (c[1] === m) b.classList.add("is-selected");
-        b.onclick = function () { set(c[0] === null ? 10 : c[0], m); close(); focusSoft(vis); };
+        b.onclick = function () { set(c[0] === null ? 10 : c[0], m); close(); if (!touch) focusSoft(vis); };
         mg.appendChild(b);
       })(m);
       hc.appendChild(hg); mc.appendChild(mg);
@@ -521,7 +521,7 @@
         Array.prototype.forEach.call(input.files, function (f, i) { if (i !== idx) dt.items.add(f); });
         input.files = dt.files;
       } catch (e) { input.value = ""; }
-      sync(); fire(input, "change");
+      fire(input, "change");
     }
     function sync() {
       var files = Array.prototype.slice.call(input.files || []);
@@ -553,16 +553,19 @@
         card.hidden = !f; plus.hidden = !!f;
         if (f) { name.textContent = f.name; meta.textContent = size(f); cardIco.textContent = (f.name.split(".").pop() || "").slice(0, 4).toUpperCase() || "ФАЙЛ"; }
       }
-      if (files.length && !bad && input.hasAttribute("data-autosubmit") && input.form && !root._syncing) {
+      return files.length > 0 && !bad;
+    }
+    input.addEventListener("change", function (e) {
+      var ok = sync();
+      if (e.isTrusted && ok && input.hasAttribute("data-autosubmit") && input.form) {
         if (input.form.requestSubmit) input.form.requestSubmit(); else input.form.submit();
       }
-    }
-    input.addEventListener("change", function (e) { if (e.isTrusted !== false || !root._syncing) sync(); });
-    clear.addEventListener("click", function () { input.value = ""; sync(); fire(input, "change"); });
+    });
+    clear.addEventListener("click", function () { input.value = ""; fire(input, "change"); });
     root.addEventListener("dragover", function (e) { e.preventDefault(); root.classList.add("is-drag"); });
     root.addEventListener("dragleave", function () { root.classList.remove("is-drag"); });
-    root.addEventListener("drop", function (e) { e.preventDefault(); root.classList.remove("is-drag"); if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; sync(); fire(input, "change"); } });
-    root._syncing = true; sync(); root._syncing = false;
+    root.addEventListener("drop", function (e) { e.preventDefault(); root.classList.remove("is-drag"); if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; fire(input, "change"); } });
+    sync();
   }
 
   /* ---------- Условный показ: data-show-when="name=v1,v2" | "name:checked" | "name!=" ---------- */
@@ -707,7 +710,7 @@
     if (f && !TOUCH) f.focus({ preventScroll: true });
     return true;
   }
-  document.addEventListener("htmx:afterSettle", function () { setTimeout(toTop, 0); });
+  document.addEventListener("htmx:afterSettle", function h() { document.removeEventListener("htmx:afterSettle", h); setTimeout(function () { if (toTop()) try { history.replaceState(history.state, "", location.href.replace(/([?&])top=1&?/, "$1").replace(/[?&]$/, "")); } catch (e) {} }, 0); });
   function restoreScroll() {
     try {
       var s = JSON.parse(sessionStorage.getItem(SCROLL_KEY) || "null");
@@ -921,8 +924,9 @@
       fd.set("autosave", "1");
       return fd;
     }
+    var pending = null;
     function apply(j) {
-      if (!j || !j.ok) return;
+      if (!j || !j.ok) { status(j && j.reason === "conflict" ? "Данные изменились в другой вкладке — обновите страницу" : j && j.reason === "title" ? "" : "Черновик не сохранён"); return; }
       var rev = form.querySelector("[name=revision]"), key = form.querySelector("[name=create_key]");
       if (rev) rev.value = j.revision;
       if (key && j.url) {
@@ -939,14 +943,15 @@
       var title = form.querySelector("[name=title]");
       if (title && !title.value.trim()) return;  // черновик появляется, когда есть название
       if (busy && !keep) { clearTimeout(timer); timer = setTimeout(save, 800); return; }
+      if (busy && keep && form.querySelector("[name=create_key]")) return;  // первый черновик ещё создаётся — второй не нужен
       dirty = false; busy = true;
       var url = form.getAttribute("action") || location.href;
       var opts = { method: "POST", body: data(), credentials: "same-origin", headers: { "X-Requested-With": "fetch", "Accept": "application/json" } };
       var t = document.querySelector("[name=csrfmiddlewaretoken]"); if (t) opts.headers["X-CSRFToken"] = t.value;
       if (keep) opts.keepalive = true;
       status("Сохраняем черновик…");
-      fetch(url, opts).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { busy = false; apply(j); })
-        .catch(function () { busy = false; dirty = true; status("Черновик не сохранён — проверьте связь"); });
+      pending = fetch(url, opts).then(function (r) { return r.json().catch(function () { return null; }); }).then(function (j) { busy = false; pending = null; apply(j); })
+        .catch(function () { busy = false; pending = null; dirty = true; status("Черновик не сохранён — проверьте связь"); });
     }
     function bind(scope) {
       var f = (scope || document).querySelector("form[data-autosave]");
@@ -954,7 +959,15 @@
       form = f; dirty = false;
       form.addEventListener("input", function (e) { if (e.target.type === "file") return; dirty = true; clearTimeout(timer); timer = setTimeout(save, 1200); });
       form.addEventListener("change", function (e) { if (e.target.type === "file") return; dirty = true; clearTimeout(timer); timer = setTimeout(save, 600); });
-      form.addEventListener("submit", function () { dirty = false; clearTimeout(timer); });
+      form.addEventListener("submit", function (e) {
+        clearTimeout(timer); dirty = false;
+        // автосохранение ещё идёт: дождаться новой версии, иначе обычная отправка получит конфликт версий
+        if (pending) {
+          e.preventDefault(); e.stopImmediatePropagation();
+          var btn = e.submitter, f = form;
+          pending.then(function () { if (f.requestSubmit) f.requestSubmit(btn || undefined); else f.submit(); });
+        }
+      }, true);
     }
     document.addEventListener("DOMContentLoaded", function () { bind(document); });
     document.addEventListener("htmx:afterSettle", function () { bind(document); });

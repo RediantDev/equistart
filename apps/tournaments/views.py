@@ -235,6 +235,8 @@ def _autosave_basics(t, form) -> bool:
             put("ends_on", c["ends_on"])
         elif not c.get("multiday"):
             put("ends_on", c["starts_on"])
+        if t.ends_on and t.ends_on < t.starts_on:
+            put("ends_on", t.starts_on)  # не нарушать «окончание не раньше начала», пока дата окончания не исправлена
     venue = c.get("venue")
     if venue and "venue" not in form.errors:
         put("venue", venue)

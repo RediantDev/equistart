@@ -563,8 +563,10 @@ def manage_action(request, pk, action):
 
 def _back_to(request, t):
     """Тест 6, п. 38: после добавления денников или услуги из «Брони за участника» — обратно туда."""
+    from django.utils.http import url_has_allowed_host_and_scheme
+
     nxt = request.POST.get("next") or request.GET.get("next") or ""
-    if nxt.startswith("/") and not nxt.startswith("//"):
+    if nxt.startswith("/") and url_has_allowed_host_and_scheme(nxt, {request.get_host()}, request.is_secure()):
         return nxt
     return reverse("stables:manage", args=[t.pk]) + "?tab=setup"
 
