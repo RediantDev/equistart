@@ -205,7 +205,10 @@ def profile(request):
         messages.success(request, "Сведения сохранены.")
         return redirect("accounts:profile")
     roles = [{"value": c.value, "label": c.label, "on": getattr(user, CATEGORY_FIELDS[c])} for c in Category]
-    return render(request, "accounts/profile.html", {"form": form, "roles": roles, "can_add_role": bool(user.missing_categories())})
+    # Тест 5.2, п. 69: по умолчанию — просмотр; форма — по ?edit=about или при ошибках ввода
+    editing = request.method == "POST" or request.GET.get("edit") == "about"
+    return render(request, "accounts/profile.html", {"form": form, "roles": roles, "editing": editing,
+                                                     "can_add_role": bool(user.missing_categories())})
 
 
 @login_required
