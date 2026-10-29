@@ -33,7 +33,7 @@ class AthleteForm(forms.ModelForm):
         if "region" in self.fields:
             from .catalogs import regions_json
 
-            self.fields["region"].widget.attrs.update({"data-suggest": regions_json(), "placeholder": "Начните вводить: «Моск…»"})
+            self.fields["region"].widget.attrs.update({"data-suggest": regions_json(), "placeholder": "Например: Моск…"})
         self.fields["rank"].choices = [("", "— выберите —")] + list(self.fields["rank"].choices)[1:]
 
     def clean_birth_date(self):
