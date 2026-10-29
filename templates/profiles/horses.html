@@ -5,7 +5,7 @@
 <div class="ps-screen">
   <a class="ps-back" href="{% url 'accounts:cabinet' %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Кабинет</a>
   <div class="ps-headrow">
-    <h1 class="ps-h1">Мои лошади{% if total %} <span class="ps-count">{{ total }}</span>{% endif %}</h1>
+    <h1 class="h1 ps-h1">Мои лошади</h1>
     {% if total %}<button class="ps-ib ps-ib--o ps-js" type="button" aria-label="Поиск по кличке или номеру ФКСР" aria-expanded="{% if q %}true{% else %}false{% endif %}" aria-controls="ps-hsearch" data-ps-toggle><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>{% endif %}
     <a class="ps-ib ps-ib--y" href="{% url 'profiles:horse_new' %}" aria-label="Добавить лошадь" title="Добавить лошадь"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a>
   </div>
@@ -35,10 +35,10 @@
   </form>
   {% if shared or ponies %}
   <div class="ps-chips ps-js" role="group" aria-label="Фильтр">
-    <button class="ps-flt is-on" type="button" data-f="all" aria-pressed="true">Все <small>{{ total }}</small></button>
-    <button class="ps-flt" type="button" data-f="mine" aria-pressed="false">Мои <small>{{ horses|length }}</small></button>
-    {% if shared %}<button class="ps-flt" type="button" data-f="shared" aria-pressed="false">С доступом <small>{{ shared|length }}</small></button>{% endif %}
-    {% if ponies %}<button class="ps-flt" type="button" data-f="pony" aria-pressed="false">Пони <small>{{ ponies }}</small></button>{% endif %}
+    <button class="ps-flt is-on" type="button" data-f="all" aria-pressed="true">Все</button>
+    <button class="ps-flt" type="button" data-f="mine" aria-pressed="false">Мои</button>
+    {% if shared %}<button class="ps-flt" type="button" data-f="shared" aria-pressed="false">С доступом</button>{% endif %}
+    {% if ponies %}<button class="ps-flt" type="button" data-f="pony" aria-pressed="false">Пони</button>{% endif %}
   </div>
   {% endif %}
   <div class="ps-list" id="pf-horses">
@@ -102,7 +102,7 @@
 </script>
   {% elif not invites %}
     <div class="ps-empty">
-      <h2 class="ps-h2">Лошадей пока нет</h2>
+      <h2 class="h3 ps-h2">Лошадей пока нет</h2>
       <p class="muted">Нужны кличка, год рождения, масть, пол и порода.</p>
       <div class="ps-empty__actions"><a class="btn btn--primary" href="{% url 'profiles:horse_new' %}">Добавить лошадь</a></div>
     </div>

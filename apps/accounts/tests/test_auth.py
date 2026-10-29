@@ -192,3 +192,42 @@ class CabinetTests(TestCase):
         self.user.is_moderator = True
         self.user.save()
         self.assertIn("Модератор", self.user.category_labels())
+
+
+class ProfileViewModeTests(TestCase):
+    """Тест 5.2, п. 68–69: под заголовком нет ФИО; сначала просмотр, форма — по карандашу."""
+
+    def setUp(self):
+        self.user = make_user(middle_name="Петровна", email="anna@example.com")
+        self.client.force_login(self.user)
+
+    def test_view_mode_by_default(self):
+        page = self.client.get(reverse("accounts:profile")).content.decode()
+        self.assertNotIn('name="last_name"', page)
+        self.assertIn("Иванова", page)
+        self.assertIn("anna@example.com", page)
+        self.assertIn('href="/profile/?edit=about#about"', page)
+        self.assertNotIn('<p class="muted">Иванова Анна', page)
+
+    def test_edit_mode_and_cancel(self):
+        page = self.client.get(reverse("accounts:profile") + "?edit=about").content.decode()
+        self.assertIn('name="last_name"', page)
+        self.assertIn(">Отмена</a>", page)
+        self.assertNotIn('?edit=about#about"', page)
+
+    def test_save_returns_to_view_and_errors_keep_form(self):
+        r = self.client.post(reverse("accounts:profile"), {"last_name": "Петрова", "first_name": "Анна", "middle_name": "", "email": ""})
+        self.assertRedirects(r, reverse("accounts:profile"))
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.last_name, "Петрова")
+        r = self.client.post(reverse("accounts:profile"), {"last_name": "", "first_name": "", "email": "не-почта"})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'name="last_name"')
+
+    def test_guest_redirected(self):
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("accounts:profile") + "?edit=about").status_code, 302)
+        r = self.client.post(reverse("accounts:profile"), {"last_name": "X", "first_name": "Y"})
+        self.assertEqual(r.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.last_name, "Иванова")

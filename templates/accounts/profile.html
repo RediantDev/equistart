@@ -5,13 +5,14 @@
   <div>
     <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
     <h1 class="h1">Профиль</h1>
-    <p class="muted">{{ user.full_name }}</p>
   </div>
 </div>
 <div class="wizard-grid">
   <div class="wizard-main">
-    <section class="card">
-      <h2 class="h3">О себе</h2>
+    {# Тест 5.2, п. 69: сначала просмотр, форма — по карандашу #}
+    <section class="card" id="about">
+      <div class="section-head"><h2 class="h3" style="margin: 0;">О себе</h2>{% if not editing %}{% url 'accounts:profile' as prof_url %}{% include "partials/edit_icon.html" with href=prof_url|add:"?edit=about#about" label="Изменить сведения о себе" %}{% endif %}</div>
+      {% if editing %}
       <form method="post" novalidate class="form" data-dirty-guard>{% csrf_token %}
         {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
         <div class="grid-3">
@@ -20,8 +21,16 @@
           {% include "partials/field.html" with field=form.middle_name %}
         </div>
         {% include "partials/field.html" with field=form.email %}
-        <div class="form-actions"><button class="btn btn--primary">Сохранить</button></div>
+        <div class="form-actions"><a class="btn btn--ghost" href="{% url 'accounts:profile' %}">Отмена</a><button class="btn btn--primary">Сохранить</button></div>
       </form>
+      {% else %}
+      <dl class="facts">
+        <dt>Фамилия</dt><dd>{{ user.last_name|default:"—" }}</dd>
+        <dt>Имя</dt><dd>{{ user.first_name|default:"—" }}</dd>
+        <dt>Отчество</dt><dd>{{ user.middle_name|default:"—" }}</dd>
+        <dt>Email для связи</dt><dd>{{ user.email|default:"—" }}</dd>
+      </dl>
+      {% endif %}
     </section>
 
     <section class="card">

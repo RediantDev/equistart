@@ -1,13 +1,16 @@
 {% extends "base.html" %}
 {% block title %}{{ a.full_name }} — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <a class="back" href="{% url 'profiles:athletes' %}">← Спортсмены</a>
-    <h1 class="h1">{{ a.full_name }}</h1>
-    <p class="muted">{{ a.summary|default:"Дополнительные сведения не заполнены" }}</p>
+{# Тест 5.2, п. 50: «Изменить» — карандаш справа от имени, как у лошади #}
+<div class="ps-screen ps-screen--head">
+  <a class="ps-back" href="{% url 'profiles:athletes' %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Спортсмены</a>
+  <div class="ps-headrow">
+    <div class="ps-title">
+      <h1 class="h1 ps-h1">{{ a.full_name }}</h1>
+      <p class="muted ps-sub">{{ a.summary|default:"Дополнительные сведения не заполнены" }}</p>
+    </div>
+    {% if manage %}<a class="ps-ib ps-ib--o" href="{% url 'profiles:athlete_edit' a.pk %}" aria-label="Изменить сведения спортсмена" title="Изменить сведения"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg></a>{% endif %}
   </div>
-  {% if manage %}<a class="btn btn--ghost" href="{% url 'profiles:athlete_edit' a.pk %}">Изменить</a>{% endif %}
 </div>
 <div class="wizard-grid">
   <div class="wizard-main">

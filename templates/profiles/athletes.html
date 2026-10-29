@@ -5,7 +5,7 @@
 <div class="ps-screen">
   <a class="ps-back" href="{% url 'accounts:cabinet' %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Кабинет</a>
   <div class="ps-headrow">
-    <h1 class="ps-h1">Спортсмены{% if count %} <span class="ps-count">{{ count }}</span>{% endif %}</h1>
+    <h1 class="h1 ps-h1">Спортсмены</h1>
     <a class="ps-ib ps-ib--y" href="{% url 'profiles:athlete_new' %}" aria-label="Добавить спортсмена" title="Добавить спортсмена"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a>
   </div>
   {% if count %}
@@ -29,13 +29,13 @@
       {% endif %}
       {% if mine %}
         <section class="ps-group">
-          <h2 class="ps-cap">Мои · {{ mine|length }}</h2>
+          <h2 class="ps-cap">Мои</h2>
           <div class="ps-list">{% for r in mine %}{% include "profiles/_athlete_row.html" with r=r %}{% endfor %}</div>
         </section>
       {% endif %}
       {% if trusted %}
         <section class="ps-group">
-          <h2 class="ps-cap">Мне доверили · {{ trusted|length }}</h2>
+          <h2 class="ps-cap">Мне доверили</h2>
           <div class="ps-list">{% for r in trusted %}{% include "profiles/_athlete_row.html" with r=r %}{% endfor %}</div>
         </section>
       {% endif %}
@@ -43,7 +43,7 @@
     </div>
   {% else %}
     <div class="ps-empty">
-      <h2 class="ps-h2">Спортсменов пока нет</h2>
+      <h2 class="h3 ps-h2">Спортсменов пока нет</h2>
       <p class="muted">Регистрация и телефон спортсмену не нужны.</p>
       <div class="ps-empty__actions">
         {% if user.is_athlete %}<a class="btn btn--ghost" href="{% url 'profiles:athlete_new' %}?me=1">Мой профиль спортсмена</a>{% endif %}
