@@ -1,33 +1,101 @@
 {% extends "base.html" %}
 {% block title %}{% if athlete %}{{ athlete.full_name }}{% else %}Новый спортсмен{% endif %} — СтартЛист{% endblock %}
 {% block content %}
-<section class="auth pf-form">
-  <div class="card auth__card auth__card--wide">
-    <a class="back" href="{% if next %}{{ next }}{% elif athlete %}{% url 'profiles:athlete' athlete.pk %}{% else %}{% url 'profiles:athletes' %}{% endif %}">{% if next %}← Вернуться к заявке{% else %}← Назад{% endif %}</a>
-    <h1 class="h1">{% if athlete %}Изменить спортсмена{% elif myself %}Мой профиль спортсмена{% else %}Новый спортсмен{% endif %}</h1>
-    <form method="post" novalidate class="form">
-      {% csrf_token %}{% if myself %}<input type="hidden" name="me" value="1">{% endif %}
-      <div class="grid-3">
-        {% include "partials/field.html" with field=form.last_name %}
-        {% include "partials/field.html" with field=form.first_name %}
-        {% include "partials/field.html" with field=form.middle_name %}
+{# Тест 5.3, п. 39: вариант B (макеты R4_B1, R4_B2). Новый — два шага на клиенте, без JS — одна форма; изменение — одна страница в том же стиле #}
+{% with f=form %}
+<div class="ps-screen ps-hform">
+  <a class="ps-back" href="{% if next %}{{ next }}{% elif athlete %}{% url 'profiles:athlete' athlete.pk %}{% else %}{% url 'profiles:athletes' %}{% endif %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>{% if next %}Вернуться к заявке{% elif athlete %}{{ athlete.full_name }}{% else %}Спортсмены{% endif %}</a>
+  <h1 class="h1 ps-h1">{% if athlete %}Изменить спортсмена{% elif myself %}Мой профиль спортсмена{% else %}Новый спортсмен{% endif %}</h1>
+  {% if not athlete %}
+  <ol class="ps-steps ps-js" aria-label="Шаги">
+    <li class="ps-st" data-step-dot="1"><span class="ps-sn ps-sn--ic"><svg class="ps-sn__n" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><svg class="ps-sn__ok" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Кто это</li>
+    <li class="ps-steps__line" aria-hidden="true"></li>
+    <li class="ps-st" data-step-dot="2"><span class="ps-sn ps-sn--ic"><svg class="ps-sn__n" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="15" r="6"/><path d="M8 3l4 6 4-6"/></svg></span>Клуб и номера</li>
+  </ol>
+  {% endif %}
+  {% for error in f.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
+  <form method="post" novalidate class="ps-hform__form ps-aform"{% if not athlete %} data-steps{% endif %}>
+    {% csrf_token %}{% if myself %}<input type="hidden" name="me" value="1">{% endif %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    <div class="step-pane ps-pane" data-pane="1">
+      <div class="ps-card ps-card--form">
+        {% if athlete %}<h2 class="h3 ps-card__h ps-card__h--in">Кто это</h2>{% endif %}
+        {% include "partials/field.html" with field=f.last_name %}
+        <div class="ps-g2">
+          {% include "partials/field.html" with field=f.first_name %}
+          {% include "partials/field.html" with field=f.middle_name %}
+        </div>
+        {# Тест 5.3, п. 38: дата рождения и разряд — одной строкой и на телефоне #}
+        <div class="ps-g2">
+          {% include "partials/field.html" with field=f.birth_date %}
+          {% include "partials/field.html" with field=f.rank %}
+        </div>
+        <p class="ps-m">Без разряда — выберите «б/р».</p>
       </div>
-      {# Тест 5.3, п. 38: дата рождения и разряд — одной строкой и на телефоне #}
-      <div class="ps-g2">
-        {% include "partials/field.html" with field=form.birth_date %}
-        {% include "partials/field.html" with field=form.rank %}
+      {% if not athlete %}
+      <div class="ps-bar ps-js">
+        <a class="ps-btn" href="{% if next %}{{ next }}{% else %}{% url 'profiles:athletes' %}{% endif %}">Отмена</a>
+        <button type="button" class="ps-btn ps-btn--y ps-grow" data-step-next>Далее<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
       </div>
-      <div class="grid-2">
-        {% include "partials/field.html" with field=form.club %}
-        {% include "partials/field.html" with field=form.region %}
+      {% endif %}
+    </div>
+    <div class="step-pane ps-pane" data-pane="2">
+      {% if not athlete %}
+      <button type="button" class="ps-summary ps-js" data-step-prev aria-label="Вернуться к шагу «Кто это»">
+        <span class="ps-ini" aria-hidden="true" data-sum-ini></span>
+        <span class="ps-t"><b data-sum-name></b><span class="ps-m" data-sum-meta></span></span>
+        <span class="ps-ib" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg></span>
+      </button>
+      {% endif %}
+      <div class="ps-card ps-card--form">
+        {% if athlete %}<h2 class="h3 ps-card__h ps-card__h--in">Клуб и номера</h2>{% endif %}
+        <div class="ps-g2">
+          {% include "partials/field.html" with field=f.club %}
+          {% include "partials/field.html" with field=f.region %}
+        </div>
+        <div class="ps-g2">
+          {% include "partials/field.html" with field=f.fksr_number %}
+          {% include "partials/field.html" with field=f.fei_id %}
+        </div>
+        {% include "partials/field.html" with field=f.coach_name %}
       </div>
-      <div class="grid-2">
-        {% include "partials/field.html" with field=form.fksr_number %}
-        {% include "partials/field.html" with field=form.fei_id %}
+      <div class="ps-bar">
+        {% if athlete %}<a class="ps-btn" href="{% if next %}{{ next }}{% else %}{% url 'profiles:athlete' athlete.pk %}{% endif %}">Отмена</a>
+        {% else %}<button type="submit" class="ps-btn ps-grow ps-js" data-skip>Пропустить</button>{% endif %}
+        <button type="submit" class="ps-btn ps-btn--y ps-grow">Сохранить</button>
       </div>
-      {% include "partials/field.html" with field=form.coach_name %}
-      <button type="submit" class="btn btn--primary btn--block">Сохранить</button>
-    </form>
-  </div>
-</section>
+    </div>
+  </form>
+</div>
+{% if not athlete %}
+<script>
+(function () {
+  var form = document.querySelector(".ps-aform[data-steps]");
+  if (!form || form.dataset.psBound) return;
+  form.dataset.psBound = "1";
+  var STEP2 = ["club", "region", "fksr_number", "fei_id", "coach_name"];
+  function txt(name) {
+    var el = form.elements[name];
+    if (!el) return "";
+    if (el.tagName === "SELECT") return el.value ? el.options[el.selectedIndex].text : "";
+    return (el.value || "").trim();
+  }
+  function summary() {
+    var last = txt("last_name"), first = txt("first_name"), d = txt("birth_date").split("-");
+    form.querySelector("[data-sum-name]").textContent = [last, first].filter(Boolean).join(" ") || "Без фамилии";
+    form.querySelector("[data-sum-ini]").textContent = ((last[0] || "") + (first[0] || "")).toUpperCase();
+    form.querySelector("[data-sum-meta]").textContent = [d.length === 3 ? d[2] + "." + d[1] + "." + d[0] : "", txt("rank")].filter(Boolean).join(" · ");
+  }
+  form.addEventListener("click", function (e) {
+    if (e.target.closest("[data-step-next]")) summary();
+    // «Пропустить» — сохранить без клуба и номеров
+    if (e.target.closest("[data-skip]")) STEP2.forEach(function (n) { if (form.elements[n]) form.elements[n].value = ""; });
+  });
+  form.addEventListener("input", summary);
+  form.addEventListener("change", summary);
+  summary();
+})();
+</script>
+{% endif %}
+{% endwith %}
 {% endblock %}
