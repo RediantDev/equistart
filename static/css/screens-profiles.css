@@ -197,6 +197,7 @@ html.js .ps-upload .ps-grid2 + .ps-file .file:not(.has-file) { position: absolut
 .ps-st { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--text-muted); }
 .ps-sn { width: 26px; height: 26px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex: none; background: var(--surface-2); color: var(--text); }
 .ps-sn__ok { display: none; }
+.ps-sn--ic { width: 32px; height: 32px; }  /* шаги с иконками (тест 5.3, п. 39: спортсмен — человек, медаль) */
 .ps-st.is-current { color: var(--text); }
 .ps-st.is-current .ps-sn { background: var(--accent); }
 .ps-st.is-done { color: var(--text); }

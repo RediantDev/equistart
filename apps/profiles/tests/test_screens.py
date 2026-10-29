@@ -52,6 +52,53 @@ class AthletesScreenTests(Base):
         self.client.logout()
         self.assertEqual(self.client.get(reverse("profiles:athlete_new")).status_code, 302)
 
+    def test_form_variant_b_steps_and_edit_page(self):
+        """Тест 5.3, п. 39: новый — два шага «Кто это» / «Клуб и номера»; изменение — одна страница с теми же блоками."""
+        self.client.force_login(self.coach)
+        page = self.client.get(reverse("profiles:athlete_new")).content.decode()
+        self.assertIn("data-steps", page)
+        self.assertIn("Кто это", page)
+        self.assertIn("Клуб и номера", page)
+        self.assertIn("Без разряда — выберите «б/р».", page)
+        self.assertIn("data-step-next", page)
+        self.assertIn("Пропустить", page)
+        p1, p2 = page.index('data-pane="1"'), page.index('data-pane="2"')
+        for name in ("last_name", "first_name", "middle_name", "birth_date", "rank"):
+            self.assertTrue(p1 < page.index(f'name="{name}"') < p2, name)
+        for name in ("club", "region", "fksr_number", "fei_id", "coach_name"):
+            self.assertGreater(page.index(f'name="{name}"'), p2, name)
+        page = self.client.get(reverse("profiles:athlete_edit", args=[self.a1.pk])).content.decode()
+        self.assertNotIn("data-steps", page)
+        self.assertNotIn("Пропустить", page)
+        self.assertIn('<h2 class="h3 ps-card__h ps-card__h--in">Кто это</h2>', page)
+        self.assertIn('value="Смирнова"', page)
+
+    def test_form_variant_b_saves_validates_and_returns(self):
+        self.client.force_login(self.coach)
+        base = {"last_name": "Дудко", "first_name": "Леся", "birth_date": "2012-03-14", "rank": "none"}
+        r = self.client.post(reverse("profiles:athlete_new"), {**base, "fksr_number": "12"})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "field--error")
+        self.assertFalse(Athlete.objects.filter(last_name="Дудко").exists())
+        r = self.client.post(reverse("profiles:athlete_new"), {**base, "last_name": ""})
+        self.assertEqual(r.status_code, 200)
+        nxt = "/t/1/apply/"
+        r = self.client.post(reverse("profiles:athlete_new"), {**base, "next": nxt})
+        a = Athlete.objects.get(last_name="Дудко")
+        self.assertEqual(a.manager, self.coach)
+        self.assertRedirects(r, f"{nxt}?athlete={a.pk}#add", fetch_redirect_response=False)
+
+    def test_form_variant_b_foreign_and_guest(self):
+        edit = reverse("profiles:athlete_edit", args=[self.a1.pk])
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get(edit).status_code, 403)
+        self.assertEqual(self.client.post(edit, {"last_name": "Взлом", "first_name": "X", "birth_date": "2012-03-14", "rank": "none"}).status_code, 403)
+        self.client.logout()
+        self.assertEqual(self.client.get(edit).status_code, 302)
+        self.assertEqual(self.client.get(reverse("profiles:athlete_new")).status_code, 302)
+        self.a1.refresh_from_db()
+        self.assertEqual(self.a1.last_name, "Смирнова")
+
     def test_detail_edit_is_pencil_for_manager_only(self):
         """Тест 5.2, п. 50: «Изменить» — карандаш справа от имени; делегату, чужому и гостю — нет."""
         url = reverse("profiles:athlete", args=[self.a1.pk])
