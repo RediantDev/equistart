@@ -5,19 +5,18 @@
 <div class="page-head">
   <div>
     <h1 class="h1">Клубы</h1>
-    <p class="muted">Проверенные клубы: адреса, контакты, турниры. Например, «Фаворит», «Москва» или «Московская область».</p>
   </div>
   {% if user.is_authenticated and user.is_club %}{% if my_club %}<a class="btn btn--ghost" href="{% url 'clubs:mine' %}">Мой клуб</a>{% else %}<a class="btn btn--dark" href="{% url 'clubs:mine' %}">+ Добавить клуб</a>{% endif %}{% endif %}
 </div>
-<form method="get" role="search" class="club-search" data-require-input>
+<form method="get" role="search" class="club-search" data-live="#club-results">
   <label class="visually-hidden" for="q">Название, город или регион</label>
   <div class="club-search__box">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>
     <input id="q" name="q" type="search" value="{{ q }}" placeholder="Название, город или регион" title="Например, «Фаворит», «Москва» или «Московская область»" enterkeyhint="search">
-    <button type="submit" class="btn btn--dark btn--sm" data-require-btn>Найти</button>
   </div>
   {% if region %}<input type="hidden" name="region" value="{{ region }}">{% endif %}{% if with_t %}<input type="hidden" name="with_t" value="1">{% endif %}
 </form>
+<div id="club-results">
 <div class="club-chips">
   <a class="club-chip{% if not with_t and not region and not q %} is-on{% endif %}" href="{% url 'clubs:list' %}">Все</a>
   <a class="club-chip{% if with_t %} is-on{% endif %}" href="?{% if q %}q={{ q|urlencode }}&{% endif %}{% if region %}region={{ region }}&{% endif %}{% if not with_t %}with_t=1{% endif %}">С турнирами</a>
@@ -81,4 +80,5 @@
     {% endif %}
   </div>
 {% endif %}
+</div>
 {% endblock %}

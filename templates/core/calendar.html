@@ -8,13 +8,13 @@
   {% if user.is_authenticated and user.can_create_tournament %}<a class="btn btn--ghost" href="{% url 'tournaments:create' %}">+ Создать соревнование</a>{% endif %}
 </div>
 
-{# Тест 5.2: поиск — по вводу (Enter), фильтры — иконкой; календарь (вариант B) и карточки (вариант A) #}
-<form method="get" role="search" class="calendar-filters cal-search" action="{% url 'core:calendar' %}">
+{# Тест 5.2/5.3: поиск — по мере ввода и по Enter, без перезагрузки (data-live в smooth.js), фильтры — иконкой; календарь (вариант B) и карточки (вариант A) #}
+<form method="get" role="search" class="calendar-filters cal-search" action="{% url 'core:calendar' %}" data-live="#cal-list,#cal-dates,#cal-fbtn">
   <label class="visually-hidden" for="q">Поиск</label>
   <div class="cal-search__box">{% include "partials/icon.html" with name="search" size=18 %}<input id="q" name="q" type="search" placeholder="Турнир, клуб или город" value="{{ q }}" enterkeyhint="search" autocomplete="off"></div>
   {% if day %}<input type="hidden" name="day" value="{{ day|date:'Y-m-d' }}">{% endif %}
   <details class="filters cal-search__filters" data-filters>
-    <summary class="cal-search__fbtn{% if filters_count %} is-on{% endif %}" aria-label="Фильтры{% if filters_count %}: выбрано {{ filters_count }}{% endif %}" title="Фильтры">{% include "partials/icon.html" with name="filter" size=20 %}{% if filters_count %}<span class="cal-search__count">{{ filters_count }}</span>{% endif %}</summary>
+    <summary id="cal-fbtn" class="cal-search__fbtn{% if filters_count %} is-on{% endif %}" aria-label="Фильтры{% if filters_count %}: выбрано {{ filters_count }}{% endif %}" title="Фильтры">{% include "partials/icon.html" with name="filter" size=20 %}{% if filters_count %}<span class="cal-search__count">{{ filters_count }}</span>{% endif %}</summary>
     <div class="filters__body">
       <div class="field"><label class="field__label" for="discipline">Дисциплина</label>
         <select id="discipline" name="discipline"><option value="">Все</option>{% for v, label in disciplines %}<option value="{{ v }}"{% if v == discipline %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
@@ -45,7 +45,7 @@
 {% endif %}
 {% if day %}
   <div class="cal-day-head"><h2 class="cal-day-head__h">{{ day|date:"j E" }}, {{ day|date:"l"|lower }}</h2>
-    <a class="cal-day-head__all" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}{% if discipline %}discipline={{ discipline }}&amp;{% endif %}{% if region %}region={{ region }}&amp;{% endif %}{% if only_open %}open=1&amp;{% endif %}{% if club %}club={{ club.pk }}&amp;{% endif %}" data-cal-all>Все даты</a></div>
+    <a class="cal-day-head__all" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}{% if discipline %}discipline={{ discipline }}&amp;{% endif %}{% if region %}region={{ region }}&amp;{% endif %}{% if only_open %}open=1&amp;{% endif %}{% if club %}club={{ club.pk }}&amp;{% endif %}" data-cal-all>Все соревнования</a></div>
 {% endif %}
 {% if cards %}
   <div class="tcards">
@@ -55,7 +55,7 @@
   <div class="empty card">
     {% if day %}
       <h2 class="h3">В этот день соревнований нет</h2>
-      <p class="muted">Выберите другую дату или <a href="?" data-cal-all>покажите все даты</a>.</p>
+      <p class="muted">Выберите другую дату или <a href="?" data-cal-all>покажите все соревнования</a>.</p>
     {% elif active %}
       <h2 class="h3">По этим условиям ничего не найдено</h2>
       <p class="muted">Измените фильтры или <a href="{% url 'core:calendar' %}">сбросьте их</a>.</p>

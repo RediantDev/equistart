@@ -859,6 +859,8 @@ def _card(t, today=None):
         "date_sub": (MONTHS_GEN_SHORT[start.month - 1] if same_month else f"{MONTHS_GEN_SHORT[start.month - 1]}–{MONTHS_GEN_SHORT[end.month - 1]}") + ", " + wd_low,
         "disc_line": ", ".join(n[:1].lower() + n[1:] for n in disc_names),
         "status_kind": st_kind, "status_text": st_text,
+        # Тест 5.3, п. 7: цвет блока даты — по состоянию; «Приём закрыт» — цвет первой дисциплины
+        "date_kind": st_kind if st_kind != "muted" else (DISCIPLINE_COLORS.get(disc[0], "muted") if disc and st_text == "Приём закрыт" else "muted"),
         "month": MONTHS_SHORT[start.month - 1] if (start.month, start.year) == (end.month, end.year)
                  else f"{MONTHS_SHORT[start.month - 1]}–{MONTHS_SHORT[end.month - 1]}",
         "days": days,
