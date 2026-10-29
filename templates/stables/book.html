@@ -51,7 +51,7 @@
 
   {% if others %}{# тест 5.2, вариант A (R3_06A) + значок грузовика из варианта B #}
   <section class="sb-card sb-others" aria-labelledby="oth-h">
-    <div class="sb-blockhead"><span class="sb-ibox" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 7h11v9H2zM13 10h4l3 3v3h-7"/><circle cx="6" cy="17" r="2"/><circle cx="16" cy="17" r="2"/></svg></span><h2 class="h3" id="oth-h">Представителю и коневозу</h2></div>
+    <div class="sb-blockhead"><span class="sb-ibox" aria-hidden="true">{% include "partials/icon.html" with name="truck" %}</span><h2 class="h3" id="oth-h">Представителю и коневозу</h2></div>
     {% for q in others %}<div class="sb-svc">
       <div data-counter data-svc="{{ q.s.pk }}" data-sname="{{ q.s.name }}" data-unit="{{ q.s.unit }}">
         <b class="sb-svc__name">{{ q.s.name }}</b>
