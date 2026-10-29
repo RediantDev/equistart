@@ -43,7 +43,7 @@
 .sb-sv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .sb-si { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: var(--radius-pill); min-height: 44px; padding: 0 12px; min-width: 0; }
 .sb-si.is-js { padding-left: 10px; }
-.sb-si label { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-si label { flex: 1; min-width: 0; font-size: 13px; line-height: 16px; font-weight: 600; overflow-wrap: anywhere; hyphens: auto; }
 .sb-si input { width: 52px; min-height: 36px; height: 36px; padding: 0 4px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 .sb-si.is-js { padding-right: 0; gap: 0; }
 .sb-si.is-js input { width: 22px; min-width: 0; flex: none; border: 0; background: transparent; padding: 0; -moz-appearance: textfield; appearance: textfield; box-shadow: none; }
@@ -52,8 +52,33 @@
 .sb-si button { width: 32px; height: 42px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; color: var(--text); flex: none; }
 .sb-si button[hidden] { display: none; }
 .sb-trailer { min-height: 44px; border-radius: var(--radius-pill); }
+/* тест 5.2, п. 29: «Представителю и коневозу» — полное название, единица и кому */
+.sb-sv--others { grid-template-columns: minmax(0, 1fr); }
+.sb-si--full { border-radius: var(--radius-md); min-height: 52px; padding-top: 6px; padding-bottom: 6px; }
+.sb-si--full label { display: flex; flex-direction: column; gap: 1px; }
+.sb-si__name { font-size: 15px; line-height: 20px; font-weight: 600; }
+.sb-si__sub { font-size: 13px; line-height: 16px; font-weight: 400; color: var(--text-muted); }
 
-.sb-mine { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.sb-mine { list-style: none; margin: 0; padding: 0; }
+/* тест 5.2, п. 23: оформленное по лошади — свёрнуто до строки-итога */
+.sb-mine-box { border-top: 1px solid var(--border); }
+.sb-mine-sum { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 40px; padding-top: 6px; cursor: pointer; font-size: 13px; line-height: 18px; }
+.sb-mine-sum::-webkit-details-marker { display: none; }
+.sb-mine-sum__text { flex: 1; min-width: 0; font-weight: 600; }
+.sb-mine-sum__more { flex: none; }
+.sb-mine-box[open] .sb-mine-sum__more { display: none; }
+.sb-chev { flex: none; fill: none; stroke: currentColor; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; color: var(--text-muted); transition: transform .15s; }
+details[open] > summary .sb-chev { transform: rotate(180deg); }
+.sb-mine-box[open] .sb-mine-sum { border-bottom: 1px dashed var(--border); padding-bottom: 6px; }
+/* тест 5.2, п. 25: ночи ожидающей брони меняются нажатием на ленту */
+.sb-nt.is-edit { cursor: pointer; }
+.sb-nt.is-edit input { pointer-events: none; }
+.sb-nt.is-edit .sb-nt__in { opacity: 1 !important; }
+.sb-nt.is-edit input:checked + .sb-nt__in { background: var(--ink); opacity: .8 !important; outline: 2px dashed var(--surface); outline-offset: -5px; }
+.sb-nt.is-edit:focus-visible { outline: none; }
+.sb-nt.is-edit:focus-visible .sb-nt__in { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sb-hint { margin-top: -2px; }
+.sb-hint.is-warn { color: var(--danger, #b42318); }
 .sb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 0 0; font-size: 13px; scroll-margin-top: 72px; }
 .sb-row + .sb-row { border-top: 1px dashed var(--border); margin-top: 8px; }
 .sb-row__main { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -65,8 +90,16 @@
 .sb-act__body.inline-row input { flex: 1 1 180px; }
 
 .sb-extra { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; }
-.sb-extra > summary { cursor: pointer; font-weight: 600; font-size: 13px; min-height: 28px; display: flex; align-items: center; }
-.sb-extra[open] > summary { margin-bottom: 8px; }
+/* тест 5.2, п. 30: свёрнутый блок выглядит как карточка-действие */
+.sb-extra > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; min-height: 48px; }
+.sb-extra > summary::-webkit-details-marker { display: none; }
+.sb-extra__ico { flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--accent); color: var(--ink); display: flex; align-items: center; justify-content: center; }
+.sb-extra__ico svg { fill: none; stroke: currentColor; stroke-width: 1.8px; stroke-linecap: round; stroke-linejoin: round; }
+.sb-extra__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sb-extra__text b { font-size: 15px; line-height: 20px; }
+.sb-extra__text .sb-m { font-size: 13px; line-height: 17px; }
+.sb-extra > summary .sb-chev { color: var(--text); }
+.sb-extra[open] > summary { margin-bottom: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 .sb-extra .field { margin-top: 8px; }
 
 .sb-bar { position: sticky; bottom: 0; z-index: 6; display: flex; align-items: center; gap: 12px; margin-top: 4px;
@@ -80,9 +113,14 @@
 @media (min-width: 721px) {
   .sb-strip { grid-template-columns: repeat(var(--cols-wide, 3), minmax(0, 120px)); }
   .sb-sv { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sb-sv--others { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sb-bar { bottom: 12px; }
 }
 @media (max-width: 720px) {
   /* Панель «Заказать» — во всю ширину над нижним меню, как в макете */
-  .sb-bar { bottom: calc(var(--bnav-h) + env(safe-area-inset-bottom)); margin-left: -12px; margin-right: -12px; border-radius: 0; border-width: 1px 0 0; box-shadow: none; padding: 8px 12px 10px 16px; }
+  /* тест 5.2, п. 21: панель закреплена вплотную к нижнему меню (с учётом safe-area на iPhone) и не оставляет пустоты в конце страницы;
+     место под ней — отступ формы, чтобы панель не перекрывала последнюю карточку */
+  .sb-bar { position: fixed; left: 0; right: 0; bottom: calc(var(--bnav-h) + env(safe-area-inset-bottom)); margin: 0; z-index: 55;
+    border-radius: 0; border-width: 1px 0 0; box-shadow: none; padding: 8px 12px 10px 16px; }
+  .sb-form:has(> .sb-bar) { padding-bottom: 72px; }
 }

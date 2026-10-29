@@ -1,4 +1,4 @@
-<li class="sb-row" id="b{{ b.pk }}">
+<li class="sb-row" id="b{{ b.pk }}"{% if b.state == "pending" and open %} data-edit-bk="{{ b.pk }}" data-arrive="{{ b.arrive|date:'Y-m-d' }}" data-depart="{{ b.depart|date:'Y-m-d' }}" data-cat="{{ b.category_id }}" data-hname="{{ b.horse_name }}"{% endif %}>
   <div class="sb-row__main"><span>{% if show_horse %}<strong>{{ b.horse_name }}</strong> · {% endif %}{{ b.category.name }} · {{ b.period }}</span>
     {% if b.required %}<span class="sb-m">Без денника выступления невозможны{% if b.state == "pending" or b.state == "rejected" %} — выступления лошади ждут подтверждения брони{% endif %}</span>{% endif %}
     {% if b.reason and b.state != "pending" %}<span class="sb-m">Причина: {{ b.reason }}</span>{% endif %}</div>
@@ -11,7 +11,7 @@
           <div class="field"><label class="field__label" for="e{{ b.pk }}-d">Выезд</label><input id="e{{ b.pk }}-d" type="date" name="depart" form="e{{ b.pk }}" value="{{ b.depart|date:'Y-m-d' }}" required></div></div>
         <button class="btn btn--dark btn--sm" form="e{{ b.pk }}">Сохранить изменения</button>
       </div></details>{% endif %}
-    <details class="inline-details sb-act"><summary class="btn btn--ghost btn--sm">Отменить</summary>
-      <div class="sb-act__body inline-row"><input type="text" name="reason" form="x{{ b.pk }}" placeholder="Причина (необязательно)" aria-label="Причина отмены"><button class="btn btn--danger btn--sm" form="x{{ b.pk }}">Отменить бронь</button></div></details>
+    {# тест 5.2, п. 26: без поля «причина» — только подтверждение #}
+    <button class="btn btn--ghost btn--sm" form="x{{ b.pk }}" data-confirm="Отменить бронь денника: {{ b.horse_name }}, {{ b.category.name }}, {{ b.period }}? Место освободится для других." data-confirm-ok="Отменить бронь">Отменить</button>
   </div>{% endif %}
 </li>
