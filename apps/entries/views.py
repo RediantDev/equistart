@@ -673,37 +673,39 @@ PAGE_SIZE = 50
 TABS = [("pending", "На рассмотрении"), ("accepted", "Принятые"), ("rejected", "Отклонённые"), ("cancelled", "Отменённые")]
 
 
+LOWER_TABS = [("accepted", "Принятые"), ("rejected", "Отклонённые"), ("cancelled", "Отменённые")]
+
+
 @login_required
 def manage(request, pk):
-    """Экран заявок судьи (тест 4): вкладки по решению, внутри — маршрут → зачёт → пары; принять / отклонить в строке."""
+    """Экран заявок судьи. Тест 6, п. 30 (вариант В): ждущие решения — отдельным блоком сверху с «Принять все»,
+    ниже — принятые / отклонённые / отменённые чипами; поиск одной строкой, маршрут — в фильтре."""
     t = get_object_or_404(Tournament, pk=pk)
     services.require_judge(request.user, t)
     from django.db.models import Count
 
     counts = dict(Entry.objects.filter(tournament=t).order_by().values("decision").annotate(n=Count("id")).values_list("decision", "n"))
-    tab = request.GET.get("tab") or request.GET.get("decision") or ("pending" if counts.get("pending") else "accepted")
-    if tab not in dict(TABS):
-        tab = "pending"
-    f = {"q": request.GET.get("q", ""), "program": request.GET.get("program", ""), "decision": tab}
-    qs = (_manage_qs(t, f).select_related("application", "tclass", "program").prefetch_related("proposals")
-          .order_by("day", "program__start_time", "program__position", "program_id", "tclass__position", "tclass_id", "athlete_snapshot__name", "pk"))
-    groups, by_prog = [], {}
-    for e in qs:
-        e.pending_proposal = next((p for p in e.proposals.all() if p.state == ChangeProposal.State.PENDING), None)
-        g = by_prog.get(e.program_id)
-        if g is None:
-            g = by_prog[e.program_id] = {"p": e.program, "classes": [], "by_class": {}, "n": 0}
-            groups.append(g)
-        c = g["by_class"].get(e.tclass_id)
-        if c is None:
-            c = g["by_class"][e.tclass_id] = {"c": e.tclass, "entries": []}
-            g["classes"].append(c)
-        c["entries"].append(e)
-        g["n"] += 1
+    tab = request.GET.get("tab") or request.GET.get("decision") or "accepted"
+    if tab not in dict(LOWER_TABS):
+        tab = "accepted"
+    f = {"q": request.GET.get("q", ""), "program": request.GET.get("program", "")}
+    order = ("day", "program__start_time", "program__position", "program_id", "tclass__position", "tclass_id", "athlete_snapshot__name", "pk")
+
+    def rows(decision):
+        out = list(_manage_qs(t, dict(f, decision=decision)).select_related("application", "tclass", "program")
+                   .prefetch_related("proposals").order_by(*order))
+        for e in out:
+            e.pending_proposal = next((p for p in e.proposals.all() if p.state == ChangeProposal.State.PENDING), None)
+        return out
+
+    pending = rows("pending")
+    lower = rows(tab)
     params = "&".join(f"{k}={v}" for k, v in (("q", f["q"]), ("program", f["program"])) if v)
     return render(request, "entries/manage.html", {
-        "t": t, "groups": groups, "tab": tab, "tabs": [(k, l, counts.get(k, 0)) for k, l in TABS], "f": f, "params": params,
-        "programs": t.programs.all().order_by("day", "start_time", "position"), "total": sum(g["n"] for g in groups),
+        "t": t, "pending": pending, "rows": lower, "tab": tab, "f": f, "params": params,
+        "tabs": [(k, l, counts.get(k, 0)) for k, l in LOWER_TABS], "pending_total": counts.get("pending", 0),
+        "programs": t.programs.all().order_by("day", "start_time", "position"),
+        "program_name": next((p.name for p in t.programs.all() if str(p.pk) == f["program"]), ""),
         "is_manager": tservices.can_manage(request.user, t),
     })
 
@@ -799,7 +801,8 @@ def quick_add(request, pk):
             messages.success(request, f"Добавлено: {e.athlete_snapshot.get('name')} / {e.horse_snapshot.get('name')} — "
                                       + ", ".join(f"{x.program_name} · {x.class_name}" for x in entries) + ". Выступления приняты.")
             if "more" in request.POST:
-                return redirect(reverse("entries:quick_add", args=[t.pk]) + (f"?next={nxt}" if nxt else ""))
+                # тест 6, п. 33: форма пустая, экран — наверху
+                return redirect(reverse("entries:quick_add", args=[t.pk]) + "?top=1" + (f"&next={nxt}" if nxt else ""))
             return redirect(nxt or reverse("entries:manage", args=[t.pk]) + "?tab=accepted")
     groups = {}
     for k, c in form.class_objs.items():

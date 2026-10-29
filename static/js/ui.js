@@ -698,6 +698,16 @@
     if ((f.method || "").toLowerCase() !== "post" || f.hasAttribute("data-no-keep-scroll")) return;
     try { sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ path: location.pathname, y: window.scrollY, at: Date.now() })); } catch (err) {}
   });
+  // Тест 6, п. 33: «Сохранить и добавить ещё» — экран наверх, курсор в первое поле (адрес с ?top=1)
+  function toTop() {
+    if (!/[?&]top=1(&|$)/.test(location.search)) return false;
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    window.scrollTo(0, 0);
+    var f = document.querySelector("[data-autofocus]");
+    if (f && !TOUCH) f.focus({ preventScroll: true });
+    return true;
+  }
+  document.addEventListener("htmx:afterSettle", function () { setTimeout(toTop, 0); });
   function restoreScroll() {
     try {
       var s = JSON.parse(sessionStorage.getItem(SCROLL_KEY) || "null");
@@ -705,6 +715,7 @@
       // Ошибка в форме — плавно к первому полю с ошибкой (тест 4.2, п. 34)
       var err = document.querySelector(".field--error, .alert--error");
       if (err && !err.closest(".messages")) return;  // к ошибке ведёт smooth.js
+      if (toTop()) return;
       // Ссылка ведёт к блоку (#…) — плавно к нему, а не на прежнее место
       if (location.hash.length > 1) {
         var target = document.getElementById(location.hash.slice(1));

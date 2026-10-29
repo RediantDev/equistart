@@ -1,0 +1,29 @@
+{% load tournaments %}{# Строка заявки на экране «Заявки» (тест 6, пп. 30, 34): пара, маршрут и зачёт; действия — «Принять» и меню «три точки» #}
+<li class="mrow" id="e{{ e.pk }}">
+  <div class="mrow__main">
+    <a class="mrow__who" href="{% url 'entries:application' e.application_id %}"><strong>{{ e.athlete_snapshot.name }}</strong> · {{ e.horse_snapshot.name }}</a>
+    <span class="mrow__sub">{{ e.program.name }} · {{ e.tclass.label|default:e.class_name }}</span>
+    <span class="mrow__sub">{{ e.athlete_snapshot.birth_date|isodate|default:"дата рождения не указана" }}{% if e.athlete_snapshot.rank %} · {{ e.athlete_snapshot.rank }}{% endif %}{% if e.athlete_snapshot.club %} · {{ e.athlete_snapshot.club }}{% endif %}</span>
+    {% if e.pending_proposal %}<span class="chip chip--warning">Изменение на рассмотрении</span>{% endif %}
+    {% if e.decision_reason and e.decision == "rejected" %}<span class="mrow__sub">Причина: {{ e.decision_reason }}</span>{% endif %}
+    {% if e.decision == "cancelled" %}<span class="mrow__sub">{{ e.cancel_reason|default:"Отменено" }}</span>{% endif %}
+  </div>
+  <div class="mrow__act">
+    {% if e.decision == "pending" or e.decision == "rejected" %}
+      <form method="post" action="{% url 'entries:decide' t.pk %}">{% csrf_token %}<input type="hidden" name="confirm" value="1"><input type="hidden" name="action" value="accept"><input type="hidden" name="items" value="{{ e.pk }}:{{ e.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button class="btn {% if e.decision == 'pending' %}btn--dark{% else %}btn--ghost{% endif %} btn--sm">Принять</button></form>
+    {% endif %}
+    <details class="kebab">
+      <summary aria-label="Действия с заявкой {{ e.athlete_snapshot.name }}">{% include "partials/icon.html" with name="dots" size=20 %}</summary>
+      <div class="kebab__menu">
+        <a href="{% url 'entries:application' e.application_id %}">Заявка №{{ e.application.number }}{% if e.application.contact_name %} · {{ e.application.contact_name }}{% endif %}</a>
+        {% if e.decision == "pending" or e.decision == "accepted" %}
+        <form method="post" action="{% url 'entries:decide' t.pk %}" class="kebab__form">{% csrf_token %}<input type="hidden" name="confirm" value="1"><input type="hidden" name="action" value="reject"><input type="hidden" name="items" value="{{ e.pk }}:{{ e.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <label class="field"><span class="field__label">Причина отклонения — увидит подавший</span><input name="reason" required placeholder="Например: не подходит по году рождения"></label>
+          <button class="btn btn--danger btn--sm">Отклонить</button>
+        </form>
+        {% endif %}
+      </div>
+    </details>
+  </div>
+</li>
