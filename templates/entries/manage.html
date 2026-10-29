@@ -39,7 +39,7 @@
                 <span class="table__sub">{{ e.athlete_snapshot.birth_date|isodate|default:"дата рождения не указана" }}{% if e.athlete_snapshot.rank %} · {{ e.athlete_snapshot.rank }}{% endif %}{% if e.athlete_snapshot.club %} · {{ e.athlete_snapshot.club }}{% endif %}</span>
               </div>
               <div class="entry-line__horse"><strong>{{ e.horse_snapshot.name }}</strong><span class="table__sub">{{ e.horse_snapshot.birth_year }}{% if e.horse_snapshot.sex %} · {{ e.horse_snapshot.sex }}{% endif %}{% if e.horse_snapshot.color %} · {{ e.horse_snapshot.color }}{% endif %}</span></div>
-              <div class="entry-line__app"><a href="{% url 'entries:application' e.application_id %}">Заявка №{{ e.application_id }}</a><span class="table__sub">{{ e.application.contact_name }}{% if e.application.contact_phone %} · {{ e.application.contact_phone|phone }}{% endif %}</span>
+              <div class="entry-line__app"><a href="{% url 'entries:application' e.application_id %}">Заявка №{{ e.application.number }}</a><span class="table__sub">{{ e.application.contact_name }}{% if e.application.contact_phone %} · {{ e.application.contact_phone|phone }}{% endif %}</span>
                 {% if e.pending_proposal %}<span class="chip chip--warning">Изменение на рассмотрении</span>{% endif %}
                 {% if e.decision_reason and e.decision == "rejected" %}<span class="table__sub">Причина: {{ e.decision_reason }}</span>{% endif %}</div>
               <div class="entry-line__act">

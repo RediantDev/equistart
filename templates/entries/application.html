@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load tournaments %}
-{% block title %}Заявка №{{ app.pk }} — СтартЛист{% endblock %}
+{% block title %}Заявка №{{ app.number }} — СтартЛист{% endblock %}
 {% block content %}
 {# Макет 28.10.2026 (R2_03B): просмотр по дням; «Изменить заявку» — режим правки с отменой строк и решением по денникам #}
 <div class="app-head ae-head">
@@ -9,7 +9,7 @@
     <div class="ae-head__text">
       {# тест 5.2 (п.37): сводка решений — в одной строке с заголовком, справа #}
       <div class="ae-head__title">
-        <h1 class="h2 app-head__title">Заявка №{{ app.pk }}{% if edit %} <span class="chip ae-head__mode">правка</span>{% endif %}</h1>
+        <h1 class="h2 app-head__title">Заявка №{{ app.number }}{% if edit %} <span class="chip ae-head__mode">правка</span>{% endif %}</h1>
         {% if not edit %}<div class="chips ae-head__chips">{% for label, n, color in summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>{% endif %}
       </div>
       <p class="ae-head__t">{% if owner and t.publication == "published" %}<a href="{% url 'tournaments:public' t.pk %}">{{ t.pub_title }}</a>{% else %}{{ t.pub_title }}{% endif %}</p>

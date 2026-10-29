@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 
 User = settings.AUTH_USER_MODEL
 
@@ -16,19 +16,30 @@ class Application(models.Model):
     idempotency_key = models.CharField(max_length=64, unique=True)
     content_hash = models.CharField(max_length=64)
     revision = models.PositiveIntegerField(default=1)
+    # Номер заявки внутри турнира: №1, №2… (решение 29.10.2026)
+    number = models.PositiveIntegerField("номер в турнире", null=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = "заявка"
         verbose_name_plural = "заявки"
         ordering = ["-created_at"]
+        constraints = [models.UniqueConstraint(fields=["tournament", "number"], name="application_number_in_tournament")]
 
     def __str__(self):
-        return f"Заявка №{self.pk}"
+        return f"Заявка №{self.number or self.pk}"
 
-    @property
-    def number(self):
-        return self.pk
+    def save(self, *args, **kwargs):
+        if self.number is None and self.tournament_id:
+            from apps.tournaments.models import Tournament
+
+            with transaction.atomic():
+                # Блокируем турнир, чтобы две одновременные заявки не получили один номер
+                Tournament.objects.select_for_update().filter(pk=self.tournament_id).exists()
+                last = Application.objects.filter(tournament_id=self.tournament_id).aggregate(m=models.Max("number"))["m"]
+                self.number = (last or 0) + 1
+                return super().save(*args, **kwargs)
+        return super().save(*args, **kwargs)
 
     @property
     def is_group(self):

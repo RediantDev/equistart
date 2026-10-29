@@ -4,7 +4,7 @@
 {# Тест 5.2 (п.41/43): изменение из режима правки заявки — пара и маршрут/зачёт выбираются как при подаче #}
 <div class="page-head">
   <div>
-    <a class="back" href="{{ back }}">← Заявка №{{ e.application_id }}</a>
+    <a class="back" href="{{ back }}">← Заявка №{{ e.application.number }}</a>
     <h1 class="h1">Изменить выступление</h1>
     <p class="table__sub">Сейчас: {{ e.athlete_snapshot.name }} — {{ e.horse_snapshot.name }} · {{ e.program_name }}{% if e.height %} · {{ e.height }} см{% endif %} · {{ e.class_name }}</p>
   </div>
@@ -45,7 +45,7 @@
               {% for o in row.opts %}
                 {% if o.submitted %}
                   <div class="opt is-off is-filed"><span class="opt__mark" aria-hidden="true">✓</span>
-                    <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">Уже заявлены · заявка №{{ o.submitted.application_id }}</span></span></div>
+                    <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">Уже заявлены · заявка №{{ o.submitted.application.number }}</span></span></div>
                 {% else %}
                   <label class="opt{% if o.why %} is-off{% endif %}"><input type="radio" name="tclass" value="{{ o.c.pk }}"{% if o.checked and not o.why %} checked{% endif %}{% if o.why %} disabled{% endif %}>
                     <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">{% if o.current %}Сейчас{% if o.why %} · {% endif %}{% endif %}{% if o.why %}{{ o.why|join:"; " }}{% elif not o.current %}{{ o.c.conditions|default:"без ограничений" }}{% endif %}</span></span></label>

@@ -28,7 +28,7 @@ class ApplyFiledTests(Base):
     def test_filed_class_marked_and_other_class_closed(self):
         page = self.page()
         self.assertIn("Пара уже заявлена в зачёте «Дети»", page)
-        self.assertIn(f"Уже заявлены · заявка №{self.app.pk}", page)
+        self.assertIn(f"Уже заявлены · заявка №{self.app.number}", page)
         self.assertNotIn(f'name="sel_{self.p1.pk}" value="{self.c_kids.pk}"', page)
         # в маршруте пара выступает в одном зачёте — «Открытый» закрыт с причиной
         self.assertIn(f'name="sel_{self.p1.pk}" value="{self.c_open.pk}" disabled', page)
@@ -146,3 +146,20 @@ class MyCompetitionsDatesTests(Base):
         self.assertIn('id="mc-dates"', page)
         self.client.force_login(self.other)
         self.assertEqual(self.client.get(reverse("entries:competitions")).context["calendar_dates"], {"upcoming": [], "past": []})
+
+
+
+@override_settings(MEDIA_ROOT=TMP)
+class ApplicationNumberTests(Base):
+    """Решение 29.10.2026: заявки нумеруются с №1 внутри каждого турнира."""
+
+    def test_numbers_start_from_one_per_tournament(self):
+        from apps.entries.models import Application
+
+        t2 = self.make_tournament()
+        mk = lambda t, k: Application.objects.create(tournament=t, submitted_by=self.coach, idempotency_key=k, content_hash="x")
+        a1, a2, b1 = mk(self.t, "k1"), mk(self.t, "k2"), mk(t2, "k3")
+        self.assertEqual((a1.number, a2.number, b1.number), (1, 2, 1))
+        self.assertEqual(str(a2), "Заявка №2")
+        self.client.force_login(self.coach)
+        self.assertContains(self.client.get(reverse("entries:application", args=[a2.pk])), "Заявка №2")

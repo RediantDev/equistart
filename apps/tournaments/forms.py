@@ -294,7 +294,7 @@ class TermsForm(forms.ModelForm):
         self.fields["entry_deadline_time"].required = True  # тест 4.2: время обязательно
         self.fields["entry_deadline_time"].error_messages["required"] = "Укажите время окончания приёма заявок."
         if not self.instance.entry_deadline_time and not self.is_bound:
-            self.initial["entry_deadline_time"] = "23:59"
+            self.initial["entry_deadline_time"] = "17:00"  # решение 29.10.2026: по умолчанию до 17:00
 
     def clean_regulation(self):
         f = self.cleaned_data.get("regulation")

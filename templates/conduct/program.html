@@ -117,7 +117,7 @@
           <li class="entry-line">
             <div class="entry-line__who"><strong>{{ e.athlete_snapshot.name }}</strong><span class="table__sub">{{ e.athlete_snapshot.birth_date|isodate|default:"" }}{% if e.athlete_snapshot.rank %} · {{ e.athlete_snapshot.rank }}{% endif %}{% if e.athlete_snapshot.club %} · {{ e.athlete_snapshot.club }}{% endif %}</span></div>
             <div class="entry-line__horse"><strong>{{ e.horse_snapshot.name }}</strong><span class="table__sub">{{ e.class_name }}</span></div>
-            <div class="entry-line__app"><a href="{% url 'entries:application' e.application_id %}">Заявка №{{ e.application_id }}</a><span class="table__sub">{{ e.application.contact_name }}</span></div>
+            <div class="entry-line__app"><a href="{% url 'entries:application' e.application_id %}">Заявка №{{ e.application.number }}</a><span class="table__sub">{{ e.application.contact_name }}</span></div>
             <div class="entry-line__act">
               {% if e.decision == "pending" or e.decision == "rejected" %}
                 <form method="post" action="{% url 'entries:decide' t.pk %}">{% csrf_token %}<input type="hidden" name="confirm" value="1"><input type="hidden" name="action" value="accept"><input type="hidden" name="items" value="{{ e.pk }}:{{ e.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn--primary btn--sm">Принять</button></form>

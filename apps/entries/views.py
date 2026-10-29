@@ -221,7 +221,7 @@ def apply(request, pk):
                     if line.key() in existing:
                         errs.append("уже есть в заявке")
                     elif other_filed:
-                        errs.append(f"в этом маршруте пара уже заявлена в зачёте «{other_filed[0].class_name}» (заявка №{other_filed[0].application_id})")
+                        errs.append(f"в этом маршруте пара уже заявлена в зачёте «{other_filed[0].class_name}» (заявка №{other_filed[0].application.number})")
                     elif single and taken.get(c.program_id, set()) - {c.pk}:
                         errs.append("в этом маршруте пара уже заявлена в другом зачёте — уберите его, чтобы выбрать этот")
                     if errs:
@@ -264,7 +264,7 @@ def apply(request, pk):
                 return redirect(_apply_url(t, late))
             else:
                 _drop_cart(request, t, late)
-                messages.success(request, f"Заявка №{app.pk} отправлена. Решение по каждому выступлению появится здесь и в уведомлениях.")
+                messages.success(request, f"Заявка №{app.number} отправлена. Решение по каждому выступлению появится здесь и в уведомлениях.")
                 return redirect("entries:application", pk=app.pk)
 
     lines = _load_lines(cart)
@@ -604,7 +604,7 @@ def propose(request, pk):
         if not c:
             error = "Выберите маршрут и зачёт."
         elif other:
-            error = f"В этом маршруте пара уже заявлена в зачёте «{other[0].class_name}» (заявка №{other[0].application_id})."
+            error = f"В этом маршруте пара уже заявлена в зачёте «{other[0].class_name}» (заявка №{other[0].application.number})."
         else:
             try:
                 services.propose(request.user, e.pk, athlete=a, horse=h, tclass=c)

@@ -187,7 +187,7 @@ def submit(user, tournament_id, lines: list[Line], key: str, contact_name="", co
 
     judges = _judges(t)
     notify_merged(judges, "application", reverse("entries:manage", args=[t.pk]) + "?decision=pending",
-                  lambda n: f"«{t.pub_title}»: новых заявок — {n}. Последняя: №{app.pk}, выступлений {len(lines)}.")
+                  lambda n: f"«{t.pub_title}»: новых заявок — {n}. Последняя: №{app.number}, выступлений {len(lines)}.")
     return app
 
 
@@ -278,7 +278,7 @@ def _notify_decisions(t, done):
             for e, text in items:
                 by_text.setdefault(text, 0)
                 by_text[text] += 1
-            msg = f"«{t.pub_title}», заявка №{app_id}: " + "; ".join(f"{k.lower()} — {v}" for k, v in by_text.items())
+            msg = f"«{t.pub_title}», заявка №{items[0][0].application.number}: " + "; ".join(f"{k.lower()} — {v}" for k, v in by_text.items())
         notify([u], msg, reverse("entries:application", args=[app_id]), "decision")
 
 
@@ -330,7 +330,7 @@ def cancel_by_representative(user, application_id, items: list[tuple[int, str]])
         except Entry.DoesNotExist:
             results.append(RowResult(entry_id, False, "позиция не найдена в этой заявке"))
     if any(r.ok for r in results):
-        notify(_judges(app.tournament), f"Заявка №{app.pk}: представитель отменил выступлений — {sum(r.ok for r in results)}", reverse("entries:manage", args=[app.tournament_id]), "cancel")
+        notify(_judges(app.tournament), f"Заявка №{app.number}: представитель отменил выступлений — {sum(r.ok for r in results)}", reverse("entries:manage", args=[app.tournament_id]), "cancel")
     return results
 
 
@@ -360,7 +360,7 @@ def propose(user, entry_id, athlete=None, horse=None, tclass=None) -> ChangeProp
         raise ValueError(errors[0])
     p = ChangeProposal.objects.create(entry=e, athlete=athlete, horse=horse, tclass=tclass, created_by=user)
     audit(user, "proposal.create", e, proposal=p.pk, text=p.describe())
-    notify(_judges(e.tournament), f"Предложено изменение в заявке №{e.application_id}: {p.describe()}", reverse("entries:application", args=[e.application_id]), "proposal")
+    notify(_judges(e.tournament), f"Предложено изменение в заявке №{e.application.number}: {p.describe()}", reverse("entries:application", args=[e.application_id]), "proposal")
     return p
 
 
@@ -398,7 +398,7 @@ def decide_proposal(user, proposal_id, accept: bool, reason: str = "") -> Change
     p.decided_by, p.decided_at = user, now
     p.save()
     audit(user, "proposal.accept" if accept else "proposal.reject", e, proposal=p.pk, text=p.describe(), reason=p.reason)
-    notify(_recipients(e), f"Изменение в заявке №{e.application_id} {'принято' if accept else 'отклонено'}: {p.describe()}", reverse("entries:application", args=[e.application_id]), "proposal")
+    notify(_recipients(e), f"Изменение в заявке №{e.application.number} {'принято' if accept else 'отклонено'}: {p.describe()}", reverse("entries:application", args=[e.application_id]), "proposal")
     return p
 
 

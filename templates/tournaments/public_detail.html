@@ -29,7 +29,7 @@
         <b>{% if club %}<a href="{% url 'clubs:detail' club.pk %}">{{ s.venue.name }}</a>{% else %}{{ s.venue.name }}{% endif %}</b>
         <small><span title="{{ s.venue.region_name }}, {{ s.venue.settlement }}{% if s.venue.address %}, {{ s.venue.address }}{% endif %}">{{ s.venue.settlement|default:s.venue.region_name }}</span>{% if map_query %} · <a class="tp-tile__link" href="https://yandex.ru/maps/?text={{ map_query|urlencode }}" target="_blank" rel="noopener">на карте</a>{% endif %}</small></div>
       {% if t.publication == "published" %}
-      <div class="tp-tile{% if open %} tp-tile--due{% endif %}"><span class="tp-tile__cap">Заявки до</span><b>{{ deadline|isodate:False|default:"—" }}{% if s.entry_deadline_time %}, {{ s.entry_deadline_time }}{% elif deadline %}, 23:59{% endif %}</b>
+      <div class="tp-tile{% if open %} tp-tile--due{% endif %}"><span class="tp-tile__cap">Заявки до</span><b>{{ deadline|isodate:False|default:"—" }}{% if s.entry_deadline_time %}, {{ s.entry_deadline_time }}{% elif deadline %}, 17:00{% endif %}</b>
         <small>{% if open and days_left is not None %}{% if days_left == 0 %}последний день{% else %}осталось дней: {{ days_left }}{% endif %}{% else %}приём завершён{% endif %}</small></div>
       {% endif %}
       {% if s.contact and user.is_authenticated %}

@@ -69,7 +69,7 @@
                           <button class="btn btn--ghost btn--sm opt__remove" name="remove" value="{{ o.remove }}" aria-label="Убрать {{ o.label }}">Убрать</button></div>
                       {% elif o.submitted %}
                         <div class="opt is-off is-filed"><span class="opt__mark" aria-hidden="true">✓</span>
-                          <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">Уже заявлены · заявка №{{ o.submitted.application_id }}</span></span></div>
+                          <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">Уже заявлены · заявка №{{ o.submitted.application.number }}</span></span></div>
                       {% else %}
                         <label class="opt{% if o.why %} is-off{% endif %}"><input type="checkbox" name="sel_{{ row.p.pk }}" value="{{ o.value }}"{% if o.why %} disabled{% endif %}>
                           <span class="opt__body"><span class="opt__name">{{ o.label }}</span><span class="opt__sub">{% if o.why %}{{ o.why|join:"; " }}{% else %}{{ o.conditions|default:"без ограничений" }}{% endif %}</span></span></label>
