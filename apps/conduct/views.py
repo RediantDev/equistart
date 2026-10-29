@@ -156,6 +156,10 @@ def program(request, pk, program_id):
     ctx = {
         "program_entries": ctx_entries, "blocked_ids": blocked,
         "tab": tab, "tabs": tabs, "others": t.programs.exclude(pk=p.pk).order_by("day", "start_time", "position"),
+        # тест 6, п. 32: основные вкладки — по порядку работы, остальное — в меню «три точки»; смена маршрута — по названию
+        "main_tabs": [x for x in [("entries", "Заявки"), ("order", "Порядок"), ("protocol", "Протокол"), ("results", "Результаты")] if x[0] in dict(tabs)],
+        "more_tabs": [x for x in tabs if x[0] in ("course", "panel", "merge")],
+        "all_programs": t.programs.order_by("day", "start_time", "position"),
         "t": t, "p": p, "slots": slots, "outside": outside, "classes": classes,
         "published": p.start_publications.first(),
         "fields": [(f, RESULT_FIELDS.get(f, f)) for f in p.result_fields], "statuses": Result.Status.choices,
