@@ -127,86 +127,164 @@
   window.addEventListener("hashchange", openHash);
   openHash();
 
-  // Тест 5.2, п. 25: ночи ожидающей брони меняются нажатием на ленту — крайний день убирает ночь, соседний добавляет.
-  // Отправляется обычная форма изменения брони (my_edit): сервер заново проверяет подряд идущие ночи, вместимость и состояние брони.
+  // ---- Тест 5.2, вариант A (R3_04A): меню «⋯» у оформленного ----
+  form.classList.add("is-js");
+  function closeMenus(except) {
+    document.querySelectorAll("details[data-menu][open]").forEach(function (d) { if (d !== except) d.open = false; });
+  }
+  document.addEventListener("click", function (e) {
+    var m = e.target.closest("details[data-menu]");
+    closeMenus(m);
+    if (m && e.target.closest(".sb-menu__item") && !e.target.closest("[data-confirm]")) m.open = false;
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenus(null); });
+  // «Другая категория»: открывает форму изменения брони под строкой
+  form.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-edit-form]");
+    if (b) {
+      var d = document.getElementById("ef" + b.dataset.editForm);
+      if (d) { d.open = true; var c = d.querySelector("[data-close-act]"); if (c) c.hidden = false; var f = d.querySelector("select, input"); if (f) f.focus(); }
+      return;
+    }
+    var x = e.target.closest("[data-close-act]");
+    if (x) x.closest("details").open = false;
+  });
+
+  // ---- Тест 5.2, вариант A (R3_05A): правка ночей ожидающей брони ----
+  // Нажатия только помечают: оформленная ночь — «убрать», свободная — «+ добавить». Сохраняет кнопка «Сохранить изменения»
+  // через обычную форму my_edit (итоговый набор ночей); сервер заново проверяет непрерывность, вместимость и версию брони.
   function isoOf(d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
   function shift(iso, n) { var d = parse(iso); d.setDate(d.getDate() + n); return isoOf(d); }
   function ask(text, ok) {
-    if (window.SLConfirm) return window.SLConfirm(text, ok, false);
+    if (window.SLConfirm) return window.SLConfirm(text, ok, true);
     return Promise.resolve(window.confirm(text));
-  }
-  function hint(card, text, warn) {
-    var h = card.querySelector("[data-edit-hint]");
-    if (!h) return;
-    if (!h.dataset.base) h.dataset.base = h.textContent;
-    h.textContent = text || h.dataset.base;
-    h.classList.toggle("is-warn", !!warn);
   }
   function pendingOf(card) {
     return Array.prototype.slice.call(card.querySelectorAll("[data-edit-bk]")).map(function (li) {
       return { id: li.dataset.editBk, arrive: li.dataset.arrive, depart: li.dataset.depart, cat: li.dataset.cat, name: li.dataset.hname };
     });
   }
-  function submitEdit(b, arrive, depart) {
-    // поля формы изменения связаны с ней атрибутом form= (календарь ui.js переносит id на видимое поле, поэтому ищем по name)
-    function fld(name) { return document.querySelector('[name="' + name + '"][form="e' + b.id + '"]'); }
-    var a = fld("arrive"), d = fld("depart"), f = document.getElementById("e" + b.id);
-    if (!a || !d || !f) return;
-    a.value = arrive; d.value = depart;
-    var cat = fld("category");
-    if (cat) cat.value = b.cat;
-    f.requestSubmit ? f.requestSubmit() : f.submit();
+  function nightsOf(b) { var out = [], d = b.arrive; while (d < b.depart) { out.push(d); d = shift(d, 1); } return out; }
+  function labs(card) { return Array.prototype.slice.call(card.querySelectorAll("[data-night]")); }
+  function contiguous(list) { for (var i = 1; i < list.length; i++) if (shift(list[i - 1], 1) !== list[i]) return false; return true; }
+  var ST = { keep: "оформлено", rm: "убрать", add: "+ добавить" };
+
+  // карточка → {b: бронь, rm: {ночь: 1}, add: {ночь: 1}}
+  var edits = new Map();
+  function freeFor(lab, b) { return !lab.dataset.bk && (" " + lab.dataset.cats + " ").indexOf(" " + b.cat + " ") >= 0; }
+  function result(st) {
+    var own = nightsOf(st.b).filter(function (n) { return !st.rm[n]; });
+    return own.concat(Object.keys(st.add)).sort();
   }
-  function change(card, b, arrive, depart) {
-    var was = period(b.arrive, shift(b.depart, -1)), now = period(arrive, shift(depart, -1));
-    ask("Изменить бронь «" + b.name + "»: было " + was + ", станет " + now + "? Бронь по-прежнему ждёт подтверждения конюшни.", "Изменить бронь")
-      .then(function (ok) { if (ok) { hint(card, "Сохраняем…"); submitEdit(b, arrive, depart); } });
+  function render(card) {
+    var st = edits.get(card), panel = card.querySelector("[data-edit-panel]"), intro = card.querySelector("[data-edit-intro]");
+    card.classList.toggle("is-editing", !!st);
+    labs(card).forEach(function (lab) {
+      lab.classList.remove("is-keep", "is-rm", "is-add");
+      var em = lab.querySelector(".sb-nt__st");
+      if (em) em.textContent = "";
+      if (!st) return;
+      var n = lab.dataset.night;
+      var k = lab.dataset.bk === st.b.id ? (st.rm[n] ? "rm" : "keep") : (st.add[n] ? "add" : "");
+      if (k) { lab.classList.add("is-" + k); if (em) em.textContent = ST[k]; }
+      lab.setAttribute("aria-pressed", k === "add" || k === "keep" ? "true" : "false");
+    });
+    if (intro) intro.hidden = !!st;
+    if (!panel) return;
+    panel.hidden = !st;
+    if (!st) return;
+    var res = result(st), save = panel.querySelector("[data-edit-save]"), hint = panel.querySelector("[data-edit-hint]");
+    var changed = Object.keys(st.rm).length || Object.keys(st.add).length;
+    panel.querySelector("[data-was]").textContent = period(st.b.arrive, shift(st.b.depart, -1));
+    var now = panel.querySelector("[data-now]"), ok = res.length && contiguous(res);
+    now.textContent = !res.length ? "бронь будет отменена" : ok ? period(res[0], res[res.length - 1]) : "ночи с разрывом";
+    hint.textContent = res.length && !ok ? "Ночи одной брони должны идти подряд — добавьте пропущенную ночь или уберите крайнюю." : "";
+    hint.classList.toggle("is-warn", !!(res.length && !ok));
+    save.disabled = !changed || (res.length && !ok);
+    save.textContent = res.length ? "Сохранить изменения" : "Отменить бронь";
+    save.classList.toggle("btn--danger", !res.length);
+    save.classList.toggle("btn--primary", !!res.length);
+  }
+  function start(card, b) {
+    // новая бронь в этой карточке и правка — не одновременно: снимаем отмеченные ночи новой брони
+    tiles(card).forEach(function (i) { if (free(i)) i.checked = false; });
+    edits.set(card, { b: b, rm: {}, add: {} });
+    sync();
+    render(card);
+  }
+  function tap(card, lab) {
+    var st = edits.get(card), n = lab.dataset.night;
+    if (lab.dataset.bk === st.b.id) { if (st.rm[n]) delete st.rm[n]; else st.rm[n] = 1; }
+    else if (freeFor(lab, st.b)) { if (st.add[n]) delete st.add[n]; else st.add[n] = 1; }
+    else return;
+    render(card);
+  }
+  function submit(st) {
+    var res = result(st);
+    if (!res.length) {
+      ask("Убраны все ночи — бронь «" + st.b.name + "» будет отменена. Отменить бронь?", "Отменить бронь").then(function (ok) {
+        var f = document.getElementById("x" + st.b.id);
+        if (ok && f) f.requestSubmit ? f.requestSubmit() : f.submit();
+      });
+      return;
+    }
+    var f = document.getElementById("e" + st.b.id);
+    if (!f || !contiguous(res)) return;
+    f.querySelectorAll("input[data-gen]").forEach(function (i) { i.remove(); });
+    res.forEach(function (n) {
+      var i = document.createElement("input"); i.type = "hidden"; i.name = "nights"; i.value = n; i.dataset.gen = "1"; f.appendChild(i);
+    });
+    var cat = document.createElement("input"); cat.type = "hidden"; cat.name = "category"; cat.value = st.b.cat; cat.dataset.gen = "1";
+    // поле категории из формы «Другая категория» связано с формой атрибутом form= — на время отправки отключаем его
+    document.querySelectorAll('[name="category"][form="e' + st.b.id + '"]').forEach(function (s) { s.disabled = true; });
+    f.appendChild(cat);
+    f.requestSubmit ? f.requestSubmit() : f.submit();
   }
 
   cards.forEach(function (card) {
     var list = pendingOf(card);
     if (!list.length) return;
-    var h = card.querySelector("[data-edit-hint]");
-    if (h) h.hidden = false;
+    var intro = card.querySelector("[data-edit-intro]");
+    if (intro) intro.hidden = false;
     list.forEach(function (b) {
       card.querySelectorAll('[data-night][data-bk="' + b.id + '"]').forEach(function (lab) {
-        lab.classList.add("is-edit");
-        lab.tabIndex = 0;
-        lab.setAttribute("role", "button");
-        lab.setAttribute("aria-label", lab.dataset.night + ": ночь брони, ожидающей подтверждения. Нажмите, чтобы убрать");
+        lab.classList.add("is-tap"); lab.tabIndex = 0; lab.setAttribute("role", "button");
       });
     });
+    var panel = card.querySelector("[data-edit-panel]");
+    if (panel) {
+      panel.querySelector("[data-edit-reset]").addEventListener("click", function () { edits.delete(card); render(card); });
+      panel.querySelector("[data-edit-save]").addEventListener("click", function () { var st = edits.get(card); if (st) submit(st); });
+    }
   });
+  document.querySelectorAll("[data-edit-nights]").forEach(function (b) { b.hidden = false; });
+  document.querySelectorAll("[data-edit-form]").forEach(function (b) { b.hidden = false; });
 
-  // Нажатие на ночь ожидающей брони: крайняя — убрать, единственная — предложить отмену, средняя — подсказка.
-  function tapBooked(lab) {
-    var card = lab.closest("[data-horse]"), b = pendingOf(card).filter(function (x) { return x.id === lab.dataset.bk; })[0];
-    if (!b) return;
-    var night = lab.dataset.night, last = shift(b.depart, -1);
-    if (night === b.arrive && night === last) {
-      ask("Это единственная ночь брони «" + b.name + "». Отменить бронь?", "Отменить бронь").then(function (ok) {
-        var f = document.getElementById("x" + b.id);
-        if (ok && f) f.requestSubmit ? f.requestSubmit() : f.submit();
-      });
-    } else if (night === b.arrive) change(card, b, shift(b.arrive, 1), b.depart);
-    else if (night === last) change(card, b, b.arrive, last);
-    else hint(card, "Ночи брони идут подряд — убрать можно только первую или последнюю ночь.", true);
+  function bookingById(card, id) { return pendingOf(card).filter(function (x) { return x.id === id; })[0]; }
+  function onNight(e, lab) {
+    var card = lab.closest("[data-horse]"), st = edits.get(card);
+    if (st) { e.preventDefault(); tap(card, lab); return true; }
+    var b = lab.dataset.bk && bookingById(card, lab.dataset.bk);
+    if (b) { e.preventDefault(); start(card, b); tap(card, lab); return true; }
+    return false;
   }
   form.addEventListener("click", function (e) {
-    var lab = e.target.closest(".sb-nt.is-edit");
-    if (!lab) return;
-    e.preventDefault();
-    tapBooked(lab);
+    var lab = e.target.closest("[data-night]");
+    if (lab && (lab.classList.contains("is-tap") || edits.get(lab.closest("[data-horse]")))) onNight(e, lab);
+    var en = e.target.closest("[data-edit-nights]");
+    if (en) {
+      var row = document.getElementById("b" + en.dataset.editNights), card = row && row.closest("[data-horse]");
+      if (card) { start(card, bookingById(card, en.dataset.editNights)); card.querySelector(".sb-strip").scrollIntoView({ block: "center", behavior: "smooth" }); }
+    }
   });
   form.addEventListener("keydown", function (e) {
-    var lab = e.target.closest && e.target.closest(".sb-nt.is-edit");
-    if (lab && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); tapBooked(lab); }
+    var lab = e.target.closest && e.target.closest(".sb-nt.is-tap");
+    if (lab && (e.key === "Enter" || e.key === " ")) onNight(e, lab);
   });
-
-  // Соседняя свободная ночь: добавляется к ожидающей брони (в её категории), а не создаёт отдельную бронь.
+  // свободная соседняя ночь ожидающей брони: начинает правку («+ добавить»), а не отдельную бронь
   form.addEventListener("change", function (e) {
     var inp = e.target, lab = inp.closest && inp.closest("[data-night]"), card = lab && lab.closest("[data-horse]");
-    if (!card || !inp.checked || lab.dataset.bk) return;
+    if (!card || !inp.checked || lab.dataset.bk || edits.get(card)) return;
     var night = lab.dataset.night;
     var b = pendingOf(card).filter(function (x) {
       return (night === x.depart || night === shift(x.arrive, -1)) && (" " + lab.dataset.cats + " ").indexOf(" " + x.cat + " ") >= 0;
@@ -214,9 +292,8 @@
     if (!b) return;
     e.stopImmediatePropagation();
     inp.checked = false;
-    sync();
-    if (night === b.depart) change(card, b, b.arrive, shift(b.depart, 1));
-    else change(card, b, night, b.depart);
+    start(card, b);
+    tap(card, lab);
   }, true);
 
   cards.forEach(applyCategory);

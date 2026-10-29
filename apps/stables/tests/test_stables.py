@@ -633,8 +633,11 @@ class Test52Tests(StableBase):
     def test_others_service_full_name(self):
         self.client.force_login(self.coach)
         page = self.client.get(self.url).content.decode()
-        self.assertIn('<span class="sb-si__name">Электричество для коневоза</span><span class="sb-si__sub">сутки · для коневоза</span>', page)
-        self.assertIn("Телефон и комментарий для конюшни", page)
+        self.assertIn('<b class="sb-svc__name">Электричество для коневоза</b>', page)
+        self.assertIn("Количество, сутки</label>", page)  # единица — из услуги
+        self.assertIn("Госномер коневоза", page)
+        self.assertIn('<h2 class="h3" id="st-h">Для конюшни</h2>', page)
+        self.assertIn('M2 7h11v9H2z', page)  # значок грузовика у блока
 
     def test_strip_edit_shrinks_and_extends_pending(self):
         self.cat.available_to = self.d1 + datetime.timedelta(days=1)
@@ -669,3 +672,78 @@ class Test52Tests(StableBase):
         self.client.post(edit, data)
         b.refresh_from_db()
         self.assertEqual((b.arrive, b.state), (self.d0, "confirmed"))
+
+
+class Test52VariantATests(StableBase):
+    """Тест 5.2, вариант A: строки оформленного с меню «⋯», правка ночей с ленты — итоговым набором ночей через my_edit."""
+
+    def setUp(self):
+        super().setUp()
+        self.cat.capacity = 2
+        self.cat.available_to = self.d1 + datetime.timedelta(days=2)
+        self.cat.save()
+        self.hay = Service.objects.create(tournament=self.t, name="Сено", unit="тюк")
+        self.url = reverse("stables:book", args=[self.t.pk])
+        self.b = self.book(self.h1, "b1")  # d0–d1: 2 ночи
+        self.edit = reverse("stables:my_edit", args=[self.b.pk])
+
+    def day(self, n):
+        return (self.d0 + datetime.timedelta(days=n)).isoformat()
+
+    def test_rows_and_menu(self):
+        services.order(self.coach, self.hay.pk, 2, "o1", horse=self.h1)
+        self.client.force_login(self.coach)
+        page = self.client.get(self.url).content.decode()
+        self.assertIn("<b>Денник</b>", page)
+        self.assertIn("2 тюка", page)
+        self.assertIn(f'data-edit-nights="{self.b.pk}"', page)
+        self.assertIn(">Отменить бронь</button>", page)
+        self.assertIn(">Отменить услугу</button>", page)
+        self.assertIn("data-edit-panel", page)
+        self.assertNotIn('name="reason"', page)
+
+    def test_nights_shift_and_extend(self):
+        self.client.force_login(self.coach)
+        self.client.post(self.edit, {"nights": [self.day(1), self.day(2), self.day(3)], "revision": self.b.revision})
+        self.b.refresh_from_db()
+        self.assertEqual((self.b.arrive.isoformat(), self.b.depart.isoformat(), self.b.state, self.b.category_id), (self.day(1), self.day(4), "pending", self.cat.pk))
+
+    def test_gap_rejected(self):
+        self.client.force_login(self.coach)
+        r = self.client.post(self.edit, {"nights": [self.day(0), self.day(2)], "revision": self.b.revision}, follow=True)
+        self.assertContains(r, "должны идти подряд")
+        self.b.refresh_from_db()
+        self.assertEqual((self.b.arrive, self.b.depart, self.b.revision), (self.d0, self.d1, 1))
+
+    def test_capacity_checked(self):
+        self.cat.capacity = 1
+        self.cat.save()
+        Booking.objects.create(tournament=self.t, category=self.cat, horse=self.h3, horse_name="Гранит", requested_by=self.coach,
+                               arrive=self.d1, depart=self.d1 + datetime.timedelta(days=1), idempotency_key="x")
+        self.client.force_login(self.coach)
+        self.client.post(self.edit, {"nights": [self.day(0), self.day(1), self.day(2)], "revision": self.b.revision})
+        self.b.refresh_from_db()
+        self.assertEqual(self.b.depart, self.d1)
+
+    def test_stale_revision(self):
+        self.client.force_login(self.coach)
+        self.client.post(self.edit, {"nights": [self.day(1)], "revision": 99})
+        self.b.refresh_from_db()
+        self.assertEqual(self.b.arrive, self.d0)
+
+    def test_confirmed_foreign_guest(self):
+        data = {"nights": [self.day(1)]}
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.post(self.edit, data).status_code, 403)
+        self.client.logout()
+        r = self.client.post(self.edit, data)
+        self.assertEqual(r.status_code, 302)
+        self.assertIn(reverse("accounts:login"), r["Location"])
+        services.decide(self.groom, self.b.pk, True)
+        self.client.force_login(self.coach)
+        page = self.client.get(self.url).content.decode()
+        self.assertNotIn(f'data-edit-nights="{self.b.pk}"', page)
+        r = self.client.post(self.edit, data, follow=True)
+        self.assertContains(r, "Бронь уже рассмотрена")
+        self.b.refresh_from_db()
+        self.assertEqual((self.b.arrive, self.b.state), (self.d0, "confirmed"))
