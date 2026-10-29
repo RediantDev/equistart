@@ -1699,3 +1699,89 @@ a.lrow:active, button.lrow:active { background: var(--surface-2); }
 .uisheet .dp__sel:last-child { width: 92px; }
 @media (min-width: 721px) { .uisheet { align-items: center; } .uisheet__box { border-radius: 24px; padding-bottom: 16px; } }
 .dp__input[readonly] { caret-color: transparent; -webkit-user-select: none; user-select: none; }
+
+/* ===== Тест 5.2: календарь (вариант B) и карточка соревнования (вариант A) ===== */
+/* Поиск + фильтры иконкой */
+.calendar-filters.cal-search { display: flex; flex-direction: row; gap: 8px; align-items: flex-start; position: relative; margin: 0 0 10px; }
+.cal-search__box { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border: 1px solid var(--control-border); border-radius: var(--radius-pill); background: var(--surface); color: var(--text-muted); }
+.cal-search__box:focus-within { outline: 3px solid var(--focus); outline-offset: 1px; }
+.cal-search__box input { flex: 1; min-width: 0; height: 100%; border: 0 !important; box-shadow: none !important; background: transparent; padding: 0 !important; outline: 0; }
+.cal-search__filters { position: static; flex: none; }
+.cal-search__fbtn { position: relative; list-style: none; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--control-border); background: var(--surface); color: var(--text); display: grid; place-items: center; cursor: pointer; transition: transform .08s, background-color .12s; }
+.cal-search__fbtn::-webkit-details-marker { display: none; }
+.cal-search__fbtn:active { transform: scale(.94); }
+.cal-search__fbtn.is-on, .cal-search__filters[open] > .cal-search__fbtn { background: var(--ink); border-color: var(--ink); color: #fff; }
+.cal-search__count { position: absolute; top: -3px; right: -3px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--ink); font-size: 11px; font-weight: 800; display: grid; place-items: center; }
+.cal-search__filters > .filters__body { position: absolute; left: 0; right: 0; top: calc(100% + 8px); z-index: 20; margin: 0; box-shadow: 0 12px 32px rgba(20,20,20,.14); }
+/* Календарь: промежутки между днями и кнопками не меньше 4px, у каждой ячейки — свои скругления */
+.cal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 10px 10px 12px; margin: 0 0 var(--space-4); }
+html:not(.js) .cal { display: none; }
+.cal__head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.cal__title { flex: 1; min-width: 0; padding-left: 6px; font-size: 16px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal__ib { flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: var(--text); display: grid; place-items: center; cursor: pointer; transition: transform .08s, background-color .12s; }
+.cal__ib:active { transform: scale(.92); background: var(--surface-2); }
+.cal__toggle { flex: none; height: 40px; margin-left: 2px; padding: 0 10px 0 14px; border: 1px solid var(--ink); border-radius: var(--radius-pill); background: var(--ink); color: #fff; font: inherit; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; transition: transform .08s; }
+.cal__toggle:active { transform: scale(.96); }
+.cal.is-week .cal__toggle { background: var(--surface); color: var(--text); border-color: var(--control-border); }
+.cal.is-week .cal__toggle-ico { transform: rotate(180deg); }
+.cal__toggle-ico { display: grid; transition: transform .15s; }
+.cal__wd, .cal__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); column-gap: 4px; }
+.cal__wd span { text-align: center; font-size: 12px; font-weight: 700; color: var(--text-muted); padding: 2px 0 4px; }
+.cal__grid { row-gap: 4px; }
+.cal__d { position: relative; height: 44px; min-width: 0; padding: 0 0 6px; border: 0; border-radius: 12px; background: transparent; color: var(--text); font: inherit; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; transition: transform .08s, background-color .12s; }
+@media (hover: hover) { .cal__d:hover:not(.is-sel):not(.is-wk) { background: var(--surface-2); } .cal__ib:hover { background: var(--surface-2); } }
+.cal__d:active { transform: scale(.94); }
+.cal__d.is-out { color: var(--text-muted); font-weight: 500; }
+.cal__d.is-today { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.cal__d.is-wk { background: var(--accent-soft); }
+.cal__d.is-past-ev { background: var(--surface-2); }
+.cal__d.is-sel { background: var(--ink); color: #fff; font-weight: 800; box-shadow: none; }
+.cal__dot { position: absolute; left: 50%; bottom: 6px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--ink); }
+.cal__dot--2 { width: 12px; margin-left: -6px; background: radial-gradient(circle, var(--ink) 2.5px, transparent 2.6px) 0 0 / 7px 5px repeat-x; border-radius: 0; }
+.cal__dot--past { background: transparent; box-shadow: inset 0 0 0 1.2px var(--text-muted); width: 6px; height: 6px; margin-left: -3px; }
+.cal__d.is-sel .cal__dot { background: var(--accent); }
+.cal__d.is-sel .cal__dot--2 { background: radial-gradient(circle, var(--accent) 2.5px, transparent 2.6px) 0 0 / 7px 5px repeat-x; }
+.cal__d.is-sel .cal__dot--past { background: transparent; box-shadow: inset 0 0 0 1.2px var(--accent); }
+.cal.is-week .cal__d { height: 52px; font-size: 17px; font-weight: 700; }
+/* Компьютер: календарь слева (закреплён), список справа */
+@media (min-width: 1000px) {
+  .cal-layout { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: var(--space-5); align-items: start; }
+  .cal-layout > .cal { position: sticky; top: 80px; margin: 0; }
+  .cal-layout .tcards { grid-template-columns: minmax(0, 1fr); }
+  .cal-search { max-width: 380px; }
+}
+/* Список под календарём */
+.cal-list { min-height: 120px; }
+.cal-active { margin: 0 0 var(--space-3); align-items: center; }
+.cal-active a { font-size: 14px; font-weight: 650; }
+.cal-active__n { font-size: 14px; margin-left: auto; }
+.cal-day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 var(--space-2); }
+.cal-day-head__h { margin: 0; font-size: 17px; font-weight: 800; }
+.cal-day-head__all { font-size: 14px; font-weight: 700; flex: none; min-height: 32px; display: inline-flex; align-items: center; }
+/* Карточка соревнования (вариант A) */
+.tcards { display: flex; flex-direction: column; gap: 8px; }
+@media (min-width: 721px) and (max-width: 999px) { .tcards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tcard { display: flex; align-items: center; gap: 12px; padding: 10px 8px 10px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); text-decoration: none; transition: background-color .12s, transform .08s; }
+.tcard:hover { border-color: var(--control-border); color: var(--text); }
+.tcard:active { background: var(--surface-2); }
+.tcard.is-cancelled .tcard__title { text-decoration: line-through; text-decoration-color: var(--text-muted); }
+.tcard__date { flex: none; align-self: stretch; width: 76px; min-height: 64px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 6px 4px; }
+.tcard__date b { font-size: 18px; line-height: 22px; font-weight: 800; white-space: nowrap; }
+.tcard__date small { font-size: 12px; line-height: 15px; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+.tcard__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tcard__title { font-size: var(--fs-row); line-height: 1.3; font-weight: 750; overflow-wrap: anywhere; }
+.tcard__sub { font-size: var(--fs-sub); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tcard__st { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sub); font-weight: 700; color: var(--text-muted); }
+.tcard__st::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.tcard__st--info { color: var(--info); }
+.tcard__st--warning { color: var(--warning); }
+.tcard__st--success { color: var(--success); }
+.tcard__st--danger { color: var(--danger); }
+.tcard__chev { flex: none; color: var(--text); display: grid; }
+/* «Мои соревнования»: дата в календаре отбирает карточки */
+.mc-card.is-date-off { display: none !important; }
+.mc-tools + .cal { margin-top: 12px; }
+.mc-datebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 var(--space-2); }
+.mc-datebar[hidden] { display: none; }
+.mc-datebar b { font-size: 15px; }
+.mc-datebar button { border: 0; background: none; font: inherit; font-size: 14px; font-weight: 700; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; cursor: pointer; min-height: 32px; color: var(--text); }

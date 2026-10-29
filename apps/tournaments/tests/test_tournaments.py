@@ -342,7 +342,7 @@ class CalendarTests(Base):
         b = self.publish(b)
         resp = self.client.get("/")
         self.assertContains(resp, a.pub_title)
-        self.assertContains(resp, "Приём заявок открыт")
+        self.assertContains(resp, "tcard__st--info")  # тест 5.2, карточка A: «Приём до …» синей точкой
         resp = self.client.get("/?discipline=dressage")
         self.assertContains(resp, "Выездка «Осень»")
         self.assertNotContains(resp, "Кубок «Белая роща»")
