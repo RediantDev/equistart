@@ -150,6 +150,33 @@ def period_label(arrive, depart):
     return f"{dates} · {n} {_plural(n, 'ночь', 'ночи', 'ночей')}"
 
 
+def dates_label(arrive, depart):
+    """«20–22 ноября»: даты заезда и выезда без числа ночей."""
+    if arrive.month == depart.month:
+        return f"{arrive.day}–{depart.day} {MONTHS[depart.month - 1]}"
+    return f"{arrive.day} {MONTHS[arrive.month - 1]} – {depart.day} {MONTHS[depart.month - 1]}"
+
+
+SHORT_STATE = {"pending": "ожидает", "confirmed": "подтверждена", "rejected": "отклонена", "cancelled": "отменена"}
+
+
+def mine_summary(bookings, orders):
+    """Строка-итог свёрнутого списка броней и услуг лошади: «Денник 20–22 ноября · ожидает · 2 услуги» (тест 5.2, п. 23)."""
+    parts = []
+    holding = [b for b in bookings if b.is_holding]
+    for b in holding:
+        parts.append(f"Денник {dates_label(b.arrive, b.depart)} · {SHORT_STATE[b.state]}" + (f" · № {b.box_number}" if b.box_number else ""))
+    if not holding and bookings:
+        last = bookings[-1]
+        parts.append(f"Бронь {SHORT_STATE[last.state]}")
+    active = sum(1 for o in orders if o.state == ServiceOrder.State.ORDERED)
+    if active:
+        parts.append(f"{active} {_plural(active, 'услуга', 'услуги', 'услуг')}")
+    elif orders and not parts:
+        parts.append(f"Отменённых заказов: {len(orders)}")
+    return " · ".join(parts)
+
+
 def _contiguous(nights):
     return all((b - a).days == 1 for a, b in zip(nights, nights[1:]))
 
@@ -165,27 +192,30 @@ def _render_cart(request, t, cats, svcs, horses, my_bookings, my_orders, post=No
     for b in my_bookings:
         b.period = period_label(b.arrive, b.depart)
     cards, shown = [], set()
+    open_ = services.booking_open(t)
     for h in horses:
         bks = [b for b in my_bookings if b.horse_id == h.pk]
-        busy = {d for b in bks if b.is_holding for d in services._days(b.arrive, b.depart)}
+        busy = {d: b for b in bks if b.is_holding for d in services._days(b.arrive, b.depart)}
         chosen = set(post.getlist(f"n-{h.pk}")) if post else set()
         cat = post.get(f"c-{h.pk}", default_cat) if post else default_cat
         nights = [{"d": d, "iso": d.isoformat(), "wd": f"{WEEKDAYS[d.weekday()]} → {WEEKDAYS[(d.weekday() + 1) % 7]}",
-                   "busy": d in busy, "on": d.isoformat() in chosen and d not in busy,
+                   "busy": d in busy, "on": d.isoformat() in chosen and d not in busy, "bk": busy[d].pk if d in busy else "",
                    "cats": " ".join(str(c.pk) for c in cats if c.available_from <= d < c.available_to)} for d in days]
         on = [n["d"] for n in nights if n["on"]]
         holding = [b for b in bks if b.is_holding]
         empty = "; ".join(b.period for b in holding) if holding else "без денника"
         summary = period_label(on[0], on[-1] + datetime.timedelta(days=1)) if on else empty
         counters = [{"s": s, "name": f"q-{s.pk}-{h.pk}", "value": post.get(f"q-{s.pk}-{h.pk}", "") if post else ""} for s in horse_svcs]
+        h_orders = [o for o in my_orders if o.horse_id == h.pk]
         cards.append({"h": h, "nights": nights, "cat": cat, "bookings": bks, "summary": summary, "empty": empty, "selected": bool(on),
-                      "orders": [o for o in my_orders if o.horse_id == h.pk], "counters": counters})
+                      "orders": h_orders, "counters": counters, "mine": mine_summary(bks, h_orders),
+                      "editable": open_ and any(b.state == Booking.State.PENDING for b in bks)})
         shown.add(h.pk)
     others = [{"s": s, "name": f"q-{s.pk}", "value": post.get(f"q-{s.pk}", "") if post else "", "trailer": post.get(f"trailer-{s.pk}", "") if post else ""}
               for s in other_svcs]
     cols = min(len(days), 4) or 1
     return render(request, "stables/book.html", {
-        "t": t, "cats": cats, "cards": cards, "others": others, "open": services.booking_open(t), "errors": errors or [],
+        "t": t, "cats": cats, "cards": cards, "others": others, "open": open_, "errors": errors or [],
         "key": post.get("key") if post else uuid.uuid4().hex,
         "extra_bookings": [b for b in my_bookings if b.horse_id not in shown],
         "extra_orders": [o for o in my_orders if o.horse_id not in shown],
