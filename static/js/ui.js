@@ -16,7 +16,6 @@
   // Телефон: календарь и списки открываются без клавиатуры (тест 5, п. 13.1, 21.3)
   var TOUCH = window.matchMedia && matchMedia("(pointer: coarse)").matches;
   function focusSoft(x) { if (!TOUCH && x) x.focus(); }
-  function toTop(root) { if (window.innerWidth < 720) root.scrollIntoView({ behavior: "smooth", block: "start" }); }
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -45,8 +44,59 @@
     if (openPopup) { openPopup.close(); openPopup = null; }
   }
   document.addEventListener("mousedown", function (e) {
-    if (openPopup && !openPopup.root.contains(e.target)) closePopup();
+    if (openPopup && !openPopup.root.contains(e.target) && !(openPopup.host && openPopup.host.contains(e.target))) closePopup();
   });
+
+  /* Тест 5.2, п. 58, 60, 63: список и календарь не уходят за экран.
+     Телефон, а также поле внутри шторки/окна (контейнер обрезает содержимое) — отдельной шторкой снизу (.uisheet);
+     компьютер — выпадающей панелью вниз или вверх, где больше места, высота списка — по доступному месту. */
+  function asSheet(root) {
+    if (window.innerWidth < 720) return true;
+    for (var n = root.parentElement; n && n !== document.body; n = n.parentElement) {
+      var cs = getComputedStyle(n);
+      if (cs.position === "fixed" || /(auto|scroll|hidden)/.test(cs.overflowY + cs.overflowX)) return true;
+    }
+    return false;
+  }
+  function fieldTitle(root) {
+    var ctl = root.querySelector("[id]"), l = ctl ? document.querySelector('label[for="' + ctl.id + '"]') : null;
+    var f = root.closest(".field, .ps-f");
+    if (!l && f) l = f.querySelector("label, .field__label, .ps-f__l, legend");
+    return l ? l.textContent.replace(/\s*(необязательно|обязательно)\s*$/i, "").trim() : "";
+  }
+  // Свободное место над и под элементом: без шапки сверху и нижнего меню/закреплённых панелей снизу
+  function room(r) {
+    var vv = window.visualViewport, h = vv ? vv.height : window.innerHeight;
+    var bar = document.querySelector(".topbar"), top = bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+    var bn = document.querySelector(".bnav"), bottom = h;
+    if (bn && getComputedStyle(bn).display !== "none") bottom = Math.min(bottom, bn.getBoundingClientRect().top);
+    return { below: bottom - r.bottom - 12, above: r.top - top - 12 };
+  }
+  function openSheet(pop, title, onClose) {
+    var back = el("div", "uisheet"), box = el("div", "uisheet__box");
+    box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true");
+    if (title) box.setAttribute("aria-label", title);
+    box.appendChild(el("div", "sheet__grip"));
+    var head = el("div", "uisheet__head"), x = el("button", "uisheet__x", "×");
+    x.type = "button"; x.setAttribute("aria-label", "Закрыть"); x.addEventListener("click", onClose);
+    head.appendChild(el("span", "uisheet__title", title || "Выберите")); head.appendChild(x);
+    box.appendChild(head); box.appendChild(pop); back.appendChild(box);
+    document.body.appendChild(back);
+    back.addEventListener("click", function (e) { if (e.target === back) onClose(); });
+    // Прокручивается только список внутри шторки, страница под ней — нет
+    back.addEventListener("touchmove", function (e) {
+      var sc = e.target.closest && e.target.closest(".sel__list");
+      if (!sc || sc.scrollHeight <= sc.clientHeight) e.preventDefault();
+    }, { passive: false });
+    requestAnimationFrame(function () { back.classList.add("is-open"); });
+    return { back: back, box: box };
+  }
+  function closeSheet(sh, pop, root) {
+    if (!sh) return;
+    root.appendChild(pop);
+    sh.back.classList.remove("is-open");
+    setTimeout(function () { sh.back.remove(); }, 180);
+  }
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePopup(); });
 
   function placeholderFor(input) {
@@ -134,26 +184,39 @@
       i = Math.max(0, Math.min(vis.length - 1, i));
       items.forEach(function (li) { li.classList.remove("is-active"); });
       vis[i].classList.add("is-active");
-      vis[i].scrollIntoView({ block: "nearest" });
+      var ul = vis[i].parentNode, o = vis[i].offsetTop - ul.offsetTop;  // прокручиваем только список, не страницу
+      if (o < ul.scrollTop) ul.scrollTop = o;
+      else if (o + vis[i].offsetHeight > ul.scrollTop + ul.clientHeight) ul.scrollTop = o + vis[i].offsetHeight - ul.clientHeight;
       active = i;
     }
+    var sheet = null;
     function open() {
       if (btn.disabled) return;
       closePopup();
       build();
       pop.hidden = false;
       root.classList.add("is-open");
-      var r = btn.getBoundingClientRect();
-      if (window.innerWidth < 720) { root.classList.remove("is-up"); if (window.innerHeight - r.bottom < 300) toTop(root); }  // тест 5, п. 15.1: поле поднимается, список — под ним
-      else root.classList.toggle("is-up", window.innerHeight - r.bottom < 280 && r.top > 300);
-      openPopup = { root: root, close: close };
+      var list = pop.querySelector(".sel__list");
+      if (asSheet(root)) {
+        sheet = openSheet(pop, fieldTitle(root) || btn.getAttribute("aria-label") || "", close);
+        list.style.maxHeight = "";
+      } else {
+        var r = btn.getBoundingClientRect(), sp = room(r);
+        var extra = (filter ? 52 : 0) + 14;  // поиск и отступы панели
+        var want = Math.min(360, list.scrollHeight) + extra;
+        var up = sp.below < want && sp.above > sp.below;
+        root.classList.toggle("is-up", up);
+        list.style.maxHeight = Math.max(140, Math.min(360, (up ? sp.above : sp.below) - extra)) + "px";
+      }
+      openPopup = { root: root, close: close, host: sheet && sheet.box };
       var vis = items.filter(function (li) { return !li.hidden; });
       highlight(Math.max(0, vis.indexOf(items[sel.selectedIndex])));
       if (filter) focusSoft(filter);
     }
     function close() {
       pop.hidden = true;
-      root.classList.remove("is-open");
+      root.classList.remove("is-open", "is-up");
+      if (sheet) { closeSheet(sheet, pop, root); sheet = null; }
       if (openPopup && openPopup.root === root) openPopup = null;
     }
     function keys(e) {
@@ -186,7 +249,10 @@
     var vis = el("input", "dp__input");
     vis.type = "text";
     vis.autocomplete = "off";
-    vis.inputMode = "numeric";
+    // Тест 5.2, п. 60: на телефоне дата выбирается только календарём — без клавиатуры
+    var typing = !TOUCH && window.innerWidth >= 720;
+    vis.inputMode = typing ? "numeric" : "none";
+    if (!typing) vis.readOnly = true;
     if (input.id) { vis.id = input.id; input.removeAttribute("id"); }
     vis.placeholder = placeholderFor(input) || "выберите дату";
     if (input.getAttribute("aria-describedby")) vis.setAttribute("aria-describedby", input.getAttribute("aria-describedby"));
@@ -263,24 +329,39 @@
       }
       pop.appendChild(foot);
     }
+    var sheet = null;
     function open() {
+      if (!pop.hidden) return;
       closePopup();
       view = parseIso(input.value) || new Date();
       view = new Date(view.getFullYear(), view.getMonth(), 1);
       render();
       pop.hidden = false;
       root.classList.add("is-open");
-      openPopup = { root: root, close: close };
-      var r = root.getBoundingClientRect();
-      if (window.innerHeight - r.bottom < 360) toTop(root);
+      if (asSheet(root)) {
+        if (document.activeElement === vis) vis.blur();
+        sheet = openSheet(pop, fieldTitle(root) || "Дата", close);
+      } else {
+        // Панель — в пределах экрана: вправо/влево и вверх/вниз по свободному месту
+        var r = root.getBoundingClientRect(), sp = room(r), w = pop.offsetWidth || 304, h = pop.offsetHeight || 380;
+        root.classList.toggle("is-right", r.left + w > document.documentElement.clientWidth - 8 && r.right - w >= 8);
+        root.classList.toggle("is-up", sp.below < h && sp.above > sp.below);
+      }
+      openPopup = { root: root, close: close, host: sheet && sheet.box };
     }
-    function close() { pop.hidden = true; root.classList.remove("is-open"); if (openPopup && openPopup.root === root) openPopup = null; }
+    function close() {
+      pop.hidden = true;
+      root.classList.remove("is-open", "is-up", "is-right");
+      if (sheet) { closeSheet(sheet, pop, root); sheet = null; }
+      if (openPopup && openPopup.root === root) openPopup = null;
+    }
     vis.addEventListener("click", open);
-    icon.addEventListener("click", function () { if (pop.hidden) { open(); focusSoft(vis); } else close(); });
+    icon.addEventListener("click", function () { if (pop.hidden) { open(); if (!sheet) focusSoft(vis); } else close(); });
     vis.addEventListener("keydown", function (e) { if (e.key === "ArrowDown") { e.preventDefault(); open(); } if (e.key === "Enter") { e.preventDefault(); vis.blur(); } });
-    vis.addEventListener("focus", function () { var d = parseIso(input.value); if (d) vis.value = pad(d.getDate()) + "." + pad(d.getMonth() + 1) + "." + d.getFullYear(); });
+    vis.addEventListener("focus", function () { if (!typing) return; var d = parseIso(input.value); if (d) vis.value = pad(d.getDate()) + "." + pad(d.getMonth() + 1) + "." + d.getFullYear(); });
     // Тест 5.1, п. 22.6: при вводе с клавиатуры точки ставятся сами — дд.мм.гггг
-    vis.placeholder = vis.placeholder === "Необязательно" || !vis.placeholder ? "дд.мм.гггг" : vis.placeholder;
+    if (typing) vis.placeholder = vis.placeholder === "Необязательно" || !vis.placeholder ? "дд.мм.гггг" : vis.placeholder;
+    else if (vis.placeholder === "Необязательно") vis.placeholder = "выберите дату";
     vis.addEventListener("input", function (e) {
       if (e.inputType && e.inputType.indexOf("delete") === 0) return;
       var d = vis.value.replace(/\D/g, "").slice(0, 8), out = d.slice(0, 2);
@@ -289,6 +370,7 @@
       vis.value = out;
     });
     vis.addEventListener("blur", function () {
+      if (!typing) return;
       var raw = vis.value.trim();
       if (!raw) { set(null); return; }
       var d = parseRu(raw);
@@ -351,8 +433,23 @@
       if (!input.required) { var clear = el("button", "dp__link", "Очистить"); clear.type = "button"; clear.onclick = function () { set(null); close(); }; foot.appendChild(clear); }
       pop.appendChild(foot);
     }
-    function open() { closePopup(); render(); pop.hidden = false; root.classList.add("is-open"); openPopup = { root: root, close: close }; }
-    function close() { pop.hidden = true; root.classList.remove("is-open"); if (openPopup && openPopup.root === root) openPopup = null; }
+    var sheet = null;
+    function open() {
+      if (!pop.hidden) return;
+      closePopup(); render(); pop.hidden = false; root.classList.add("is-open");
+      if (asSheet(root)) sheet = openSheet(pop, fieldTitle(root) || "Время", close);
+      else {
+        var r = root.getBoundingClientRect(), sp = room(r);
+        root.classList.toggle("is-right", r.left + pop.offsetWidth > document.documentElement.clientWidth - 8 && r.right - pop.offsetWidth >= 8);
+        root.classList.toggle("is-up", sp.below < pop.offsetHeight && sp.above > sp.below);
+      }
+      openPopup = { root: root, close: close, host: sheet && sheet.box };
+    }
+    function close() {
+      pop.hidden = true; root.classList.remove("is-open", "is-up", "is-right");
+      if (sheet) { closeSheet(sheet, pop, root); sheet = null; }
+      if (openPopup && openPopup.root === root) openPopup = null;
+    }
     vis.addEventListener("click", open);
     vis.addEventListener("focus", function () { setTimeout(function () { vis.select(); }, 0); });  // ввод заменяет «23:59», а не дописывается
     icon.addEventListener("click", function () { if (pop.hidden) { open(); focusSoft(vis); } else close(); });
