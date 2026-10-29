@@ -487,13 +487,15 @@ def my_cancel(request, kind, obj_id):
 
 # ---------------- конюшня ----------------
 
-TABS = [("bookings", "Брони"), ("grid", "Занятость"), ("orders", "Заказы услуг"), ("setup", "Категории и услуги")]
+TABS = [("bookings", "Брони"), ("orders", "Услуги"), ("setup", "Денники")]  # тест 6, пп. 37, 39: три вкладки помещаются, не прыгают
 
 
 @login_required
 def manage(request, pk):
     t = _staff_tournament(request, pk)
     tab = request.GET.get("tab", "bookings")
+    if tab == "grid":
+        tab = "setup"  # занятость — теперь внутри вкладки «Денники»
     if tab not in dict(TABS):
         tab = "bookings"
     ctx = {"t": t, "tab": tab, "tabs": TABS, "manage": can_manage(request.user, t)}
@@ -511,13 +513,6 @@ def manage(request, pk):
         elif state in Booking.State.values:
             qs = qs.filter(state=state)
         ctx.update({"bookings": qs, "state": state, "states": Booking.State.choices, "pending": pending, "nobox": nobox})
-    elif tab == "grid":
-        grid = []
-        for c in cats:
-            occ = services.occupancy(c)
-            nights = c.nights()
-            grid.append({"c": c, "cells": [(d, occ.get(d, 0), c.capacity) for d in nights]})
-        ctx["grid"] = grid
     elif tab == "orders":
         show = request.GET.get("show", "open")
         qs = ServiceOrder.objects.filter(tournament=t).select_related("service", "ordered_by").prefetch_related("deliveries")
@@ -525,8 +520,12 @@ def manage(request, pk):
             qs = [o for o in qs.filter(state=ServiceOrder.State.ORDERED) if o.delivered < o.quantity]
         ctx.update({"orders": qs, "show": show})
     else:
+        grid = []
         for c in cats:
             c.used = sum(1 for b in c.bookings.all() if b.is_holding)
+            occ = services.occupancy(c)
+            grid.append({"c": c, "cells": [(d, occ.get(d, 0), c.capacity) for d in c.nights()]})
+        ctx["grid"] = grid
         for s in ctx["svcs"]:
             s.used = services.ordered_total(s)
     return render(request, "stables/manage.html", ctx)
@@ -562,6 +561,14 @@ def manage_action(request, pk, action):
     return redirect(back)
 
 
+def _back_to(request, t):
+    """Тест 6, п. 38: после добавления денников или услуги из «Брони за участника» — обратно туда."""
+    nxt = request.POST.get("next") or request.GET.get("next") or ""
+    if nxt.startswith("/") and not nxt.startswith("//"):
+        return nxt
+    return reverse("stables:manage", args=[t.pk]) + "?tab=setup"
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def category_edit(request, pk, cat_id=None):
@@ -573,11 +580,11 @@ def category_edit(request, pk, cat_id=None):
         data = {f: form.cleaned_data[f] for f in CategoryForm.Meta.fields}
         try:
             services.save_category(request.user, t, data, c)
-            messages.success(request, "Категория сохранена.")
-            return redirect(reverse("stables:manage", args=[t.pk]) + "?tab=setup")
+            messages.success(request, "Денники сохранены.")
+            return redirect(_back_to(request, t))
         except ValueError as e:
             form.add_error(None, str(e))
-    return render(request, "stables/form.html", {"t": t, "form": form, "title": "Категория денников" if not c else c.name})
+    return render(request, "stables/form.html", {"t": t, "form": form, "title": "Новый вид денника" if not c else c.name, "next": _back_to(request, t)})
 
 
 @login_required
@@ -597,5 +604,5 @@ def service_edit(request, pk, svc_id=None):
 
             audit(request.user, "service.save", obj, name=obj.name)
             messages.success(request, "Услуга сохранена.")
-            return redirect(reverse("stables:manage", args=[t.pk]) + "?tab=setup")
-    return render(request, "stables/form.html", {"t": t, "form": form, "title": "Услуга" if not s else s.name})
+            return redirect(_back_to(request, t))
+    return render(request, "stables/form.html", {"t": t, "form": form, "title": "Новая услуга" if not s else s.name, "next": _back_to(request, t)})

@@ -85,7 +85,7 @@ def hub(request, pk):
         raise PermissionDenied
     manage = "organizer" in roles
     judge = bool(roles & {"organizer", "judge"})
-    stable = bool(roles & {"organizer", "stable"})
+    stable = bool(roles & {"organizer", "stable", "judge"})  # тест 6, п. 38: судья тоже ведёт денники и услуги
     ctx = {"t": t, "roles": roles, "manage": manage, "judge": judge, "stable": stable, "programs": [], "counts": {},
            "edit_step": (services.first_invalid_step(t) or 1) if manage else 1}
     if t.is_published:
@@ -1091,7 +1091,7 @@ def public_detail(request, pk):
             "can_manage": request.user.is_authenticated and services.can_manage(request.user, t),
             "can_judge": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "judge"}),
             "staff": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "judge"}),
-            "can_stable": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "stable"}),
+            "can_stable": request.user.is_authenticated and bool(services.roles_of(request.user, t) & {"organizer", "stable", "judge"}),
             "has_stables": t.stable_categories.filter(is_active=True).exists() or t.services.filter(is_active=True).exists(),
             **_public_tabs(request, t),
         },

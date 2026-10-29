@@ -138,14 +138,14 @@ class ViewTests(StableBase):
             reverse("stables:category_new", args=[self.t.pk]), reverse("stables:service_new", args=[self.t.pk]), reverse("stables:category_edit", args=[self.t.pk, self.cat.pk])]
         for u in urls:
             self.assertEqual(self.client.get(u).status_code, 302)
-        for who in (self.coach, self.judge, self.other):
+        for who in (self.coach, self.other):
             self.client.force_login(who)
             for u in urls:
                 self.assertEqual(self.client.get(u).status_code, 403, (who, u))
             self.assertEqual(self.client.post(reverse("stables:action", args=[self.t.pk, "confirm"]), {"booking": b.pk}).status_code, 403)
         b.refresh_from_db()
         self.assertEqual(b.state, "pending")
-        for who in (self.groom, self.org):
+        for who in (self.groom, self.org, self.judge):  # тест 6, п. 38: судья тоже ведёт денники и услуги
             self.client.force_login(who)
             for u in urls:
                 self.assertEqual(self.client.get(u).status_code, 200, (who, u))

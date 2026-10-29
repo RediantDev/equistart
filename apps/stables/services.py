@@ -20,8 +20,12 @@ class Conflict(Exception):
     pass
 
 
+# Решение 29.10.2026 (тест 6, п. 38): денники и услуги ведут организатор, судья и клуб (приглашённый как «конюшня»)
+ACCESS_ROLES = STABLE_ROLES | {TeamMember.Role.JUDGE}
+
+
 def can_stable(user, tournament) -> bool:
-    return bool(roles_of(user, tournament) & STABLE_ROLES)
+    return bool(roles_of(user, tournament) & ACCESS_ROLES)
 
 
 def require_stable(user, tournament):

@@ -2079,3 +2079,20 @@ a.steps2__dot:hover { color: var(--text); }
   .publish-bar--sticky { position: sticky; bottom: calc(var(--bnav-h) + var(--safe-b)); z-index: 6; margin: var(--space-3) 0 0; box-shadow: 0 -4px 14px rgba(20,20,20,.06); }
   .kb-open .publish-bar--sticky { bottom: 0; }
 }
+
+/* Денники и услуги (тест 6, пп. 37–40) */
+.seg3 { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); background: var(--surface-2); border-radius: var(--radius-pill); padding: 3px; margin: 0 0 var(--space-4); }
+.seg3__item { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 0 8px; border-radius: var(--radius-pill); font-size: 14px; font-weight: 650; color: var(--text-muted); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seg3__item.is-active { background: var(--ink); color: var(--surface); font-weight: 700; }
+.seg3__item .count-pill { font-size: 11px; }
+.state-pick { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 var(--space-3); }
+.state-pick__lbl { font-weight: 650; font-size: 14px; }
+.state-pick select { width: auto; min-width: 200px; }
+.state-pick__hint { font-size: 14px; font-weight: 700; color: var(--warning); }
+.empty-line { margin: var(--space-3) 0; }
+.setup-cap { margin: var(--space-4) 2px 8px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.setup-cap:first-of-type { margin-top: 0; }
+.setup-add { margin-top: 8px; }
+.occ-box { margin-top: var(--space-5); }
+.occ-box > summary { cursor: pointer; }
+.empty-add { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; } .empty-add .h3, .empty-add p { margin: 0; }
