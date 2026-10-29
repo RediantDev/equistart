@@ -23,9 +23,9 @@
   <div class="alert alert--error" role="alert" style="margin-bottom: var(--space-4);"><strong>Замечания модератора:</strong> {{ t.moderation_comment|linebreaksbr }}</div>
 {% endif %}
 {% if t.status == "rejected" %}
-  <div class="alert alert--error" role="alert" style="margin-bottom: var(--space-4);"><strong>Соревнование отклонено модератором:</strong> {{ t.moderation_comment|linebreaksbr }}<br>Повторно отправить его нельзя. Черновик можно удалить на шаге 4.</div>
+  <div class="alert alert--error" role="alert" style="margin-bottom: var(--space-4);"><strong>Соревнование отклонено модератором:</strong> {{ t.moderation_comment|linebreaksbr }}<br>Повторно отправить его нельзя. Черновик можно удалить в «Мои соревнования».</div>
 {% elif t.is_locked %}
-  <div class="alert alert--warning" style="margin-bottom: var(--space-4);">Турнир на проверке у модератора. Редактирование откроется после решения.</div>
+  <div class="alert alert--warning" style="margin-bottom: var(--space-4);">Турнир на проверке у модератора — ниже сводка только для просмотра. Чтобы исправить, нажмите «Отозвать и изменить».</div>
 {% elif t.is_published and t.status != "approved" %}
   <div class="alert alert--warning" style="margin-bottom: var(--space-4);">Участники видят прежнюю опубликованную версию. Изменения появятся в календаре после проверки модератором.</div>
 {% endif %}

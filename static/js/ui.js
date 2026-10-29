@@ -891,6 +891,14 @@
   document.addEventListener("DOMContentLoaded", growAll);
   document.addEventListener("htmx:afterSettle", growAll);
 
+  // Меню «три точки» (тест 6): закрыть по клику вне и по Escape; открыто только одно
+  document.addEventListener("click", function (e) {
+    document.querySelectorAll("details.kebab[open]").forEach(function (d) { if (!d.contains(e.target)) d.removeAttribute("open"); });
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") document.querySelectorAll("details.kebab[open]").forEach(function (d) { d.removeAttribute("open"); });
+  });
+
   // «Раздел: …» в «Проведении»
   document.addEventListener("click", function (e) {
     var btn = e.target.closest("[data-start-drop] .start-drop__btn");

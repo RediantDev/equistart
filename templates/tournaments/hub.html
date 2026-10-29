@@ -19,56 +19,80 @@
       {% for r in roles %}<span class="tag tag--lilac">{% if r == "organizer" %}Вы организатор{% elif r == "judge" %}Вы судья{% else %}Вы — конюшня и услуги{% endif %}</span>{% endfor %}
     </div>
   </div>
-  {% if t.is_published %}<div class="row-actions"><a class="btn btn--ghost" href="{% url 'tournaments:public' t.pk %}">Страница для участников</a><button type="button" class="btn btn--ghost" data-share="{{ request.scheme }}://{{ request.get_host }}{% url 'tournaments:public' t.pk %}" data-share-title="{{ t.pub_title }}">Поделиться</button></div>{% endif %}
+  {% if t.is_published %}<div class="row-actions"><button type="button" class="btn btn--ghost btn--sm" data-share="{{ request.scheme }}://{{ request.get_host }}{% url 'tournaments:public' t.pk %}" data-share-title="{{ t.pub_title }}">Поделиться</button></div>{% endif %}
 </div>
 
-<div class="hub">
+{# Тест 6, пп. 26, 29: статус и нужное действие — в шапке; разделы — строками в едином стиле; «Проверка и публикация» больше не отдельная плитка #}
+{% if manage and t.publication != "cancelled" and t.publication != "finished" %}
+<section class="hub-status{% if t.status == 'review' %} hub-status--wait{% elif t.status == 'returned' or t.status == 'rejected' %} hub-status--bad{% endif %}">
+  <p class="hub-status__text">
+    {% if t.status == "review" %}Отправлено {{ t.submitted_at|date:"j E в H:i" }}. Модератор проверит положение, даты, место и программу — ответ придёт в уведомлениях.
+    {% elif t.status == "returned" %}Модератор вернул турнир с замечаниями — исправьте и отправьте снова.
+    {% elif t.status == "rejected" %}Модератор отклонил турнир.
+    {% elif t.status == "approved" %}Турнир в календаре. Изменения условий снова уйдут на проверку.
+    {% elif t.is_published %}Есть изменения, которые ещё не отправлены модератору. Участники видят прежнюю версию.
+    {% else %}Черновик сохраняется автоматически. Заполните все шаги и отправьте на проверку.{% endif %}
+  </p>
+  <div class="hub-status__actions">
+    {% if t.status == "review" %}
+      <form method="post" action="{% url 'tournaments:withdraw' t.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}"><button type="submit" class="btn btn--ghost btn--sm" data-confirm="Снять турнир с проверки, чтобы внести правки? Потом его нужно будет отправить снова." data-confirm-ok="Отозвать">Отозвать и изменить</button></form>
+    {% elif t.status == "draft" or t.status == "returned" %}
+      <a class="btn btn--primary btn--sm" href="{% url 'tournaments:step' t.pk 4 %}">Отправить на проверку</a>
+    {% endif %}
+    <a class="btn btn--ghost btn--sm" href="{% if t.is_published %}{% url 'tournaments:public' t.pk %}{% else %}{% url 'tournaments:step' t.pk 4 %}{% endif %}">{% include "partials/icon.html" with name="eye" size=18 %}Как видят участники</a>
+  </div>
+</section>
+{% endif %}
+
+<nav class="nav-rows" aria-label="Разделы турнира">
   {% if judge and t.is_published %}
-  <a class="hub-tile hub-tile--main" href="{% url 'entries:manage' t.pk %}">
-    <span class="hub-tile__icon tag--sky">{% include "partials/icon.html" with name="list" %}</span>
-    <span class="hub-tile__body"><span class="hub-tile__title">Заявки</span><span class="hub-tile__text">Принять или отклонить, добавить участника вручную.</span></span>
-    <span class="hub-tile__meta">{% if counts.pending %}<span class="count-pill">{{ counts.pending }}</span> ждут решения{% else %}принято: {{ counts.accepted|default:0 }}{% endif %}</span>
+  <a class="nav-row" href="{% url 'entries:manage' t.pk %}">
+    <span class="nav-row__ico">{% include "partials/icon.html" with name="list" size=22 %}</span>
+    <span class="nav-row__body"><span class="nav-row__title">Заявки</span><span class="nav-row__text">Принять, отклонить, добавить участника</span></span>
+    <span class="nav-row__meta">{% if counts.pending %}<span class="count-pill">{{ counts.pending }}</span>{% else %}{{ counts.accepted|default:0 }}{% endif %}</span>
+    <span class="nav-row__go" aria-hidden="true">{% include "partials/icon.html" with name="chevron-right" size=18 %}</span>
   </a>
-  <a class="hub-tile hub-tile--main" href="{% url 'conduct:overview' t.pk %}">
-    <span class="hub-tile__icon tag--mint">{% include "partials/icon.html" with name="flag" %}</span>
-    <span class="hub-tile__body"><span class="hub-tile__title">Проведение</span><span class="hub-tile__text">Стартовый порядок, экран судьи, результаты по каждому маршруту и езде.</span></span>
-    <span class="hub-tile__meta">маршрутов и езд: {{ programs|length }}</span>
+  <a class="nav-row" href="{% url 'conduct:overview' t.pk %}">
+    <span class="nav-row__ico">{% include "partials/icon.html" with name="flag" size=22 %}</span>
+    <span class="nav-row__body"><span class="nav-row__title">Проведение</span><span class="nav-row__text">Порядок, экран судьи, результаты</span></span>
+    <span class="nav-row__meta">{{ programs|length }}</span>
+    <span class="nav-row__go" aria-hidden="true">{% include "partials/icon.html" with name="chevron-right" size=18 %}</span>
   </a>
   {% endif %}
   {% if stable and t.is_published %}
-  <a class="hub-tile" href="{% url 'stables:manage' t.pk %}">
-    <span class="hub-tile__icon tag--lemon">{% include "partials/icon.html" with name="stable" %}</span>
-    <span class="hub-tile__body"><span class="hub-tile__title">Денники и услуги</span><span class="hub-tile__text">Брони денников, заказы опилок и сена, ручная бронь для участника.</span></span>
-    <span class="hub-tile__meta">{% if bookings_pending %}<span class="count-pill">{{ bookings_pending }}</span> брони ждут{% endif %}</span>
+  <a class="nav-row" href="{% url 'stables:manage' t.pk %}">
+    <span class="nav-row__ico">{% include "partials/icon.html" with name="stable" size=22 %}</span>
+    <span class="nav-row__body"><span class="nav-row__title">Денники и услуги</span><span class="nav-row__text">Брони, опилки и сено, бронь за участника</span></span>
+    <span class="nav-row__meta">{% if bookings_pending %}<span class="count-pill">{{ bookings_pending }}</span>{% endif %}</span>
+    <span class="nav-row__go" aria-hidden="true">{% include "partials/icon.html" with name="chevron-right" size=18 %}</span>
   </a>
   {% endif %}
   {% if manage %}
-  <a class="hub-tile" href="{% url 'tournaments:step' t.pk edit_step %}">
-    <span class="hub-tile__icon tag--peach">{% include "partials/icon.html" with name="edit" %}</span>
-    <span class="hub-tile__body"><span class="hub-tile__title">Сведения и программа</span><span class="hub-tile__text">Даты, место, маршруты и зачёты, положение. Изменения проверяет модератор.</span></span>
-    <span class="hub-tile__meta"><span class="hub-tile__go">Изменить</span></span>
+  <a class="nav-row" href="{% if t.is_locked %}{% url 'tournaments:step' t.pk 4 %}{% else %}{% url 'tournaments:step' t.pk edit_step %}{% endif %}">
+    <span class="nav-row__ico">{% include "partials/icon.html" with name="edit" size=22 %}</span>
+    <span class="nav-row__body"><span class="nav-row__title">Сведения и программа</span><span class="nav-row__text">{% if t.is_locked %}Просмотр — на проверке у модератора{% else %}Даты, место, маршруты, зачёты, положение{% endif %}</span></span>
+    <span class="nav-row__go" aria-hidden="true">{% include "partials/icon.html" with name="chevron-right" size=18 %}</span>
   </a>
-  <a class="hub-tile" href="{% url 'tournaments:step' t.pk 4 %}">
-    <span class="hub-tile__icon tag--lilac">{% include "partials/icon.html" with name="check" %}</span>
-    <span class="hub-tile__body"><span class="hub-tile__title">Проверка и публикация</span><span class="hub-tile__text">Как турнир видят участники, отправка модератору, история, отмена.</span></span>
-  </a>
-  <a class="hub-tile" href="{% url 'tournaments:team' t.pk %}">
-    <span class="hub-tile__icon tag--pink">{% include "partials/icon.html" with name="users" %}</span>
-    <span class="hub-tile__body"><span class="hub-tile__title">Команда турнира</span><span class="hub-tile__text">Пригласить судей, организаторов и конюшню по телефону.</span></span>
+  <a class="nav-row" href="{% url 'tournaments:team' t.pk %}">
+    <span class="nav-row__ico">{% include "partials/icon.html" with name="users" size=22 %}</span>
+    <span class="nav-row__body"><span class="nav-row__title">Команда турнира</span><span class="nav-row__text">Судьи, организаторы, конюшня</span></span>
+    <span class="nav-row__go" aria-hidden="true">{% include "partials/icon.html" with name="chevron-right" size=18 %}</span>
   </a>
   {% endif %}
-</div>
+</nav>
+{% if manage %}
+<p class="hub-minor"><a href="{% url 'tournaments:step' t.pk 4 %}#history">История турнира</a>{% if t.publication == "published" %} · <a href="{% url 'tournaments:step' t.pk 4 %}#cancel">Отменить соревнование</a>{% endif %}</p>
+{% endif %}
 
 {% if judge and programs %}
-<section class="card section-gap">
+<section class="section-gap">
   <h2 class="h3">Маршруты и езды</h2>
-  <div class="list-cards">
+  <div class="nav-rows">
     {% for p in programs %}
-      <a class="row-card row-card--link" href="{% url 'conduct:program' t.pk p.pk %}">
+      <a class="nav-row" href="{% url 'conduct:program' t.pk p.pk %}">
         <span class="prog-row__time">{{ p.start_time|time:"H:i"|default:"—" }}</span>
-        <span style="flex: 1 1 220px; min-width: 0;"><strong>{{ p.name }}</strong><span class="table__sub">{{ p.day|date:"j E" }} · принято пар: {{ p.accepted }}</span></span>
-        {% if p.has_protocol %}<span class="chip chip--info">протокол опубликован</span>{% else %}<span class="chip">протокол не опубликован</span>{% endif %}
-        <span class="hub-tile__go">Открыть →</span>
+        <span class="nav-row__body"><span class="nav-row__title">{{ p.name }}</span><span class="nav-row__text"><span class="dot {% if p.has_protocol %}dot--ok{% else %}dot--wait{% endif %}" aria-hidden="true"></span>{{ p.day|date:"j E" }} · принято {{ p.accepted }} · протокол {% if p.has_protocol %}опубликован{% else %}не опубликован{% endif %}</span></span>
+        <span class="nav-row__go" aria-hidden="true">{% include "partials/icon.html" with name="chevron-right" size=18 %}</span>
       </a>
     {% endfor %}
   </div>

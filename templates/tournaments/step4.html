@@ -27,6 +27,11 @@
     {% elif t.status == "review" %}
       <h2 class="h3">На проверке</h2>
       <p class="muted">Отправлено {{ t.submitted_at|date:"j E в H:i" }}. Модератор проверит положение, даты, место и программу с зачётами.</p>
+      {# Тест 6, п. 28: можно снять с проверки, исправить и отправить повторно #}
+      <form method="post" action="{% url 'tournaments:withdraw' t.pk %}" class="form-actions" style="justify-content: flex-start; margin-top: var(--space-3);">
+        {% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}">
+        <button type="submit" class="btn btn--ghost" data-confirm="Снять турнир с проверки, чтобы внести правки? Потом его нужно будет отправить снова." data-confirm-ok="Отозвать">Отозвать и изменить</button>
+      </form>
     {% elif t.status == "approved" %}
       <h2 class="h3">Опубликовано</h2>
       <p class="muted">Турнир виден в календаре. Любое изменение условий снова отправит его на проверку; до одобрения участники видят опубликованную версию.</p>
@@ -40,28 +45,21 @@
     {% endif %}
   </section>
 
-  {% if t.publication == "published" or not t.is_published and t.status != "review" %}
-  <details class="card danger-zone">
-    <summary class="h3">{% if t.is_published %}Отменить соревнование{% else %}Удалить черновик{% endif %}</summary>
-    {% if t.is_published %}
+  {# Тест 6, п. 22: «Удалить черновик» здесь не показываем — удалить можно в «Мои соревнования» #}
+  {% if t.publication == "published" %}
+  <details class="card danger-zone" id="cancel">
+    <summary class="h3">Отменить соревнование</summary>
       <form method="post" action="{% url 'tournaments:cancel' t.pk %}" class="form">
         {% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}">
         <p class="muted">Отмена сразу видна в календаре.</p>
         <div class="field"><label class="field__label" for="reason">Причина отмены — увидят участники</label><textarea id="reason" name="reason" rows="3" required></textarea></div>
         <div class="form-actions" style="justify-content: flex-start;"><button type="submit" class="btn btn--danger">Отменить «{{ t.title }}»</button></div>
       </form>
-    {% else %}
-      <form method="post" action="{% url 'tournaments:delete' t.pk %}" class="form">
-        {% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}">
-        <p class="muted">Черновик «{{ t.title }}» и его программа будут удалены без возможности восстановления.</p>
-        <div class="form-actions" style="justify-content: flex-start;"><button type="submit" class="btn btn--danger">Удалить черновик</button></div>
-      </form>
-    {% endif %}
   </details>
   {% endif %}
 
   {% if history %}
-  <details class="card">
+  <details class="card" id="history">
     <summary class="h3">История</summary>
     <p class="table__sub" style="margin: 6px 0 0;">Ключевые события. Мелкие правки между ними собраны в одну строку.</p>
     <ul class="list">

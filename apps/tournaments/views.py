@@ -117,7 +117,29 @@ def my_tournaments(request):
         .distinct()
         .order_by("-starts_on", "-created_at")
     )
-    rows = [{"t": t, "roles": services.roles_of(user, t)} for t in items]
+    # Тест 6, п. 25: в карточке — дисциплины, число маршрутов/езд, срок заявок и принятые пары
+    from django.db.models import Count
+
+    from apps.entries.models import Entry
+
+    from .disciplines import DISCIPLINE_NAMES
+
+    items = list(items)
+    ids = [t.pk for t in items]
+    progs = {}
+    for tid, disc in ProgramItem.objects.filter(tournament_id__in=ids).values_list("tournament_id", "discipline"):
+        progs.setdefault(tid, []).append(disc)
+    accepted = dict(Entry.objects.filter(tournament_id__in=ids, decision="accepted").order_by().values("tournament_id")
+                    .annotate(n=Count("id")).values_list("tournament_id", "n"))
+    rows = []
+    for t in items:
+        discs = progs.get(t.pk, [])
+        uniq = [d for i, d in enumerate(discs) if d not in discs[:i]]
+        rows.append({"t": t, "roles": services.roles_of(user, t), "programs": len(discs),
+                     "disciplines": [(d, DISCIPLINE_NAMES.get(d, d), DISCIPLINE_COLORS.get(d, "")) for d in uniq],
+                     "only_dressage": bool(discs) and set(discs) == {"dressage"},
+                     "accepted": accepted.get(t.pk, 0),
+                     "can_delete": t.owner_id == user.pk and not t.is_published and t.status != Tournament.Status.REVIEW})
     return render(request, "tournaments/my_list.html", {"rows": rows})
 
 
@@ -190,6 +212,9 @@ def step(request, pk, step):
     if step not in range(1, LAST + 1):
         raise Http404
     t = _managed(request, pk)
+    if request.method == "GET" and step != LAST and t.is_locked:
+        # Тест 6, п. 27: на проверке — только просмотр сводкой (шаг 4), без формы и кнопок сохранения
+        return redirect("tournaments:step", pk=t.pk, step=LAST)
     if request.method == "GET" and step != LAST and not t.is_locked:
         probs, bad = _step_state(t)
         first_bad = min(bad) if bad else LAST + 1
@@ -508,14 +533,16 @@ def _step4(request, t):
         except ValueError:
             messages.error(request, "Не всё заполнено — исправьте пункты ниже.")
         else:
-            messages.success(request, "Турнир отправлен на проверку. Мы сообщим о решении модератора в кабинете.")
+            # Тест 6, п. 23: после отправки — на панель этого турнира со статусом
+            messages.success(request, "Отправлено на проверку. Ответ модератора придёт в уведомлениях.")
+            return redirect("tournaments:hub", pk=t.pk)
         return redirect("tournaments:step", pk=t.pk, step=LAST)
     preview = services.build_snapshot(t) if t.starts_on else None
     history = _compact_history(AuditLog.objects.filter(target_type="tournament", target_id=t.pk).select_related("actor")[:200])
     return render(request, "tournaments/step4.html", _wizard_ctx(t, LAST, preview=preview, history=history, tz_label=tz_label(t.timezone) if t.timezone else ""))
 
 
-KEY_ACTIONS = {"tournament.create", "tournament.submit", "tournament.approve", "tournament.return", "tournament.reject", "tournament.cancel", "venue.confirm"}
+KEY_ACTIONS = {"tournament.create", "tournament.submit", "tournament.withdraw", "tournament.approve", "tournament.return", "tournament.reject", "tournament.cancel", "venue.confirm"}
 EDIT_KINDS = {"tournament.edit": "сведения", "program.save": "программа", "program.delete": "программа",
               "class.save": "зачёты", "class.delete": "зачёты"}
 
@@ -549,12 +576,26 @@ def _compact_history(items):
 
 @login_required
 @require_POST
+def withdraw(request, pk):
+    """Тест 6, п. 28: «Отозвать и изменить» — снять с проверки и открыть шаг 1 для правок."""
+    t = _managed(request, pk)
+    try:
+        services.withdraw(request.user, t.pk, request.POST.get("revision"))
+    except Conflict:
+        messages.error(request, "Турнир уже не на проверке — обновите страницу.")
+        return redirect("tournaments:hub", pk=pk)
+    messages.success(request, "Турнир снят с проверки. Внесите правки и отправьте повторно на шаге 4.")
+    return redirect("tournaments:step", pk=pk, step=1)
+
+
+@login_required
+@require_POST
 def delete(request, pk):
     try:
         services.delete_draft(request.user, pk, request.POST.get("revision"))
     except Conflict:
         messages.error(request, "Удалить можно только неопубликованный черновик, который не на проверке.")
-        return redirect("tournaments:step", pk=pk, step=LAST)
+        return redirect("tournaments:mine")
     messages.success(request, "Черновик удалён.")
     return redirect("tournaments:mine")
 

@@ -177,6 +177,23 @@ def submit(user, tournament_id: int, revision) -> Tournament:
 
 
 @transaction.atomic
+def withdraw(user, tournament_id: int, revision) -> Tournament:
+    """Тест 6, п. 28 (решение 29.10.2026): организатор снимает турнир с проверки, чтобы внести правки.
+    Рабочая копия снова черновик; опубликованная версия (если есть) остаётся в календаре без изменений."""
+    t = Tournament.objects.select_for_update().get(pk=tournament_id)
+    require_manage(user, t)
+    check_revision(t, revision)
+    if t.status != Tournament.Status.REVIEW:
+        raise Conflict
+    t.status = Tournament.Status.DRAFT
+    t.submitted_at = None
+    t.revision += 1
+    t.save()
+    audit(user, "tournament.withdraw", t, revision=t.revision)
+    return t
+
+
+@transaction.atomic
 def approve(moderator, tournament_id: int, revision, confirm_venue: bool = False) -> Tournament:
     if not moderator.is_moderator:
         raise PermissionDenied
