@@ -711,10 +711,12 @@ def calendar(request):
 
     qs = Tournament.objects.filter(publication__in=PUBLIC_STATES)
     today = timezone.localdate()
-    if past:
-        qs = qs.filter(pub_ends_on__lt=today).order_by("-pub_starts_on")
-    else:
-        qs = qs.filter(pub_ends_on__gte=today - datetime.timedelta(days=1)).order_by("pub_starts_on")
+    # Тест 5.2 (вариант B): дата в календаре — турниры этого дня (прошедшие тоже), фильтры и поиск сохраняются
+    day = None
+    try:
+        day = datetime.date.fromisoformat(request.GET.get("day", ""))
+    except ValueError:
+        day = None
     if q:
         # Тест 5, п. 9.5: «белая роща», «кск Белая роща», «Берёзки» — по названию, площадке, месту и региону
         from apps.core import search
@@ -737,8 +739,25 @@ def calendar(request):
             club = club.merged_into
         if club:
             qs = qs.filter(venue_id=club.venue_id)
+    # Даты с турнирами для календаря — с учётом поиска и фильтров (кроме месяца и «прошедших»): ±13 месяцев
+    cal_qs = qs.filter(pub_ends_on__gte=today - datetime.timedelta(days=400), pub_starts_on__lte=today + datetime.timedelta(days=400))
+    cal_dates = {}
+    for t in cal_qs.only("pk", "publication", "pub_starts_on", "pub_ends_on", "pub_deadline", "pub_deadline_time", "pub_timezone")[:2000]:
+        if not t.pub_starts_on or (only_open and not t.public_entries_open()):
+            continue
+        end = t.pub_ends_on if t.pub_ends_on and t.pub_ends_on >= t.pub_starts_on and (t.pub_ends_on - t.pub_starts_on).days < 60 else t.pub_starts_on
+        d = t.pub_starts_on
+        while d <= end:
+            cal_dates[d.isoformat()] = cal_dates.get(d.isoformat(), 0) + 1
+            d += datetime.timedelta(days=1)
+    if day:
+        qs = qs.filter(pub_starts_on__lte=day, pub_ends_on__gte=day).order_by("pub_starts_on")
+    elif past:
+        qs = qs.filter(pub_ends_on__lt=today).order_by("-pub_starts_on")
+    else:
+        qs = qs.filter(pub_ends_on__gte=today - datetime.timedelta(days=1)).order_by("pub_starts_on")
     month_label = ""
-    if month:
+    if month and not day:
         try:
             y, m = (int(x) for x in month.split("-"))
             first = datetime.date(y, m, 1)
@@ -750,7 +769,7 @@ def calendar(request):
     items = list(qs[:200])
     if only_open:
         items = [t for t in items if t.public_entries_open()]
-    cards = [_card(t) for t in items]
+    cards = [_card(t, today) for t in items]
     active = []
     if q:
         active.append(f"«{q}»")
@@ -776,6 +795,7 @@ def calendar(request):
             # Тест 5, п. 1.4: в фильтре — только дисциплины, с которыми работаем
             "disciplines": [d for d in DISCIPLINE_CHOICES if d[0] in ACTIVE_DISCIPLINES], "regions": REGION_CHOICES,
             "filters_count": sum(bool(x) for x in (discipline, region, month, only_open, past)), "club": club,
+            "day": day, "today": today, "cal_dates": cal_dates,
         },
     )
 
@@ -797,7 +817,28 @@ def _month_options(today):
     return out
 
 
-def _card(t):
+MONTHS_GEN_SHORT = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"]
+
+
+def _card_status(t, today, is_open):
+    """Строка состояния карточки (макет R3_02A): точка цвета + текст — по реальным состояниям."""
+    from .templatetags.tournaments import isodate
+
+    start, end = t.pub_starts_on, t.pub_ends_on or t.pub_starts_on
+    if t.publication == Tournament.Publication.CANCELLED:
+        return "danger", "Отменён"
+    if t.publication == Tournament.Publication.FINISHED or (end and end < today):
+        return "muted", "Завершено"
+    if start and start <= today <= end:
+        return "success", "Идёт"
+    if is_open:
+        left = (t.pub_deadline - today).days if t.pub_deadline else None
+        return ("warning" if left is not None and left <= 7 else "info"), f"Приём до {isodate(t.pub_deadline, False)}"
+    return "muted", "Приём закрыт"
+
+
+def _card(t, today=None):
+    today = today or timezone.localdate()
     s = t.snapshot or {}
     start, end = t.pub_starts_on, t.pub_ends_on
     if start == end:
@@ -807,8 +848,17 @@ def _card(t):
         days = f"{start.day}–{end.day}"  # месяцы — в подписи над числами («ОКТ–НОЯ»), чтобы дата не ломалась в 3 строки
         wd = f"{WEEKDAYS[start.weekday()]}–{WEEKDAYS[end.weekday()]}"
     disc = s.get("disciplines", [])
+    is_open = t.public_entries_open()
+    st_kind, st_text = _card_status(t, today, is_open)
+    same_month = (start.month, start.year) == (end.month, end.year)
+    wd_low = WEEKDAYS[start.weekday()].lower() + ("" if start == end else "–" + WEEKDAYS[end.weekday()].lower())
+    disc_names = [dict(DISCIPLINE_CHOICES).get(d, d) for d in disc]
     return {
         "t": t,
+        # Вариант A (тест 5.2): «21–22» крупно, «ноя, сб–вс» мелко; «клуб · дисциплины»; состояние точкой
+        "date_sub": (MONTHS_GEN_SHORT[start.month - 1] if same_month else f"{MONTHS_GEN_SHORT[start.month - 1]}–{MONTHS_GEN_SHORT[end.month - 1]}") + ", " + wd_low,
+        "disc_line": ", ".join(n[:1].lower() + n[1:] for n in disc_names),
+        "status_kind": st_kind, "status_text": st_text,
         "month": MONTHS_SHORT[start.month - 1] if (start.month, start.year) == (end.month, end.year)
                  else f"{MONTHS_SHORT[start.month - 1]}–{MONTHS_SHORT[end.month - 1]}",
         "days": days,
@@ -817,7 +867,7 @@ def _card(t):
         "tz_label": s.get("timezone_label", ""),
         "disciplines": [(d, dict(DISCIPLINE_CHOICES).get(d, d), DISCIPLINE_COLORS.get(d, "")) for d in disc],
         "programs_count": len(s.get("programs", [])),
-        "open": t.public_entries_open(),
+        "open": is_open,
         "color": DISCIPLINE_COLORS.get(disc[0], "lemon") if disc else "lemon",
     }
 
