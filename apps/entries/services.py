@@ -123,7 +123,7 @@ def check_line(user, tournament, line: Line, late=False, allowed_athletes=None) 
         errors.append(f"Нет права подавать заявку за спортсмена «{a.public_name}».")
     year = (tournament.pub_starts_on or tournament.starts_on or timezone.localdate()).year
     for r in class_reasons(a, line.horse, c, year, line.height, line.confirmed):
-        errors.append(f"«{a.public_name} / {line.horse.name}» — зачёт «{c.label}»: {r}.")
+        errors.append(f"«{a.public_name} / {line.horse.name}» — зачёт «{c.label}»: {r.rstrip('.')}.")
     if Entry.objects.filter(tclass=c, athlete=line.athlete, horse=line.horse, height=line.height, decision__in=Entry.ACTIVE).exists():
         errors.append(f"«{line.athlete.public_name}» на «{line.horse.name}» уже заявлен(а) в этот зачёт.")
     return errors

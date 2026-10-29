@@ -203,6 +203,8 @@ def apply(request, pk):
                     rc = classes.get(r["c"])
                     if rc and r["a"] == a.pk and r["h"] == h.pk:
                         taken.setdefault(rc.program_id, set()).add(r["c"])
+                # тест 5.2 (п.35): и с выступлениями этой пары в уже поданных заявках на турнир
+                filed = _filed_by_program(t, a.pk, h.pk)
                 for cid, ht, confirmed in picks:
                     c = classes.get(cid)
                     if not c:
@@ -214,9 +216,13 @@ def apply(request, pk):
                         ht = c.height
                     line = Line(a, h, c, ht, confirmed)
                     errs = services.check_line(request.user, t, line, late=late, allowed_athletes=set(by_a))
+                    single = not (c.program.heights and len(c.program.heights) > 1)
+                    other_filed = [e for e in filed.get(c.program_id, []) if e.tclass_id != c.pk] if single else []
                     if line.key() in existing:
                         errs.append("уже есть в заявке")
-                    elif not (c.program.heights and len(c.program.heights) > 1) and taken.get(c.program_id, set()) - {c.pk}:
+                    elif other_filed:
+                        errs.append(f"в этом маршруте пара уже заявлена в зачёте «{other_filed[0].class_name}» (заявка №{other_filed[0].application_id})")
+                    elif single and taken.get(c.program_id, set()) - {c.pk}:
                         errs.append("в этом маршруте пара уже заявлена в другом зачёте — уберите его, чтобы выбрать этот")
                     if errs:
                         pair_errors.extend(f"{c.program.name}, {c.label}: {e}" for e in errs)
@@ -278,6 +284,9 @@ def apply(request, pk):
         mine = [(i, l) for i, l in enumerate(lines) if l.athlete.pk == a.pk and l.horse.pk == h.pk]
         mine_keys = {(l.tclass.pk, l.height) for _, l in mine}
         is_open = open_pair == f"{a.pk}-{h.pk}"
+        # Тест 5.2 (п.35): выступления пары в уже поданных заявках на этот турнир видны при выборе,
+        # а не ошибкой после отправки; в маршруте пара выступает в одном зачёте (ТЗ, решения 28.10).
+        filed = _filed_by_program(t, a.pk, h.pk) if is_open else {}
         progs = []
         # Сводка свёрнутой пары: маршрут → выбранные зачёты
         by_p = {}
@@ -288,6 +297,9 @@ def apply(request, pk):
             for p in programs:
                 opts = []
                 multi = p.heights and len(p.heights) > 1
+                p_filed = filed.get(p.pk, [])
+                # в маршруте с одной высотой — один зачёт: уже выбранный в черновике или поданный закрывает остальные
+                p_draft = [l for _, l in mine if l.tclass.program_id == p.pk] if not multi else []
                 for c in p.classes.all():
                     if c.merged_into_id:
                         continue
@@ -296,16 +308,25 @@ def apply(request, pk):
                         why = services.class_reasons(a, h, c, year, ht, True)
                         why = [w for w in why if w != "выберите высоту"]
                         label = c.label + (f" · {ht} см" if ht and not c.height else "")
+                        added = (c.pk, ht) in mine_keys
+                        sub = next((e for e in p_filed if e.tclass_id == c.pk and (not multi or e.height == ht)), None)
+                        if not added and not sub and not multi:
+                            other = next((e for e in p_filed if e.tclass_id != c.pk), None)
+                            if other:
+                                why = ["пара уже заявлена в этом маршруте в другом зачёте"]
+                            elif any(l.tclass.pk != c.pk for l in p_draft):
+                                why = ["в этом маршруте уже выбран другой зачёт — уберите его, чтобы выбрать этот"]
                         opts.append({"value": f"{c.pk}|{ht}" if ht else str(c.pk), "label": label, "why": why, "conditions": c.conditions,
-                                     "added": (c.pk, ht) in mine_keys, "remove": f"{c.pk}|{ht if ht else ''}"})
+                                     "added": added, "submitted": sub if not added else None, "remove": f"{c.pk}|{ht if ht else ''}"})
                 shown = {(o["value"].partition("|")[0], o["value"].partition("|")[2]) for o in opts if o["added"]}
                 # строки, которых нет среди вариантов (например, зачёт объединили), — отдельными плашками
                 added = [(f"{l.tclass.pk}|{l.height or ''}", l) for _, l in mine if l.tclass.program_id == p.pk
                          and (str(l.tclass.pk), str(l.height) if l.height else "") not in shown]
                 # Тест 5: разряд указан в профиле — условие «не выполнявшие норматив» решается по нему, без галочки
                 progs.append({"p": p, "opts": opts, "added": added,
+                              "filed": [e.class_name + (f" · {e.height} см" if multi and e.height and not e.tclass.height else "") for e in p_filed],
                               "never": not a.rank and any(c.rank_rule == "never" and c.rank for c in p.classes.all() if not c.merged_into_id),
-                              "has_ok": any(o["added"] or not o["why"] for o in opts),
+                              "has_ok": any(o["added"] or o["submitted"] or not o["why"] for o in opts),
                               "need_birth": any("нужна дата рождения всадника" in (o["why"] or []) for o in opts)})
         pairs.append({"a": a, "h": h, "programs": progs, "count": len(mine), "open": is_open, "mine": mine, "summary": summary,
                       "errors": pair_errors if is_open else []})
@@ -324,6 +345,15 @@ def apply(request, pk):
             "sel_h": _int(request.GET.get("horse")) or (horses[0].pk if len(horses) == 1 else None),
         },
     )
+
+
+def _filed_by_program(t, athlete_id, horse_id):
+    """Действующие выступления пары в поданных заявках на турнир, по маршрутам (тест 5.2, п.35)."""
+    out = {}
+    for e in (Entry.objects.filter(tournament=t, athlete_id=athlete_id, horse_id=horse_id, decision__in=Entry.ACTIVE)
+              .select_related("tclass").order_by("pk")):
+        out.setdefault(e.program_id, []).append(e)
+    return out
 
 
 def _ru_count(n, one, few, many):
@@ -392,6 +422,7 @@ def application(request, pk):
         "app": app, "t": app.tournament, "entries": entries, "groups": groups, "owner": owner, "judge": judge,
         "summary": services.summarize(entries), "show_contacts": owner or judge,
         "can_edit": can_edit, "edit": edit, "bookings": bookings, "orders": orders,
+        "edit_contacts": owner and request.GET.get("contacts") == "1",
     })
 
 
@@ -539,25 +570,74 @@ def application_contacts(request, pk):
 @login_required
 @require_http_methods(["GET", "POST"])
 def propose(request, pk):
-    e = get_object_or_404(Entry.objects.select_related("application", "tournament", "tclass"), pk=pk)
+    """Изменение выступления из режима правки заявки (тест 5.2, п.41/43): лошадь, всадник, маршрут и зачёт —
+    выбор карточками, как при подаче. По ТЗ (APP-09) это предложение изменения: до решения судьи
+    действуют прежние сведения (`services.propose` / `decide_proposal`)."""
+    e = get_object_or_404(Entry.objects.select_related("application", "tournament", "tclass", "program"), pk=pk)
     if e.application.submitted_by_id != request.user.pk:
         raise PermissionDenied
+    back = reverse("entries:application", args=[e.application_id]) + "?edit=1"
+    pending = e.proposals.filter(state=ChangeProposal.State.PENDING).first()
+    if not e.is_active or e.is_started:
+        messages.error(request, "Это выступление уже нельзя изменить.")
+        return redirect(back)
+    t = e.tournament
     athletes = list(athletes_for_entry(request.user))
+    if e.athlete_id not in {x.pk for x in athletes}:
+        athletes.insert(0, e.athlete)
     horse_ids = set(pservices.horses_for_entry(request.user).values_list("pk", flat=True)) | {e.horse_id}
     horses = list(Horse.objects.filter(pk__in=horse_ids).order_by("name"))
-    class_groups, classes = _class_choices(e.tournament)
-    if request.method == "POST":
-        a = next((x for x in athletes if str(x.pk) == request.POST.get("athlete")), None)
-        h = next((x for x in horses if str(x.pk) == request.POST.get("horse")), None)
-        c = classes.get(int(request.POST["tclass"])) if request.POST.get("tclass", "").isdigit() else None
-        try:
-            services.propose(request.user, e.pk, athlete=a, horse=h, tclass=c)
-        except ValueError as ex:
-            messages.error(request, str(ex))
+    src = request.POST if request.method == "POST" else request.GET
+    a = next((x for x in athletes if str(x.pk) == src.get("athlete")), None) or next(x for x in athletes if x.pk == e.athlete_id)
+    h = next((x for x in horses if str(x.pk) == src.get("horse")), None) or next(x for x in horses if x.pk == e.horse_id)
+    programs = _programs(t)
+    classes = {c.pk: c for p in programs for c in p.classes.all() if not c.merged_into_id}
+    # выступления новой пары в этом турнире (кроме изменяемого) — «Уже заявлены», в маршруте один зачёт
+    filed = {}
+    for x in Entry.objects.filter(tournament=t, athlete=a, horse=h, decision__in=Entry.ACTIVE).exclude(pk=e.pk):
+        filed.setdefault(x.program_id, []).append(x)
+    year = (t.pub_starts_on or t.starts_on).year
+    error = ""
+    if request.method == "POST" and not pending:
+        c = classes.get(_int(request.POST.get("tclass")))
+        other = [x for x in filed.get(c.program_id, []) if x.tclass_id != c.pk] if c and not (c.program.heights and len(c.program.heights) > 1) else []
+        if not c:
+            error = "Выберите маршрут и зачёт."
+        elif other:
+            error = f"В этом маршруте пара уже заявлена в зачёте «{other[0].class_name}» (заявка №{other[0].application_id})."
         else:
-            messages.success(request, "Предложение отправлено судье. До решения действуют прежние сведения.")
-            return redirect("entries:application", pk=e.application_id)
-    return render(request, "entries/propose.html", {"e": e, "athletes": athletes, "horses": horses, "class_groups": class_groups})
+            try:
+                services.propose(request.user, e.pk, athlete=a, horse=h, tclass=c)
+            except ValueError as ex:
+                error = str(ex)
+            else:
+                messages.success(request, "Изменение отправлено судье. До его решения действуют прежние сведения.")
+                return redirect("entries:application", pk=e.application_id)
+    chosen = _int(request.POST.get("tclass")) if request.method == "POST" else e.tclass_id
+    rows = []
+    for p in programs:
+        multi = p.heights and len(p.heights) > 1
+        p_filed = filed.get(p.pk, [])
+        opts = []
+        for c in p.classes.all():
+            if c.merged_into_id:
+                continue
+            # высота сохраняется только внутри того же маршрута (так устроено services.propose)
+            ht = e.height if p.pk == e.program_id else (c.height if multi else None)
+            why = [w for w in services.class_reasons(a, h, c, year, ht, e.conditions_confirmed)
+                   if not (w == "выберите высоту" and multi and p.pk != e.program_id)]
+            if multi and p.pk != e.program_id and not c.height:
+                why = ["высоту в другом маршруте не изменить — отмените выступление и подайте новую заявку"]
+            sub = next((x for x in p_filed if x.tclass_id == c.pk and (not multi or x.height == ht)), None)
+            if not sub and not multi and any(x.tclass_id != c.pk for x in p_filed):
+                why = ["пара уже заявлена в этом маршруте в другом зачёте"]
+            current = c.pk == e.tclass_id
+            opts.append({"c": c, "label": c.label + (f" · {ht} см" if ht and not c.height else ""), "why": [] if current and a.pk == e.athlete_id and h.pk == e.horse_id else why,
+                         "submitted": sub, "current": current, "checked": c.pk == chosen})
+        rows.append({"p": p, "opts": opts, "filed": [x.class_name for x in p_filed]})
+    return render(request, "entries/propose.html", {
+        "e": e, "athletes": athletes, "horses": horses, "a": a, "h": h, "rows": rows, "error": error, "pending": pending, "back": back,
+    })
 
 
 @login_required
@@ -753,6 +833,23 @@ def quick_search(request, pk):
     return JsonResponse({"items": items})
 
 
+def _days_iso(cards):
+    from datetime import timedelta
+
+    out = set()
+    for c in cards:
+        t = c["t"]
+        start, end = t.pub_starts_on or t.starts_on, t.pub_ends_on or t.ends_on
+        if not start:
+            continue
+        end = end if end and end >= start and (end - start).days < 60 else start
+        d = start
+        while d <= end:
+            out.add(d.isoformat())
+            d += timedelta(days=1)
+    return sorted(out)
+
+
 def _norm(text):
     """Строка для поиска на странице: нижний регистр, «ё» = «е»."""
     return " ".join(str(text or "").lower().replace("ё", "е").split())
@@ -827,7 +924,11 @@ def my_competitions(request):
     past.sort(key=lambda c: c["t"].pub_starts_on or c["t"].starts_on, reverse=True)
     for e in entries:
         e.search = _norm(e.athlete_snapshot.get("name", "") + " " + e.horse_snapshot.get("name", ""))
+    # Тест 5.2 (п.47/48): даты соревнований пользователя — для будущего раскрывающегося календаря
+    # (вид выбирает заказчик). ISO-даты всех дней каждого турнира.
+    calendar_dates = {"upcoming": _days_iso(upcoming), "past": _days_iso(past)}
     return render(request, "entries/my_competitions.html", {
+        "calendar_dates": calendar_dates,
         "tab": tab, "cards": past if tab == "past" else upcoming,
         "counts": {"upcoming": len(upcoming), "past": len(past)}, "q": request.GET.get("q", "").strip()[:100],
         "status_filters": [("", "Все"), ("pending", "На рассмотрении"), ("accepted", "Принято"), ("rejected", "Отклонено")],
