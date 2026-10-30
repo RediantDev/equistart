@@ -6,13 +6,14 @@
   <div class="card auth__card auth__card--wide">
     <a class="back" href="{% if club %}{% url 'clubs:mine' %}{% else %}{% url 'clubs:list' %}{% endif %}" data-fixed-back>← {% if club %}Мой клуб{% else %}Клубы{% endif %}</a>
     <h1 class="h1" style="margin-bottom: 0;">{% if club %}{{ club.name }}{% else %}Новый клуб{% endif %}</h1>
-    <ol class="steps-mini" aria-label="Шаги" data-steps-nav>
+    {# Тест 6.1, п. 4: у созданного клуба сведения меняются одной страницей; мастер по шагам — только при создании #}
+    {% if not club %}<ol class="steps-mini" aria-label="Шаги" data-steps-nav>
       <li data-step-dot="1">1. Название и адрес</li><li data-step-dot="2">2. Контакты</li><li data-step-dot="3">3. Логотип</li>
-    </ol>
+    </ol>{% endif %}
     {% if invites %}<div class="alert alert--info" style="margin-top: var(--space-3);">Вас пригласили управлять клубом: {% for m in invites %}«{{ m.club.name }}»{% if not forloop.last %}, {% endif %}{% endfor %}. <a href="{% url 'tournaments:invitations' %}">Принять приглашение</a> — и не создавайте второй профиль.</div>{% endif %}
     {% if club.status == "returned" %}<div class="alert alert--error" role="alert" style="margin-top: var(--space-3);"><strong>Модератор вернул профиль:</strong> {{ club.moderator_comment }}</div>{% endif %}
     {% if club.is_public %}<p class="table__sub">Изменение названия, региона, города или адреса снова отправит профиль модератору. До решения все видят прежние данные.</p>{% endif %}
-    <form method="post" enctype="multipart/form-data" novalidate class="form" data-steps style="margin-top: var(--space-4);">
+    <form method="post" enctype="multipart/form-data" novalidate class="form{% if club %} club-onepage{% endif %}"{% if not club %} data-steps{% endif %} style="margin-top: var(--space-4);">
       {% csrf_token %}
       {% if form.non_field_errors %}<div class="alert alert--error">{{ form.non_field_errors|join:" " }}</div>{% endif %}
 
@@ -23,7 +24,7 @@
         {% include "partials/field.html" with field=form.region %}
         {% include "partials/field.html" with field=form.settlement %}
         {% include "partials/field.html" with field=form.address %}
-        <div class="form-actions step-pane__nav"><button type="button" class="btn btn--primary" data-step-next>Далее</button></div>
+        {% if not club %}<div class="form-actions step-pane__nav"><button type="button" class="btn btn--primary" data-step-next>Далее</button></div>{% endif %}
       </fieldset>
 
       <fieldset class="form__group step-pane" data-step="2">
@@ -34,16 +35,17 @@
         {% include "partials/field.html" with field=form.site %}
         {% include "partials/field.html" with field=form.socials %}
         {% include "partials/field.html" with field=form.description %}
-        <div class="form-actions step-pane__nav"><button type="button" class="btn btn--ghost" data-step-prev>Назад</button><button type="button" class="btn btn--primary" data-step-next>Далее</button></div>
+        {% if not club %}<div class="form-actions step-pane__nav"><button type="button" class="btn btn--ghost" data-step-prev>Назад</button><button type="button" class="btn btn--primary" data-step-next>Далее</button></div>{% endif %}
       </fieldset>
 
       <fieldset class="form__group step-pane" data-step="3" style="border-bottom: 0;">
         <legend class="h3">Логотип</legend>
-        <p class="muted" style="margin-top: 0;">Фото манежа и обложку добавите в кабинете клуба после сохранения.</p>
-        {% if club.logo %}<div class="club-head"><img class="club-logo club-logo--lg" src="{% url 'clubs:file' 'logo' club.pk %}?w=320" alt="Текущий логотип"><label class="check"><input type="checkbox" name="logo_clear" value="1"><span>Убрать логотип</span></label></div>{% endif %}
+        {% if not club %}<p class="muted" style="margin-top: 0;">Фото манежа и обложку добавите в кабинете клуба после сохранения.</p>{% endif %}
+        {# Тест 6.1, пп. 5, 6: убрать — крестиком на логотипе; выбрать — кнопкой «+ Добавить фото» справа от заголовка #}
+        {% if club.logo %}<div class="logo-box"><img class="club-logo club-logo--lg" src="{% url 'clubs:file' 'logo' club.pk %}?w=320" alt="Текущий логотип"><button type="submit" name="logo_clear" value="1" class="logo-box__x" aria-label="Убрать логотип" data-confirm="Убрать логотип клуба?" data-confirm-ok="Убрать">×</button></div>{% endif %}
         {% include "partials/field.html" with field=form.logo %}
         <div class="form-actions step-pane__nav">
-          <button type="button" class="btn btn--ghost" data-step-prev>Назад</button>
+          {% if not club %}<button type="button" class="btn btn--ghost" data-step-prev>Назад</button>{% endif %}
           {% if not club or club.status == "draft" or club.status == "returned" %}
             <button type="submit" name="submit" value="1" class="btn btn--primary">Сохранить и отправить на проверку</button>
             <button type="submit" class="btn btn--ghost">Сохранить черновик</button>

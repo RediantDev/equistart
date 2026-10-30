@@ -511,7 +511,16 @@
     var clear = el("button", "file__clear"); clear.type = "button"; clear.setAttribute("aria-label", "Убрать файл");
     clear.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
     card.appendChild(cardIco); card.appendChild(cardTxt); card.appendChild(clear);
-    if (imgOnly) { thumbs.appendChild(plus); root.appendChild(thumbs); thumbs.hidden = false; }
+    if (imgOnly) {
+      // Тест 6.1, п. 6: фото — кнопка «+ Добавить фото» справа от подписи поля, миниатюры ниже
+      plus.className = "btn btn--ghost btn--sm file__add";
+      plus.textContent = input.multiple ? "+ Добавить фото" : (input.getAttribute("data-plus-label") || "+ Добавить фото");
+      var head = el("div", "file__head"), fld = root.closest(".field");
+      var lbl = fld && fld.querySelector(":scope > .field__label");
+      if (lbl) { fld.insertBefore(head, lbl); head.appendChild(lbl); } else { root.insertBefore(head, root.firstChild); }
+      head.appendChild(plus);
+      root.appendChild(thumbs);
+    }
     else { root.appendChild(plus); root.appendChild(card); }
     var err = el("p", "field__error"); err.hidden = true; err.setAttribute("role", "alert"); root.appendChild(err);
     function size(f) { return f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + " КБ" : (f.size / 1048576).toFixed(1).replace(".", ",") + " МБ"; }
@@ -545,9 +554,9 @@
           } else { t.appendChild(el("span", "file__thumb-name", f.name)); }
           var x = el("button", "file__thumb-x", "×"); x.type = "button"; x.setAttribute("aria-label", "Убрать " + f.name);
           x.onclick = function () { removeAt(i); };
-          t.appendChild(x); thumbs.insertBefore(t, plus);
+          t.appendChild(x); thumbs.appendChild(t);
         });
-        plus.hidden = !input.multiple && files.length > 0;
+        thumbs.hidden = !files.length;
       } else {
         var f = files[0];
         card.hidden = !f; plus.hidden = !!f;

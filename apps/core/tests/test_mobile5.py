@@ -255,7 +255,7 @@ class ClubRedesignTests(Base):
         club = Club.objects.get(manager=self.cu)
         r = self.client.get(reverse("clubs:mine"))
         self.assertContains(r, "Страница заполнена")  # кабинет
-        self.assertContains(self.client.get(reverse("clubs:mine") + "?edit=1"), "2. Контакты")
+        self.assertContains(self.client.get(reverse("clubs:mine") + "?edit=1"), "Контакты и о клубе")  # тест 6.1: одной страницей
         self.client.post(reverse("clubs:photo_add"), {"file": [png(), png()], "once": "c1"})
         p1, p2 = list(ClubPhoto.objects.filter(club=club))
         self.client.post(reverse("clubs:photo_cover", args=[p2.pk]))

@@ -234,6 +234,46 @@ def photo_add(request):
 
 @login_required
 @require_POST
+def logo_set(request):
+    """Тест 6.1, п. 3: сменить логотип одним действием — выбрал файл, он сразу сохранился."""
+    club = _my_club(request.user)
+    if not club:
+        raise Http404
+    services.require_manage(request.user, club)
+    f = request.FILES.get("logo")
+    try:
+        if not f:
+            raise ValidationError("Выберите файл логотипа.")
+        services.check_image(f)
+    except ValidationError as e:
+        messages.error(request, " ".join(e.messages))
+        return redirect("clubs:mine")
+    from apps.core import images
+
+    club.logo = images.optimize(f, 600)
+    club.save(update_fields=["logo"])
+    audit(request.user, "club.logo", club)
+    messages.success(request, "Логотип обновлён.")
+    return redirect("clubs:mine")
+
+
+@login_required
+@require_POST
+def logo_clear(request):
+    """Тест 6.1, п. 5: убрать логотип — крестиком на самом логотипе."""
+    club = _my_club(request.user)
+    if not club:
+        raise Http404
+    services.require_manage(request.user, club)
+    club.logo = None
+    club.save(update_fields=["logo"])
+    audit(request.user, "club.logo.clear", club)
+    messages.success(request, "Логотип убран.")
+    return redirect("clubs:mine")
+
+
+@login_required
+@require_POST
 def photo_cover(request, pk):
     """Сделать фото обложкой: оно становится первым (тест 5, п. 25.3)."""
     p = get_object_or_404(ClubPhoto.objects.select_related("club"), pk=pk)
