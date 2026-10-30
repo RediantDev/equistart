@@ -35,16 +35,18 @@
       <div style="flex: 1 1 240px;">
       {% if b.state == "pending" %}
         <form method="post" action="{% url 'stables:action' t.pk 'confirm' %}" class="inline-row" style="margin: 0 0 6px;">{% csrf_token %}<input type="hidden" name="booking" value="{{ b.pk }}"><input type="hidden" name="revision" value="{{ b.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn--primary btn--sm">Подтвердить</button></form>
-        <details class="inline-details"><summary class="btn btn--ghost btn--sm">Отклонить</summary><form method="post" action="{% url 'stables:action' t.pk 'reject' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="booking" value="{{ b.pk }}"><input type="hidden" name="revision" value="{{ b.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="text" name="reason" required placeholder="Причина" aria-label="Причина отказа"><button class="btn btn--danger btn--sm">Отклонить</button></form></details>
+        <button type="button" class="btn btn--ghost btn--sm" data-sheet-open="brej{{ b.pk }}">Отклонить</button>
+        {% include "stables/_reason_sheet.html" with sid="brej" action="reject" title="Отклонить бронь" ok="Отклонить" chips="Нет свободных денников|Не те даты|Нет выступлений" %}
       {% elif b.state == "confirmed" %}
         <form method="post" action="{% url 'stables:action' t.pk 'box' %}" class="order-ctl">{% csrf_token %}<input type="hidden" name="booking" value="{{ b.pk }}"><input type="hidden" name="next" value="{{ request.get_full_path }}#b{{ b.pk }}"><input class="input-sm" type="text" name="box" value="{{ b.box_number }}" placeholder="№" aria-label="Номер денника" style="width: 90px; flex-basis: 90px;"><button class="btn btn--ghost btn--sm">{% if b.box_number %}Сменить денник{% else %}Назначить денник{% endif %}</button></form>
-        <details class="inline-details"><summary class="btn btn--ghost btn--sm">Отменить бронь</summary><form method="post" action="{% url 'stables:action' t.pk 'cancel' %}" class="inline-row">{% csrf_token %}<input type="hidden" name="booking" value="{{ b.pk }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="text" name="reason" required placeholder="Причина" aria-label="Причина отмены"><button class="btn btn--danger btn--sm">Отменить</button></form></details>
+        <button type="button" class="btn btn--ghost btn--sm" data-sheet-open="bcan{{ b.pk }}">Отменить бронь</button>
+        {% include "stables/_reason_sheet.html" with sid="bcan" action="cancel" title="Отменить бронь" ok="Отменить бронь" chips="Выступления отменены|По просьбе заказчика" %}
       {% endif %}</div>
     </article>{% endfor %}</div>
-  {% else %}<p class="muted empty-line">Броней{% if state != "all" %} с этим статусом{% endif %} нет.{% if not cats %} Сначала <a href="?tab=setup">добавьте денники</a>.{% endif %}</p>{% endif %}
+  {% else %}<div class="card empty empty--sm"><p class="muted" style="margin: 0;">Броней{% if state != "all" %} с этим статусом{% endif %} нет.{% if not cats %} Сначала <a href="?tab=setup">добавьте денники</a>.{% endif %}</p></div>{% endif %}
 
 {% elif tab == "orders" %}
-  <div class="chips" style="margin-bottom: var(--space-4);"><a class="chip{% if show == 'open' %} chip--info{% endif %}" href="?tab=orders&show=open">К выдаче</a><a class="chip{% if show != 'open' %} chip--info{% endif %}" href="?tab=orders&show=all">Все</a></div>
+  <nav class="dchips" aria-label="Какие заказы показать" style="margin-bottom: var(--space-3);"><a class="dchips__item{% if show == 'open' %} is-active{% endif %}" href="?tab=orders&show=open">К выдаче</a><a class="dchips__item{% if show != 'open' %} is-active{% endif %}" href="?tab=orders&show=all">Все</a></nav>
   {% if orders %}<div class="list-cards">{% for o in orders %}
     <article class="row-card" id="o{{ o.pk }}"><div style="flex: 1 1 240px; min-width: 0;"><strong>{{ o.service.name }}</strong> × {{ o.quantity }} {{ o.service.unit }} · {{ o.recipient_label }}<span class="table__sub">{{ o.ordered_by.full_name }}{% if o.for_date %} · на {{ o.for_date|date:"j E" }}{% endif %}{% if o.comment %} · «{{ o.comment }}»{% endif %}</span>
       {% for d in o.deliveries.all %}<span class="table__sub">Выдано {{ d.quantity }} · {{ d.at|date:"j E H:i" }}{% if d.note %} · {{ d.note }}{% endif %}</span>{% endfor %}</div>

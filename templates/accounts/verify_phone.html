@@ -1,14 +1,18 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Подтверждение телефона — СтартЛист{% endblock %}
 {% block content %}
 <div class="auth">
   <section class="card auth__card">
-    <h1 class="h2">Подтвердите телефон</h1>
+    <div class="auth__head">
+      <img class="auth__icon" src="{% static 'brand/startlist-icon.svg' %}" width="56" height="56" alt="">
+      <div><h1 class="h1 auth__title">Подтвердите телефон</h1></div>
+    </div>
     <p class="muted">По закону вход на сайты в России привязан к номеру телефона. Подтвердить нужно один раз: пришлём код на <strong>{{ user.phone_display }}</strong>.</p>
     {% if sent %}
       <form method="post" class="form">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
         <div class="field"><label class="field__label" for="code">Код из СМС</label><input id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required class="input-lg" autofocus></div>
-        <button class="btn btn--primary btn--block">Подтвердить</button>
+        <button class="btn btn--primary btn--block btn--lg">Подтвердить</button>
       </form>
     {% endif %}
     <form method="post" class="form" style="margin-top: var(--space-3);">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}"><input type="hidden" name="action" value="send">

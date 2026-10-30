@@ -6,7 +6,7 @@
     <a class="back" href="{% url 'tournaments:public' t.pk %}" data-fixed-back>← К турниру</a>
     <a class="btn btn--ghost btn--sm" href="{% url 'tournaments:public_regulation' t.pk %}" download>Скачать PDF</a>
   </div>
-  <h1 class="h2" style="margin: 0 0 var(--space-3);">Положение</h1>
+  <h1 class="h1" style="margin: 0 0 var(--space-3);">Положение</h1>
   <p class="table__sub" style="margin-top: -8px;">{{ title }}</p>
   <iframe class="reg-view__frame" src="{% url 'tournaments:public_regulation' t.pk %}#view=FitH" title="Положение: {{ title }}"></iframe>
   <p class="table__sub">Если документ не показался — <a href="{% url 'tournaments:public_regulation' t.pk %}">откройте его целиком</a>, вернуться можно кнопкой «Назад» браузера.</p>

@@ -6,7 +6,7 @@
     <h1 class="h1">Помощь</h1>
     <p class="muted">Ответы на частые вопросы. Не нашли ответ — напишите нам.</p>
   </div>
-  <a class="btn btn--primary" href="{% url 'support:new' %}">Написать в поддержку</a>
+  <a class="btn btn--primary btn--sm" href="{% url 'support:new' %}">Написать в поддержку</a>
 </div>
 {% if sections %}
   {% if sections|length > 1 %}<nav class="chips" aria-label="Разделы">{% for code, label, rows in sections %}<a class="tag" href="#faq-{{ code }}">{{ label }}</a>{% endfor %}</nav>{% endif %}

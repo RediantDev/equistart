@@ -24,18 +24,6 @@
     </details>
   </div>
   {% if e.decision == "pending" or e.decision == "accepted" %}
-  {% comment %}Тест 6.1, п. 18 (вариант А): окно снизу — кто и куда, частые причины чипами, поле для своей, «Отклонить» красная{% endcomment %}
-  <div class="sheet" id="rej{{ e.pk }}" hidden data-sheet data-sheet-portal>
-    <form class="sheet__box rej" method="post" action="{% url 'entries:decide' t.pk %}" role="dialog" aria-modal="true" aria-labelledby="rej{{ e.pk }}-t">{% csrf_token %}
-      <input type="hidden" name="confirm" value="1"><input type="hidden" name="action" value="reject"><input type="hidden" name="items" value="{{ e.pk }}:{{ e.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
-      <div class="sheet__grip"></div>
-      <div class="rej__head"><div><h2 class="sheet__title" id="rej{{ e.pk }}-t">Отклонить заявку</h2><p class="rej__who">{{ e.athlete_snapshot.name }} · {{ e.horse_snapshot.name }} · {{ e.program.name }} · {{ e.tclass.label|default:e.class_name }}</p></div><button type="button" class="sheet-x" data-sheet-close aria-label="Закрыть">×</button></div>
-      <p class="rej__lbl">Причина — её увидит подавший заявку</p>
-      <div class="chips">{% for r in "Не подходит по году рождения|Нет мест|Не подходит по разряду|Лошадь не по условиям"|split:"|" %}<button type="button" class="pick-btn" data-fill="rej{{ e.pk }}-r">{{ r }}</button>{% endfor %}</div>
-      <input id="rej{{ e.pk }}-r" name="reason" required placeholder="Или напишите свою причину" aria-label="Причина отклонения" maxlength="300">
-      <div class="rej__act"><button type="button" class="btn btn--ghost" data-sheet-close>Отмена</button><button class="btn btn--danger-solid">Отклонить</button></div>
-      <a class="rej__open" href="{% url 'entries:application' e.application_id %}">Заявка №{{ e.application.number }} · открыть полностью</a>
-    </form>
-  </div>
+  {% include "entries/_reject_sheet.html" %}
   {% endif %}
 </li>

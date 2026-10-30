@@ -2,17 +2,33 @@
 {% load tournaments %}
 {% block title %}Мои соревнования — СтартЛист{% endblock %}
 {% block content %}
-{# Вариант А (решение 27.10.2026), тест 5.1: вкладки «Предстоящие / Прошедшие», поиск и фильтр — на этой же странице #}
 {# Тест 5.3, п. 52: на компьютере — «назад» (на телефоне есть нижнее меню); smooth.js ведёт туда, откуда пришли #}
 <a class="back back--desk" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
-<div class="mc-head">
-  <h1 class="h1">Мои соревнования</h1>
+{% comment %}Единый вид (30.10.2026): как «Мои соревнования» организатора — поиск и значок фильтров, фильтры в окне снизу,
+   выбранные — чипами с крестиком. Вкладки «Прошедшие» нет: прошедшие открываются выбором даты в календаре.{% endcomment %}
+<div class="head-row"><h1 class="h1">Мои соревнования</h1></div>
+
+<div class="myf" data-mc-tools>
+  <div class="myf__row">
+    <div class="cal-search__box">{% include "partials/icon.html" with name="search" size=18 %}<input id="mc-q" type="search" value="{{ q }}" placeholder="Турнир, всадник или лошадь" aria-label="Поиск по турниру, всаднику или лошади" autocomplete="off" enterkeyhint="search" data-mc-q></div>
+    <button type="button" class="cal-search__fbtn myf__fbtn" data-sheet-open="mc-sheet" data-mc-fbtn aria-label="Фильтры" title="Фильтры">{% include "partials/icon.html" with name="filter" size=20 %}<span class="cal-search__count" data-mc-count hidden></span></button>
+  </div>
+  <div class="chips myf__active" data-mc-active hidden></div>
 </div>
 
-<div class="mc-tools" data-mc-tools>
-  <label class="visually-hidden" for="mc-q">Поиск по турниру, всаднику или лошади</label>
-  <div class="mc-search">{% include "partials/icon.html" with name="search" size=18 %}<input id="mc-q" type="search" value="{{ q }}" placeholder="Турнир, всадник или лошадь" autocomplete="off" enterkeyhint="search" data-mc-q></div>
-  <div class="mc-filters" role="group" aria-label="Решение по выступлению">{% for v, l in status_filters %}<button type="button" class="mc-filter{% if not v %} is-active{% endif %}" data-mc-status="{{ v }}" aria-pressed="{% if v %}false{% else %}true{% endif %}">{{ l }}</button>{% endfor %}</div>
+<div class="sheet" id="mc-sheet" hidden data-sheet>
+  <form class="sheet__box myf__box" role="dialog" aria-modal="true" aria-labelledby="mc-sheet-t" data-mc-form>
+    <div class="sheet__grip"></div>
+    <div class="myf__head"><h2 class="sheet__title" id="mc-sheet-t">Фильтры</h2><button type="button" class="sheet-x" data-sheet-close aria-label="Закрыть">×</button></div>
+    <fieldset class="myf__group"><legend>Решение по выступлению</legend>
+      <div class="chips">{% for v, l in status_filters %}<label class="pick"><input type="checkbox" name="st" value="{{ v }}" data-label="{{ l }}"><span>{{ l }}</span></label>{% endfor %}</div>
+    </fieldset>
+    {% if riders|length > 1 %}<div class="field myf__group"><label class="field__label" for="mc-rider">Всадник</label>
+      <select id="mc-rider" name="rider"><option value="">Любой</option>{% for r in riders %}<option>{{ r }}</option>{% endfor %}</select></div>{% endif %}
+    {% if horses|length > 1 %}<div class="field myf__group"><label class="field__label" for="mc-horse">Лошадь</label>
+      <select id="mc-horse" name="horse"><option value="">Любая</option>{% for h in horses %}<option>{{ h }}</option>{% endfor %}</select></div>{% endif %}
+    <div class="myf__actions"><button type="button" class="btn btn--ghost" data-mc-reset>Сбросить</button><button class="btn btn--primary">Показать</button></div>
+  </form>
 </div>
 
 {# Тест 5.2 (вариант B, R3_03B): общий календарь; даты пользователя — предстоящие точкой, прошедшие кольцом; дата отбирает карточки #}
@@ -20,10 +36,6 @@
 <div class="mc-datebar" data-mc-datebar hidden><b data-mc-datebar-text></b><button type="button" data-mc-date-all>Все соревнования</button></div>
 
 <div id="mc-view">
-<nav class="tabs tabs--sticky mc-tabs" aria-label="Мои соревнования" data-swap="#mc-view">
-  <a class="tabs__item{% if tab == 'upcoming' %} is-active{% endif %}" href="?tab=upcoming">Предстоящие{% if counts.upcoming %} · {{ counts.upcoming }}{% endif %}</a>
-  <a class="tabs__item{% if tab == 'past' %} is-active{% endif %}" href="?tab=past">Прошедшие{% if counts.past %} · {{ counts.past }}{% endif %}</a>
-</nav>
 {% include "entries/_competition_cards.html" %}
 {# Даты каждой карточки — в том же порядке, что и карточки (для отбора по дате в календаре) #}
 <script type="application/json" id="mc-card-days">[{% for c in cards %}["{{ c.t.pub_starts_on|default:c.t.starts_on|date:'Y-m-d' }}","{{ c.t.pub_ends_on|default:c.t.ends_on|default:c.t.pub_starts_on|date:'Y-m-d' }}"]{% if not forloop.last %},{% endif %}{% endfor %}]</script>
@@ -32,80 +44,109 @@
 {{ calendar_dates|json_script:"mc-dates" }}
 <script>
 (function () {
-  // Тест 5.1: поиск и фильтр по решению — на странице, без запросов к серверу. «ё» = «е», регистр не важен.
+  // Поиск и фильтры — на странице, без запросов к серверу. «ё» = «е», регистр не важен.
+  // Без выбранной даты — предстоящие; дата в календаре показывает соревнования этого дня, в том числе прошедшие.
   function norm(s) { return String(s || "").toLowerCase().replace(/ё/g, "е").replace(/\s+/g, " ").trim(); }
+  function state() {
+    var f = document.querySelector("[data-mc-form]"), q = document.querySelector("[data-mc-q]");
+    var st = f ? Array.prototype.map.call(f.querySelectorAll("input[name=st]:checked"), function (i) { return i.value; }) : [];
+    var cal = document.querySelector('[data-cal-key="cal-mine"]');
+    return { text: norm(q && q.value), st: st, rider: f && f.rider ? f.rider.value : "", horse: f && f.horse ? f.horse.value : "",
+             date: cal ? cal.getAttribute("data-cal-selected") : null };
+  }
   function apply() {
-    var q = document.querySelector("[data-mc-q]"), act = document.querySelector("[data-mc-status].is-active");
-    var list = document.querySelector("[data-mc-list]");
-    if (!q || !list) return;
-    var text = norm(q.value), st = act ? act.getAttribute("data-mc-status") : "", shown = 0;
-    list.querySelectorAll("[data-mc-card]").forEach(function (card) {
-      var titleHit = !text || norm(card.getAttribute("data-title")).indexOf(text) >= 0;
-      var cardHit = !text || norm(card.getAttribute("data-search")).indexOf(text) >= 0;
+    var list = document.querySelector("[data-mc-list]"); if (!list) return;
+    var s = state(), shown = 0, upcoming = 0, days = [];
+    try { days = JSON.parse((document.getElementById("mc-card-days") || {}).textContent || "[]"); } catch (err) { days = []; }
+    var filtering = !!(s.text || s.st.length || s.rider || s.horse);
+    list.querySelectorAll("[data-mc-card]").forEach(function (card, i) {
+      var r = days[i], inDate = s.date ? !!(r && r[0] <= s.date && s.date <= r[1]) : !card.hasAttribute("data-past");
+      if (!card.hasAttribute("data-past")) upcoming++;
+      var titleHit = !s.text || norm(card.getAttribute("data-title")).indexOf(s.text) >= 0;
+      var cardHit = !s.text || norm(card.getAttribute("data-search")).indexOf(s.text) >= 0;
       var rows = card.querySelectorAll("[data-mc-row]"), rowsShown = 0;
-      rows.forEach(function (r) {
-        var ok = (!st || r.getAttribute("data-status") === st) && (titleHit || norm(r.getAttribute("data-search")).indexOf(text) >= 0);
-        r.hidden = !ok;
-        if (ok) rowsShown++;
+      rows.forEach(function (row) {
+        var ok = (!s.st.length || s.st.indexOf(row.getAttribute("data-status")) >= 0)
+          && (!s.rider || row.getAttribute("data-rider") === s.rider) && (!s.horse || row.getAttribute("data-horse") === s.horse)
+          && (titleHit || norm(row.getAttribute("data-search")).indexOf(s.text) >= 0);
+        row.hidden = !ok; if (ok) rowsShown++;
       });
       card.querySelectorAll("[data-mc-day]").forEach(function (d) { d.hidden = !d.querySelector("[data-mc-row]:not([hidden])"); });
-      var ok = cardHit && (!st || rowsShown > 0);
+      var ok = inDate && cardHit && (!(s.st.length || s.rider || s.horse) || rowsShown > 0);
       card.hidden = !ok;
-      if (ok) {
-        shown++;
-        if ((text || st) && rows.length && !titleHit) card.open = true;
-      }
+      if (ok) { shown++; if (filtering && rows.length && !titleHit) card.open = true; }
     });
-    var none = list.querySelector("[data-mc-none]");
-    if (none) none.hidden = shown > 0 || !list.querySelector("[data-mc-card]");
+    // заголовок месяца — только если под ним есть видимая карточка
+    list.querySelectorAll("[data-mc-month]").forEach(function (h) {
+      var n = h.nextElementSibling, vis = false;
+      while (n && !n.hasAttribute("data-mc-month")) { if (n.hasAttribute("data-mc-card") && !n.hidden) { vis = true; break; } n = n.nextElementSibling; }
+      h.hidden = !vis;
+    });
+    var none = list.querySelector("[data-mc-none]"), empty = list.querySelector("[data-mc-empty]");
+    if (empty) empty.hidden = !!s.date || upcoming > 0 || filtering;
+    if (none) none.hidden = shown > 0 || (!filtering && !s.date) || !list.querySelector("[data-mc-card]");
+    if (none && s.date && !shown && !filtering) none.textContent = "В этот день соревнований нет.";
+    else if (none) none.textContent = "Ничего не найдено. Измените запрос или фильтры.";
+    chips(s);
+    dateBar(s, shown);
+  }
+  function chips(s) {
+    var box = document.querySelector("[data-mc-active]"), cnt = document.querySelector("[data-mc-count]"), btn = document.querySelector("[data-mc-fbtn]");
+    if (!box) return;
+    var f = document.querySelector("[data-mc-form]"), items = [];
+    s.st.forEach(function (v) { var i = f.querySelector('input[name=st][value="' + v + '"]'); items.push(["st:" + v, i ? i.getAttribute("data-label") : v]); });
+    if (s.rider) items.push(["rider", s.rider]);
+    if (s.horse) items.push(["horse", s.horse]);
+    box.innerHTML = "";
+    items.forEach(function (it) {
+      var b = document.createElement("button"); b.type = "button"; b.className = "chip chip--x"; b.setAttribute("data-mc-drop", it[0]);
+      b.setAttribute("aria-label", "Убрать фильтр " + it[1]); b.innerHTML = "<span></span> <span aria-hidden=\"true\">×</span>"; b.firstChild.textContent = it[1];
+      box.appendChild(b);
+    });
+    box.hidden = !items.length;
+    if (cnt) { cnt.hidden = !items.length; cnt.textContent = items.length; }
+    if (btn) btn.classList.toggle("is-on", items.length > 0);
+  }
+  function dateBar(s, n) {
+    var bar = document.querySelector("[data-mc-datebar]"); if (!bar) return;
+    bar.hidden = !s.date;
+    if (s.date) {
+      var p = s.date.split("-"), M = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+      bar.querySelector("[data-mc-datebar-text]").textContent = (+p[2]) + " " + M[+p[1] - 1] + (n ? "" : " — соревнований нет");
+    }
   }
   if (!window.__mcInit) {
     window.__mcInit = true;
     document.addEventListener("input", function (e) { if (e.target.matches && e.target.matches("[data-mc-q]")) apply(); });
     document.addEventListener("search", function (e) { if (e.target.matches && e.target.matches("[data-mc-q]")) apply(); }, true);
-    document.addEventListener("click", function (e) {
-      var b = e.target.closest && e.target.closest("[data-mc-status]");
-      if (!b) return;
-      document.querySelectorAll("[data-mc-status]").forEach(function (x) {
-        x.classList.toggle("is-active", x === b);
-        x.setAttribute("aria-pressed", x === b ? "true" : "false");
-      });
-      apply();
-    });
-    document.addEventListener("htmx:afterSettle", function () { apply(); byDate(); });  // переключили вкладку — фильтр остаётся
-    // Тест 5.2: дата в календаре — только соревнования, идущие в этот день
-    document.addEventListener("cal:select", function (e) {
-      if (e.target.getAttribute("data-cal-key") !== "cal-mine") return;
-      var tab = document.querySelector(".mc-tabs .tabs__item.is-active"), want = e.detail.kind === "past" ? "past" : e.detail.kind === "up" ? "upcoming" : "";
-      if (want && tab && (tab.getAttribute("href") || "").indexOf("tab=" + want) < 0) {
-        var other = document.querySelector('.mc-tabs a[href*="tab=' + want + '"]');
-        if (other) { other.click(); return; }  // byDate() — после смены вкладки
-      }
-      byDate();
+    document.addEventListener("submit", function (e) {
+      if (!e.target.matches("[data-mc-form]")) return;
+      e.preventDefault(); apply();
+      var sh = document.getElementById("mc-sheet"); if (sh) { sh.classList.remove("is-open"); setTimeout(function () { sh.hidden = true; }, 180); }
     });
     document.addEventListener("click", function (e) {
-      if (!e.target.closest || !e.target.closest("[data-mc-date-all]")) return;
-      var cal = document.querySelector('[data-cal-key="cal-mine"]');
-      if (cal && cal._cal) cal._cal.select(null);
-    });
-  }
-  function byDate() {
-    var cal = document.querySelector('[data-cal-key="cal-mine"]'), d = cal ? cal.getAttribute("data-cal-selected") : null;
-    var cards = document.querySelectorAll("[data-mc-list] [data-mc-card]"), days = [];
-    try { days = JSON.parse((document.getElementById("mc-card-days") || {}).textContent || "[]"); } catch (err) { days = []; }
-    cards.forEach(function (c, i) { var r = days[i]; c.classList.toggle("is-date-off", !!d && !!r && !(r[0] <= d && d <= r[1])); });
-    var bar = document.querySelector("[data-mc-datebar]");
-    if (bar) {
-      bar.hidden = !d;
-      if (d) {
-        var p = d.split("-"), M = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
-        var n = Array.prototype.filter.call(cards, function (c) { return !c.classList.contains("is-date-off"); }).length;
-        bar.querySelector("[data-mc-datebar-text]").textContent = (+p[2]) + " " + M[+p[1] - 1] + (n ? "" : " — соревнований нет");
+      if (!e.target.closest) return;
+      var f = document.querySelector("[data-mc-form]");
+      if (e.target.closest("[data-mc-reset]") && f) {
+        f.querySelectorAll("input[name=st]").forEach(function (i) { i.checked = false; });
+        ["rider", "horse"].forEach(function (n) { if (f[n]) { f[n].value = ""; f[n].dispatchEvent(new Event("change", { bubbles: true })); } });
+        apply(); return;
       }
-    }
+      var d = e.target.closest("[data-mc-drop]");
+      if (d && f) {
+        var k = d.getAttribute("data-mc-drop");
+        if (k.indexOf("st:") === 0) { var i = f.querySelector('input[name=st][value="' + k.slice(3) + '"]'); if (i) i.checked = false; }
+        else if (f[k]) { f[k].value = ""; f[k].dispatchEvent(new Event("change", { bubbles: true })); }
+        apply(); return;
+      }
+      if (e.target.closest("[data-mc-date-all]")) {
+        var cal = document.querySelector('[data-cal-key="cal-mine"]');
+        if (cal && cal._cal) cal._cal.select(null);
+      }
+    });
+    document.addEventListener("cal:select", function (e) { if (e.target.getAttribute("data-cal-key") === "cal-mine") apply(); });
   }
   apply();
-  byDate();
 })();
 </script>
 {% endblock %}

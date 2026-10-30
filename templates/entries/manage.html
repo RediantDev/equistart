@@ -41,8 +41,8 @@
 </section>
 {% elif not f.q and not f.program %}<p class="muted mwait__none">Новых заявок на рассмотрении нет.</p>{% endif %}
 
-<nav class="seg-tabs" aria-label="Решение по заявкам">
-  {% for k, label, n in tabs %}<a class="seg-tabs__item{% if tab == k %} is-active{% endif %}" href="?tab={{ k }}{% if params %}&{{ params }}{% endif %}">{{ label }}{% if n %} · {{ n }}{% endif %}</a>{% endfor %}
+<nav class="seg3" aria-label="Решение по заявкам">
+  {% for k, label, n in tabs %}<a class="seg3__item{% if tab == k %} is-active{% endif %}" href="?tab={{ k }}{% if params %}&{{ params }}{% endif %}">{{ label }}{% if n %} <span class="count-pill">{{ n }}</span>{% endif %}</a>{% endfor %}
 </nav>
 {% if rows %}
   <ul class="mlist mlist--card">

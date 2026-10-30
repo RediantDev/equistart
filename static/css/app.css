@@ -2253,3 +2253,38 @@ a.steps2__dot:hover { color: var(--text); }
 .myf__fbtn.is-on { background: var(--ink); border-color: var(--ink); color: #fff; }
 .myf__when .seg3__item { padding: 0 6px; gap: 4px; }
 @media (max-width: 400px) { .myf__when .seg3__item { font-size: 13px; } }
+/* Заявка: карандаш «Изменить заявку» справа от заголовка (30.10.2026) */
+.ae-head__top { margin: 0; align-items: center; }
+.ae-head__top .h1 { margin: 0; }
+.ae-head__edit { flex: none; width: 44px; height: 44px; }
+.ae-head__chips { margin: 4px 0 2px; }
+/* 30.10.2026: на телефоне подтверждение — окно снизу, как остальные окна */
+@media (max-width: 640px) {
+  .modal { place-items: end center; padding: 0; }
+  .modal__box { width: 100%; border-radius: 24px 24px 0 0; padding: 22px 20px calc(20px + env(safe-area-inset-bottom)); transform: translateY(40px); }
+  .modal__box::before { content: ""; display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--border); margin: -10px auto 14px; }
+  .modal__actions { display: grid; grid-template-columns: 1fr 1fr; }
+}
+/* Шаги мастера из partials/steps.html (ui.js отмечает текущий и пройденные) */
+.steps2--js .steps2__ok { display: none; }
+.steps2--js .steps2__item.is-done .steps2__ok { display: block; }
+.steps2--js .steps2__item.is-done .steps2__n { display: none; }
+.steps2--js .steps2__item:not(.is-current) .steps2__name { font-weight: 600; color: var(--text-muted); }
+@media (max-width: 600px) { .steps2--js .steps2__item:not(.is-current) .steps2__name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } }
+.notif-seg { max-width: 360px; margin: var(--space-2) 0 var(--space-4); }
+.club-seg .seg3__item { font-size: 13px; padding: 0 4px; }
+.back--clip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Карандаш «Изменить» — 44 px везде (профиль, карточки, заявка) */
+.icon-btn--edit { width: 44px; height: 44px; }
+/* Меню «три точки» денников — тот же вид, что .kebab (30.10.2026) */
+.sb-menu__btn { width: 40px; height: 40px; border: 1px solid var(--border) !important; background: var(--surface) !important; color: var(--text); }
+.sb-menu[open] .sb-menu__btn { background: var(--ink) !important; color: var(--surface); border-color: var(--ink) !important; }
+/* Крестики закрытия окон — 44 px, серый круг (как .sheet-x) */
+.uisheet__x { width: 44px; height: 44px; font-size: 26px; color: var(--ink); }
+.tp-pair__x { width: 44px; height: 44px; border-radius: 999px; background: var(--surface-2) !important; color: var(--ink); }
+/* Затемнение под окнами — одно на весь сервис */
+.ps-sheet[open] > summary::before { background: rgba(20,20,20,.38); }
+.ps-sheet__head [data-ps-close] { background: var(--surface-2); color: var(--ink); }
+.form--narrow { max-width: 720px; }
+.inline-row--end { align-items: flex-end; }
+@media (max-width: 400px) { .rtabs__item { font-size: 13px; padding-left: 1px; padding-right: 1px; } }

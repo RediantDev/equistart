@@ -1,7 +1,8 @@
 {% load tournaments %}
 <div class="mc-cards" data-mc-list>
 {% for c in cards %}
-  <details class="card mc-card" data-mc-card data-title="{{ c.t.pub_title|default:c.t.title }}" data-search="{{ c.search }}" data-statuses="{{ c.statuses }}">
+  {% ifchanged c.past c.t.pub_starts_on.month c.t.pub_starts_on.year %}<h2 class="month-h" data-mc-month{% if c.past %} data-past{% endif %}>{{ c.t.pub_starts_on|default:c.t.starts_on|date:"F Y" }}</h2>{% endifchanged %}
+  <details class="card mc-card" data-mc-card{% if c.past %} data-past{% endif %} data-title="{{ c.t.pub_title|default:c.t.title }}" data-search="{{ c.search }}" data-statuses="{{ c.statuses }}">
     <summary class="mc-card__sum">
       <span class="mc-card__title">{{ c.t.pub_title|default:c.t.title }}</span>
       <span class="mc-card__meta">{% daterange c.t.pub_starts_on c.t.pub_ends_on %}{% if c.t.venue %} · {{ c.t.venue.name }}{% endif %}</span>
@@ -12,7 +13,7 @@
         <section class="mc-day" data-mc-day>
           <h3 class="mc-day__h">{{ d.day|date:"j E, D" }}</h3>
           <ul class="mc-rows">{% for e in d.entries %}
-            <li class="mc-row" data-mc-row data-status="{{ e.decision }}" data-search="{{ e.search }}">
+            <li class="mc-row" data-mc-row data-status="{{ e.decision }}" data-search="{{ e.search }}" data-rider="{{ e.athlete_snapshot.name }}" data-horse="{{ e.horse_snapshot.name }}">
               <div class="mc-row__main"><strong>{{ e.athlete_snapshot.name }}</strong> · {{ e.horse_snapshot.name }}
                 <span class="table__sub">{{ e.program_name }} · {{ e.class_name }}{% if e.height %} · {{ e.height }} см{% endif %}{% if e.by_coach %} · заявил тренер{% endif %}</span></div>
               {% include "entries/_entry_chips.html" %}
@@ -40,12 +41,10 @@
     </div>
   </details>
 {% endfor %}
-{% if cards %}<p class="muted mc-none" data-mc-none hidden>Ничего не найдено. Измените запрос или фильтр.</p>
-{% else %}
-  <div class="card mc-empty">
-    {% if tab == "past" %}<p class="muted">Прошедших стартов пока нет.</p>
-    {% else %}<p class="muted">Впереди пока ничего. Найдите турнир в календаре и подайте заявку — или попросите тренера заявить вас.</p>
-    <a class="btn btn--primary btn--sm" href="{% url 'core:calendar' %}">Найти соревнования</a>{% endif %}
-  </div>
-{% endif %}
+<p class="muted mc-none" data-mc-none hidden>Ничего не найдено. Измените запрос или фильтры.</p>
+<div class="card empty mc-empty" data-mc-empty{% if counts.upcoming %} hidden{% endif %}>
+  <h2 class="h3">Предстоящих стартов нет</h2>
+  <p class="muted">{% if counts.past %}Прошедшие соревнования — нажмите их дату в календаре.{% else %}Найдите турнир в календаре и подайте заявку — или попросите тренера заявить вас.{% endif %}</p>
+  {% if not counts.past %}<a class="btn btn--primary btn--sm" href="{% url 'core:calendar' %}">Найти соревнования</a>{% endif %}
+</div>
 </div>

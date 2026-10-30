@@ -67,7 +67,7 @@ class ApplicationScreenTests(Base):
         self.client.force_login(self.coach)
         page = self.client.get(self.url).content.decode()
         # п.37: сводка в строке заголовка
-        head = page.index('class="ae-head__title"')
+        head = page.index('ae-head__top')  # 30.10.2026: заголовок и карандаш — одна строка, сводка под ней
         self.assertLess(head, page.index("ae-head__chips"))
         self.assertLess(page.index("ae-head__chips"), page.index('class="ae-head__t"'))
         # п.41: «Предложить замену» убрана; п.44: карандаш у «Контактов», форма — по нему

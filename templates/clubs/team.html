@@ -21,7 +21,7 @@
       <span class="tag{% if m.state == 'accepted' %} tag--mint{% endif %}">{% if m.state == "accepted" %}Управляющий{% else %}Приглашён{% endif %}</span>
       <div class="row-card__actions">
         {% if owner and m.state == "accepted" %}
-          <form method="post">{% csrf_token %}<input type="hidden" name="member" value="{{ m.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="transfer">Сделать владельцем</button></form>
+          <form method="post">{% csrf_token %}<input type="hidden" name="member" value="{{ m.pk }}"><input type="hidden" name="confirm" value="1"><button class="btn btn--ghost btn--sm" name="action" value="transfer" data-confirm="Передать клуб «{{ club.name }}»? Владельцем станет {{ m.user.full_name }}. Вы останетесь управляющим, но приглашать и убирать людей больше не сможете; вернуть владение может только новый владелец." data-confirm-ok="Передать">Сделать владельцем</button></form>
         {% endif %}
         {% if owner %}
           <form method="post">{% csrf_token %}<input type="hidden" name="member" value="{{ m.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="remove" data-confirm="{% if m.state == 'pending' %}Отозвать приглашение?{% else %}Убрать {{ m.user.full_name|default:m.phone }} из управляющих клуба?{% endif %}" data-confirm-ok="{% if m.state == 'pending' %}Отозвать{% else %}Убрать{% endif %}">{% if m.state == "pending" %}Отозвать{% else %}Убрать{% endif %}</button></form>

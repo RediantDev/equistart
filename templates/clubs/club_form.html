@@ -7,9 +7,7 @@
     <a class="back" href="{% if club %}{% url 'clubs:mine' %}{% else %}{% url 'clubs:list' %}{% endif %}" data-fixed-back>← {% if club %}Мой клуб{% else %}Клубы{% endif %}</a>
     <h1 class="h1" style="margin-bottom: 0;">{% if club %}{{ club.name }}{% else %}Новый клуб{% endif %}</h1>
     {# Тест 6.1, п. 4: у созданного клуба сведения меняются одной страницей; мастер по шагам — только при создании #}
-    {% if not club %}<ol class="steps-mini" aria-label="Шаги" data-steps-nav>
-      <li data-step-dot="1">1. Название и адрес</li><li data-step-dot="2">2. Контакты</li><li data-step-dot="3">3. Логотип</li>
-    </ol>{% endif %}
+    {% if not club %}{% include "partials/steps.html" with names="Название и адрес|Контакты|Логотип" %}{% endif %}
     {% if invites %}<div class="alert alert--info" style="margin-top: var(--space-3);">Вас пригласили управлять клубом: {% for m in invites %}«{{ m.club.name }}»{% if not forloop.last %}, {% endif %}{% endfor %}. <a href="{% url 'tournaments:invitations' %}">Принять приглашение</a> — и не создавайте второй профиль.</div>{% endif %}
     {% if club.status == "returned" %}<div class="alert alert--error" role="alert" style="margin-top: var(--space-3);"><strong>Модератор вернул профиль:</strong> {{ club.moderator_comment }}</div>{% endif %}
     {% if club.is_public %}<p class="table__sub">Изменение названия, региона, города или адреса снова отправит профиль модератору. До решения все видят прежние данные.</p>{% endif %}

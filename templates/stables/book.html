@@ -4,7 +4,7 @@
 {% block content %}
 {# Макет 10B «Денники и услуги»: по карточке на лошадь, лента ночей, счётчики услуг, итог над нижним меню #}
 <div class="sb-page">
-<a class="sb-back" href="{% url 'tournaments:public' t.pk %}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span>{{ t.pub_title }}</span></a>
+<a class="back back--clip" href="{% url 'tournaments:public' t.pk %}">← {{ t.pub_title }}</a>
 <div class="sb-head">
   <div class="sb-head__text"><h1 class="sb-h1">Денники и услуги</h1><p class="sb-m">Отметьте ночи для каждой лошади</p></div>
   {% if open and cards|length > 1 %}<button class="btn btn--ghost sb-copy" type="button" data-copy-first hidden>Всем как у первой</button>{% endif %}

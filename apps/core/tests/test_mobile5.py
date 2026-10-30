@@ -234,7 +234,8 @@ class MyCompetitionsTests(Base):
         self.assertContains(r, f'href="{app_url}"')
         self.assertNotContains(r, f"№{app.pk}")  # тест 5.1: без номеров заявок в карточках
         self.assertNotContains(self.client.get(url + "?tab=apps"), "?tab=apps")  # вкладки «Заявки» больше нет
-        self.assertContains(self.client.get(url + "?tab=past"), "Прошедших стартов пока нет")
+        # 30.10.2026: вкладки «Прошедшие» нет — прошедшие открываются датой в календаре
+        self.assertNotContains(self.client.get(url), "?tab=past")
         self.client.force_login(self.other)
         self.assertNotContains(self.client.get(url), self.t.pub_title)
 
@@ -249,7 +250,8 @@ class ClubRedesignTests(Base):
 
     def test_wizard_then_dashboard_tabs_and_cover(self):
         r = self.client.get(reverse("clubs:mine"))
-        self.assertContains(r, "1. Название и адрес")  # нет клуба — мастер
+        self.assertContains(r, 'data-step-dot="1"><span class="steps2__dot">')  # нет клуба — мастер (шаги кружками)
+        self.assertContains(r, "Название и адрес")
         data = {"name": "КСК «Вега»", "region": "mos", "settlement": "Москва", "address": "ул. 1", "phone": "+79990007001"}
         self.client.post(reverse("clubs:mine"), data)
         club = Club.objects.get(manager=self.cu)

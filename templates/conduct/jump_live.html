@@ -4,7 +4,7 @@
 {% block content %}
 <div class="live" id="jump-live" data-queue-key="eq-queue-{{ p.pk }}">
   <div class="live__head">
-    <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← {{ p.name }}: порядок и результаты</a>
+    <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← {{ p.name }}</a>
     <h1 class="h3" style="margin: 0;">{{ p.name }}</h1>
     <div class="table__sub">{{ p.program_type_name }} · {{ p.article_label }}</div>
   </div>
@@ -12,8 +12,8 @@
   {% comment %}Тест 6.1, пп. 24–29: светлая карточка с плитками и итогом сразу (26А), фазы — шагами в карточке (24В),
      без нормы времени ввод закрыт — норма вносится тут же (25А), «Кто дальше» — список следующих пар.{% endcomment %}
   {% if stages|length > 1 and not two %}
-    <nav class="segmented segmented--wrap" aria-label="Гит" style="margin-top: var(--space-3);">
-      {% for s in stages %}<a class="segmented__item{% if s.key == stage.key %} is-active{% endif %}" href="?stage={{ s.key }}">{{ s.title }}{% if counts|get:s.key %} · {{ counts|get:s.key }}{% endif %}</a>{% endfor %}
+    <nav class="seg3" aria-label="Гит" style="margin: var(--space-3) 0 0;">
+      {% for s in stages %}<a class="seg3__item{% if s.key == stage.key %} is-active{% endif %}" href="?stage={{ s.key }}">{{ s.title }}{% if counts|get:s.key %} <span class="count-pill">{{ counts|get:s.key }}</span>{% endif %}</a>{% endfor %}
     </nav>
   {% endif %}
   <p class="table__sub" style="margin: var(--space-2) 0 0;">Табл. {{ stage.table }}{% if stage.timed %} · на время{% else %} · без учёта времени{% endif %}{% if stage.time_allowed %} · норма {{ stage.time_allowed|num }} с{% endif %}{% if stage.limit %} · лимит {{ stage.limit|num }} с{% endif %}{% if course.indoor %} · в помещении{% endif %}</p>

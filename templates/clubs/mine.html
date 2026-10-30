@@ -28,11 +28,11 @@
   </div>
   {% if club.status == "returned" %}<p class="club-top__text"><strong>Модератор вернул профиль:</strong> {{ club.moderator_comment }} <a href="?edit=1">Исправить</a></p>
   {% elif club.status == "draft" %}<p class="club-top__text">{% if missing %}Чтобы отправить на проверку: {% for m in missing %}{{ m|lower }} {% endfor %}{% else %}Всё заполнено — <a href="?edit=1">отправьте профиль на проверку</a>.{% endif %}</p>{% endif %}
-  <nav class="seg-tabs" aria-label="Разделы клуба">
-    <a class="seg-tabs__item is-active" href="#top" aria-current="page">Страница</a>
-    <a class="seg-tabs__item" href="#news">Новости</a>
-    <a class="seg-tabs__item" href="{% url 'core:calendar' %}?club={{ club.pk }}">Турниры{% if venue_t %} · {{ venue_t }}{% endif %}</a>
-    <a class="seg-tabs__item" href="{% url 'clubs:team' %}">Команда</a>
+  <nav class="seg3 club-seg" aria-label="Разделы клуба">
+    <a class="seg3__item is-active" href="#top" aria-current="page">Страница</a>
+    <a class="seg3__item" href="#news">Новости</a>
+    <a class="seg3__item" href="{% url 'core:calendar' %}?club={{ club.pk }}">Турниры{% if venue_t %} <span class="count-pill">{{ venue_t }}</span>{% endif %}</a>
+    <a class="seg3__item" href="{% url 'clubs:team' %}">Команда</a>
   </nav>
 </section>
 

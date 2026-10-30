@@ -4,14 +4,10 @@
 {# Тест 5.3, п. 39: вариант B (макеты R4_B1, R4_B2). Новый — два шага на клиенте, без JS — одна форма; изменение — одна страница в том же стиле #}
 {% with f=form %}
 <div class="ps-screen ps-hform">
-  <a class="ps-back" href="{% if next %}{{ next }}{% elif athlete %}{% url 'profiles:athlete' athlete.pk %}{% else %}{% url 'profiles:athletes' %}{% endif %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>{% if next %}Вернуться к заявке{% elif athlete %}{{ athlete.full_name }}{% else %}Спортсмены{% endif %}</a>
+  <a class="back" href="{% if next %}{{ next }}{% elif athlete %}{% url 'profiles:athlete' athlete.pk %}{% else %}{% url 'profiles:athletes' %}{% endif %}">← {% if next %}Вернуться к заявке{% elif athlete %}{{ athlete.full_name }}{% else %}Спортсмены{% endif %}</a>
   <h1 class="h1 ps-h1">{% if athlete %}Изменить спортсмена{% elif myself %}Мой профиль спортсмена{% else %}Новый спортсмен{% endif %}</h1>
   {% if not athlete %}
-  <ol class="ps-steps ps-js" aria-label="Шаги">
-    <li class="ps-st" data-step-dot="1"><span class="ps-sn ps-sn--ic"><svg class="ps-sn__n" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><svg class="ps-sn__ok" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Кто это</li>
-    <li class="ps-steps__line" aria-hidden="true"></li>
-    <li class="ps-st" data-step-dot="2"><span class="ps-sn ps-sn--ic"><svg class="ps-sn__n" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="15" r="6"/><path d="M8 3l4 6 4-6"/></svg></span>Клуб и номера</li>
-  </ol>
+  {% include "partials/steps.html" with names="Кто это|Клуб и номера" %}
   {% endif %}
   {% for error in f.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}
   <form method="post" novalidate class="ps-hform__form ps-aform"{% if not athlete %} data-steps{% endif %}>

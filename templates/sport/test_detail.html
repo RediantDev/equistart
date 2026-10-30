@@ -9,8 +9,8 @@
     <p class="table__sub">Штрафы: {{ scheme|default:"не выбраны" }} · при равенстве: {{ test.get_tie_rule_display|default:"—" }}{% if test.source %} · источник: {{ test.source }}{% endif %}</p>
   </div>
   <div class="chips">
-    {% if can_edit %}<a class="btn btn--dark" href="{% url 'sport:test_edit' test.pk %}">Изменить</a>{% endif %}
-    <a class="btn btn--ghost" href="{% url 'sport:test_new' %}?from={{ test.pk }}">Скопировать</a>
+    <a class="btn btn--ghost btn--sm" href="{% url 'sport:test_new' %}?from={{ test.pk }}">Скопировать</a>
+    {% if can_edit %}{% url 'sport:test_edit' test.pk as edit_url %}{% include "partials/edit_icon.html" with href=edit_url label="Изменить езду" %}{% endif %}
   </div>
 </div>
 {% for part in parts %}

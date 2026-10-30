@@ -3,9 +3,9 @@
 {% block content %}
 <div class="page-head">
   <div><h1 class="h1">Уведомления</h1>
-    <nav class="segmented" aria-label="Фильтр" style="margin-top: var(--space-2);">
-      <a class="segmented__item{% if show == 'unread' %} is-active{% endif %}" href="?show=unread" style="text-decoration: none;">Непрочитанные</a>
-      <a class="segmented__item{% if show == 'all' %} is-active{% endif %}" href="?show=all" style="text-decoration: none;">Все</a>
+    <nav class="seg3 notif-seg" aria-label="Фильтр">
+      <a class="seg3__item{% if show == 'unread' %} is-active{% endif %}" href="?show=unread">Непрочитанные</a>
+      <a class="seg3__item{% if show == 'all' %} is-active{% endif %}" href="?show=all">Все</a>
     </nav>
   </div>
   {% if UNREAD_NOTIFICATIONS %}<form method="post" action="{% url 'core:notifications_read_all' %}">{% csrf_token %}<button class="btn btn--ghost btn--sm">Прочитать все</button></form>{% endif %}

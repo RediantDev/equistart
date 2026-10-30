@@ -3,7 +3,7 @@
 {% block content %}
 {# Тест 5.2, п. 50: «Изменить» — карандаш справа от имени, как у лошади #}
 <div class="ps-screen ps-screen--head">
-  <a class="ps-back" href="{% url 'profiles:athletes' %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Спортсмены</a>
+  <a class="back" href="{% url 'profiles:athletes' %}">← Спортсмены</a>
   <div class="ps-headrow">
     <div class="ps-title">
       <h1 class="h1 ps-h1">{{ a.full_name }}</h1>
@@ -34,9 +34,9 @@
       {% if delegates %}
         <ul class="list">{% for d in delegates %}<li class="list__row"><span style="flex: 1;">{{ d.user.full_name }}</span><form method="post" action="{% url 'profiles:athlete_action' a.pk 'undelegate' %}">{% csrf_token %}<input type="hidden" name="delegate" value="{{ d.pk }}"><button class="btn btn--danger btn--sm">Отозвать</button></form></li>{% endfor %}</ul>
       {% else %}<p class="muted">{% if a.linked_user and a.linked_user == a.manager %}Заявки за себя подаёте вы. Если за вас заявляет тренер или менеджер — добавьте его телефон ниже.{% else %}Только вы{% if a.linked_user %} и сам спортсмен{% endif %}. Чтобы заявки мог подавать тренер или менеджер — добавьте его телефон ниже.{% endif %}</p>{% endif %}
-      <form method="post" action="{% url 'profiles:athlete_action' a.pk 'delegate' %}" class="inline-row">
-        {% csrf_token %}<label class="visually-hidden" for="dphone">Телефон тренера</label>
-        <input id="dphone" name="phone" type="tel" placeholder="Телефон тренера или менеджера">
+      <form method="post" action="{% url 'profiles:athlete_action' a.pk 'delegate' %}" class="inline-row inline-row--end">
+        {% csrf_token %}<div class="field" style="flex: 1 1 220px;"><label class="field__label" for="dphone">Телефон тренера или менеджера</label>
+        <input id="dphone" name="phone" type="tel" placeholder="+7 900 000-00-00"></div>
         <button class="btn btn--dark" data-confirm="Разрешить владельцу номера {value} подавать заявки за {{ a.full_name }}? Разрешение можно отозвать в любой момент." data-confirm-field="phone" data-confirm-ok="Разрешить">Разрешить</button>
       </form>
     </section>
@@ -52,12 +52,12 @@
     {% if not a.linked_user %}
     <details class="card"><summary class="h3">Связать с аккаунтом спортсмена</summary>
       <p class="muted">Спортсмен со своим аккаунтом увидит свои выступления и сможет подавать заявки за себя. Управлять записью продолжаете вы.</p>
-      <form method="post" action="{% url 'profiles:athlete_action' a.pk 'link' %}" class="form">{% csrf_token %}<input name="phone" type="tel" placeholder="Телефон спортсмена" aria-label="Телефон спортсмена"><button class="btn btn--dark">Отправить предложение</button></form>
+      <form method="post" action="{% url 'profiles:athlete_action' a.pk 'link' %}" class="form">{% csrf_token %}<div class="field"><label class="field__label" for="ph-link">Телефон спортсмена</label><input id="ph-link" name="phone" type="tel" placeholder="+7 900 000-00-00"></div><button class="btn btn--dark">Отправить предложение</button></form>
     </details>
     {% endif %}
     <details class="card"><summary class="h3">Передать управление</summary>
       <p class="muted">После принятия вы потеряете право редактировать запись. Прежние заявки сохранятся.</p>
-      <form method="post" action="{% url 'profiles:athlete_action' a.pk 'transfer' %}" class="form">{% csrf_token %}<input name="phone" type="tel" placeholder="Телефон нового управляющего" aria-label="Телефон нового управляющего"><button class="btn btn--dark">Предложить передачу</button></form>
+      <form method="post" action="{% url 'profiles:athlete_action' a.pk 'transfer' %}" class="form">{% csrf_token %}<div class="field"><label class="field__label" for="ph-transfer">Телефон нового управляющего</label><input id="ph-transfer" name="phone" type="tel" placeholder="+7 900 000-00-00"></div><button class="btn btn--dark">Предложить передачу</button></form>
     </details>
   </aside>
   {% endif %}

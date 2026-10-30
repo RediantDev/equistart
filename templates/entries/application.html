@@ -7,20 +7,14 @@
   {# тест 5.3 (п.35): в режиме правки «назад» ведёт на просмотр заявки; отдельной «Выйти из правки» нет #}
   {% if edit %}<a class="back" href="{% url 'entries:application' app.pk %}">← Заявка №{{ app.number }}</a>
   {% else %}<a class="back" href="{% if owner %}{% url 'entries:competitions' %}{% else %}{% url 'entries:manage' t.pk %}{% endif %}">← {% if owner %}Мои соревнования{% else %}Заявки турнира{% endif %}</a>{% endif %}
-  <div class="ae-head__row">
-    <div class="ae-head__text">
-      {# тест 5.2 (п.37): сводка решений — в одной строке с заголовком, справа #}
-      <div class="ae-head__title">
-        <h1 class="h2 app-head__title">Заявка №{{ app.number }}{% if edit %} <span class="chip ae-head__mode">правка</span>{% endif %}</h1>
-        {% if not edit %}<div class="chips ae-head__chips">{% for label, n, color in summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>{% endif %}
-      </div>
-      <p class="ae-head__t">{% if owner and t.publication == "published" %}<a href="{% url 'tournaments:public' t.pk %}">{{ t.pub_title }}</a>{% else %}{{ t.pub_title }}{% endif %}</p>
-      <p class="table__sub">{% if app.is_group %}Групповая{% else %}Индивидуальная{% endif %} · подана {{ app.created_at|date:"j E в H:i" }}{% if app.late %} · внесена судьёй{% endif %}</p>
-    </div>
-    {% if can_edit and not edit %}
-      <a class="btn btn--dark ae-head__btn" href="?edit=1" data-ae-edit>Изменить заявку</a>
-    {% endif %}
+  {% comment %}Единый вид (30.10.2026): заголовок и карандаш «Изменить заявку» справа в одной строке, как у профиля и карточек{% endcomment %}
+  <div class="head-row ae-head__top">
+    <h1 class="h1 app-head__title">Заявка №{{ app.number }}{% if edit %} <span class="chip ae-head__mode">правка</span>{% endif %}</h1>
+    {% if can_edit and not edit %}<a class="icon-btn icon-btn--edit ae-head__edit" href="?edit=1" data-ae-edit aria-label="Изменить заявку" title="Изменить заявку"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>{% endif %}
   </div>
+  {% if not edit %}<div class="chips ae-head__chips">{% for label, n, color in summary %}<span class="chip{% if color %} chip--{{ color }}{% endif %}">{{ label }}: {{ n }}</span>{% endfor %}</div>{% endif %}
+  <p class="ae-head__t">{% if owner and t.publication == "published" %}<a href="{% url 'tournaments:public' t.pk %}">{{ t.pub_title }}</a>{% else %}{{ t.pub_title }}{% endif %}</p>
+  <p class="table__sub">{% if app.is_group %}Групповая{% else %}Индивидуальная{% endif %} · подана {{ app.created_at|date:"j E в H:i" }}{% if app.late %} · внесена судьёй{% endif %}</p>
 </div>
 
 <div class="wizard-grid">
