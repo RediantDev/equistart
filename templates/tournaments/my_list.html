@@ -81,7 +81,9 @@
         </div>
         <a class="tcard2__link" href="{% if r.can_delete and t.status == 'draft' and not t.is_published %}{% url 'tournaments:step' t.pk 1 %}{% else %}{% url 'tournaments:hub' t.pk %}{% endif %}">
           <span class="tcard2__title">{{ t.title|default:"Без названия" }}</span>
-          <span class="tcard2__sub">{% if t.starts_on %}{% daterange t.starts_on t.ends_on %}{% else %}Даты не указаны{% endif %}{% if t.venue %} · {{ t.venue.name }}, {{ t.venue.settlement }}{% else %} · место не выбрано{% endif %}</span>
+          {% comment %}Тест 6.1, п. 8 (вариант В): одинаковые названия различаются датами и местом — даты крупно{% endcomment %}
+          <span class="tcard2__when">{% if t.starts_on %}{% daterange t.starts_on t.ends_on %}{% else %}Даты не указаны{% endif %}</span>
+          <span class="tcard2__sub">{% if t.venue %}{{ t.venue.name }}, {{ t.venue.settlement }}{% else %}Место не выбрано{% endif %}</span>
         </a>
         {% if r.disciplines %}<div class="chips">{% for k, name, color in r.disciplines %}<span class="tag{% if color %} tag--{{ color }}{% endif %}">{{ name }}</span>{% endfor %}</div>{% endif %}
         <dl class="tcard2__meta">

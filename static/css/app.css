@@ -2147,3 +2147,4 @@ a.steps2__dot:hover { color: var(--text); }
 .uisheet.is-kb { align-items: flex-start; }
 .uisheet.is-kb .uisheet__box { border-radius: 0 0 24px 24px; height: 100%; max-height: none !important; }
 .uisheet.is-kb .sheet__grip { display: none; }
+.tcard2__when { font-size: 20px; line-height: 1.2; font-weight: 800; color: var(--text); }
