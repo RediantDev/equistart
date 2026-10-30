@@ -85,7 +85,8 @@
         {% endif %}
       </div>
       <div class="ps-bar">
-        {% if not horse %}<button type="submit" class="ps-btn ps-grow ps-js" name="skip_extra" value="1" data-skip>Пропустить</button>{% endif %}
+        {% if horse %}<a class="ps-btn" href="{% if next %}{{ next }}{% else %}{% url 'profiles:horse' horse.pk %}{% endif %}">Отмена</a>
+        {% else %}<button type="submit" class="ps-btn ps-grow ps-js" name="skip_extra" value="1" data-skip>Пропустить</button>{% endif %}
         <button type="submit" class="ps-btn ps-btn--y ps-grow">{% if similar %}Это другая лошадь — сохранить{% else %}Сохранить{% endif %}</button>
       </div>
     </div>

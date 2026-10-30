@@ -39,7 +39,7 @@
         <thead><tr><th>Турнир</th><th>Решение</th><th>Модератор</th><th>Когда</th></tr></thead>
         <tbody>
           {% for t in recent %}
-            <tr><td class="stack-full"><a href="{% url 'moderation:detail' t.pk %}">{{ t.title }}</a></td><td data-label="Решение">{% if t.status == "returned" %}<span class="chip chip--danger">Возвращён</span>{% else %}<span class="chip chip--success">Опубликован</span>{% endif %}</td><td data-label="Модератор">{{ t.reviewed_by.short_name }}</td><td data-label="Когда">{{ t.reviewed_at|date:"d.m.Y H:i" }}</td></tr>
+            <tr><td class="stack-full"><a href="{% url 'moderation:detail' t.pk %}">{{ t.title }}</a></td><td data-label="Решение">{% if t.status == "returned" %}<span class="chip chip--danger">Возвращён</span>{% else %}<span class="chip chip--info">Опубликован</span>{% endif %}</td><td data-label="Модератор">{{ t.reviewed_by.short_name }}</td><td data-label="Когда">{{ t.reviewed_at|date:"d.m.Y H:i" }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

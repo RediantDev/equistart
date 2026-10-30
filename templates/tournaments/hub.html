@@ -14,7 +14,7 @@
       {% elif t.status == "returned" %}<span class="chip chip--danger">Нужны исправления</span>
       {% elif t.status == "rejected" %}<span class="chip chip--danger">Отклонён модератором</span>
       {% elif t.is_published and t.status != "approved" %}<span class="chip chip--warning">Опубликован · есть непроверенные изменения</span>
-      {% elif t.is_published %}<span class="chip chip--success">Опубликован</span>
+      {% elif t.is_published %}<span class="chip chip--info">Опубликован</span>
       {% else %}<span class="chip">Черновик</span>{% endif %}
       {% for r in roles %}<span class="tag tag--lilac">{% if r == "organizer" %}Вы организатор{% elif r == "judge" %}Вы судья{% else %}Вы — конюшня и услуги{% endif %}</span>{% endfor %}
     </div>

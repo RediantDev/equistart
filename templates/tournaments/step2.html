@@ -27,29 +27,27 @@
       <section class="day-pane" data-day-pane="{{ d.day|date:'Y-m-d' }}">
       {% if not d.programs %}<p class="muted day-pane__empty">{{ d.day|date:"l, j E"|capfirst }} — программы пока нет.</p>{% endif %}
       {% for p in d.programs %}
+        {% comment %}Тест 6.1, п. 14 (вариант А): свёрнутая карточка — время, название, тип, таблица, зачёты чипами; меню — в шапке;
+           раскрытая — список зачётов с корзиной, «+ Добавить зачёт» и «Свернуть».{% endcomment %}
         <details class="prc" id="program-{{ p.pk }}"{% if p.expanded %} open{% endif %}>
           <summary class="prc__head">
             <span class="prc__main">
               <span class="prc__title">{% if p.start_time %}{{ p.start_time|time:"H:i" }} · {% endif %}{{ p.name }}</span>
-              <span class="prc__sub">{% if p.is_jumping %}{{ p.program_type_name }}{% if p.variant %} ({{ p.variant }}){% endif %}{% if p|heights_extra %} · {{ p|heights_extra }}{% endif %}{% else %}{{ p.program_type_name }}{% if p.test_snapshot.level %} · {{ p.test_snapshot.level }}{% endif %}{% endif %} · Зачётов: {{ p.classes.all|length }}</span>
-              <span class="prc__tags"><span class="tag tag--{{ p.discipline_color }}">{{ p.get_discipline_display }}</span>{% if not p.classes.all %}<span class="chip chip--warning">Нет зачётов</span>{% endif %}</span>
+              <span class="prc__sub">{{ p.program_type_name }}{% if p.is_jumping %}{% if p.variant %} ({{ p.variant }}){% endif %}{% if p.table %} · табл. {{ p.table }}{% endif %}{% if p|heights_extra %} · {{ p|heights_extra }}{% endif %}{% else %}{% if p.test_snapshot.level %} · {{ p.test_snapshot.level }}{% endif %}{% endif %}</span>
+              <span class="prc__tags"><span class="tag tag--{{ p.discipline_color }}">{{ p.get_discipline_display }}</span>{% for c in p.classes.all %}<span class="tag">{{ c.label }}</span>{% empty %}<span class="chip chip--warning">Нет зачётов</span>{% endfor %}</span>
             </span>
-            <span class="prc__chev" aria-hidden="true">{% include "partials/icon.html" with name="chevron-down" size=20 %}</span>
+            {% if not t.is_locked %}
+            <details class="kebab prc__kebab">
+              <summary aria-label="Действия: {{ p.name }}">{% include "partials/icon.html" with name="dots" size=20 %}</summary>
+              <div class="kebab__menu">
+                <a href="{% url 'tournaments:program_edit' t.pk p.pk %}#program-form">Изменить {% if p.is_dressage %}езду{% else %}маршрут{% endif %}</a>
+                <form method="post" action="{% url 'tournaments:program_delete' t.pk p.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}"><button type="submit" class="is-danger" data-confirm="Удалить «{{ p.name }}» вместе с зачётами?" data-confirm-ok="Удалить">Удалить {% if p.is_dressage %}езду{% else %}маршрут{% endif %}</button></form>
+              </div>
+            </details>
+            {% else %}<span class="prc__chev" aria-hidden="true">{% include "partials/icon.html" with name="chevron-down" size=20 %}</span>{% endif %}
           </summary>
           <div class="prc__body">
-            {% if not t.is_locked %}
-            <div class="prc__tools">
-              {% if p.is_jumping and p.article_label %}<span class="table__sub" style="flex: 1 1 auto;">{{ p.article_label }}</span>{% else %}<span style="flex: 1 1 auto;"></span>{% endif %}
-              <details class="kebab">
-                <summary aria-label="Действия: {{ p.name }}">{% include "partials/icon.html" with name="dots" size=20 %}</summary>
-                <div class="kebab__menu">
-                  <a href="{% url 'tournaments:program_edit' t.pk p.pk %}#program-form">Изменить {% if p.is_dressage %}езду{% else %}маршрут{% endif %}</a>
-                  <form method="post" action="{% url 'tournaments:program_delete' t.pk p.pk %}">{% csrf_token %}<input type="hidden" name="revision" value="{{ t.revision }}"><button type="submit" class="is-danger" data-confirm="Удалить «{{ p.name }}» вместе с зачётами?" data-confirm-ok="Удалить">Удалить {% if p.is_dressage %}езду{% else %}маршрут{% endif %}</button></form>
-                </div>
-              </details>
-            </div>
-            {% endif %}
-            <div class="caption muted">ЗАЧЁТЫ · {{ p.classes.all|length }}</div>
+            {% if p.is_jumping and p.article_label %}<p class="table__sub prc__article">{{ p.article_label }}</p>{% endif %}
             {% if p.classes.all %}
               <ul class="zlist">
                 {% for c in p.classes.all %}
@@ -78,7 +76,7 @@
                       <label class="tpl-chip"><input type="checkbox" name="template" value="{{ tpl.pk }}"><span class="tpl-chip__name">{{ tpl.name }}</span><span class="tpl-chip__sub">{{ tpl|tpl_years:t.starts_on.year }}</span></label>
                     {% endif %}{% endfor %}
                     </div>
-                    <div class="form-actions" style="justify-content: flex-start;"><button type="submit" class="btn btn--dark btn--sm">Добавить отмеченные</button></div>
+                    <div class="form-actions" style="justify-content: flex-start;"><button type="submit" class="btn btn--primary btn--sm">Добавить отмеченные</button></div>
                   </form>
                   {% if not p.form %}<a class="plus-row plus-row--sm" href="?custom={{ p.pk }}#class-form-{{ p.pk }}">{% include "partials/icon.html" with name="plus" size=18 %}Свой зачёт</a>{% else %}<p class="caption muted" style="margin: var(--space-3) 0 var(--space-2);">СВОЙ ЗАЧЁТ</p>{% endif %}
                 </div>
@@ -117,12 +115,13 @@
                 {% include "partials/field.html" with field=p.form.note %}
                 <div class="form-actions">
                   {% if p.editing_class %}<a class="btn btn--ghost" href="{% url 'tournaments:step' t.pk 2 %}#program-{{ p.pk }}">Отмена</a>{% endif %}
-                  <button type="submit" class="btn btn--dark">Сохранить зачёт</button>
+                  <button type="submit" class="btn btn--primary">Сохранить зачёт</button>
                 </div>
               </form>
               {% endif %}
             </details>
           {% endif %}
+            <button type="button" class="prc__fold" data-prc-fold>Свернуть <span aria-hidden="true">▲</span></button>
           </div>
         </details>
       {% endfor %}
@@ -275,6 +274,10 @@
 })();
 </script>
 <script>
+document.addEventListener("click", function (e) {  // тест 6.1, п. 14: «Свернуть» внизу раскрытой карточки
+  var b = e.target.closest("[data-prc-fold]"); if (!b) return;
+  var c = b.closest(".prc"); c.open = false; c.scrollIntoView({ block: "nearest", behavior: "smooth" });
+});
 (function () { // Тест 6, п. 14: после сохранения маршрута карточка остаётся свёрнутой; после действий с зачётами — открыта
   var id = location.hash.replace("#", ""); if (!id) return;
   var el = document.getElementById(id); if (!el) return;

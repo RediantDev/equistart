@@ -2242,3 +2242,14 @@ a.steps2__dot:hover { color: var(--text); }
   .table--res td.res-val::before { content: attr(data-label) ": "; }
   .table--res td.res-val:empty { display: none; }
 }
+/* Тест 6.1, п. 14 (вариант А): карточка маршрута на шаге «Программа» */
+.prc__head { align-items: flex-start; }
+.prc__kebab { flex: none; margin: -4px -4px 0 0; }
+.prc__article { margin: 0; }
+.prc__fold { align-self: center; border: 0; background: none; color: var(--text-muted); font: inherit; font-size: 14px; font-weight: 650; min-height: 40px; padding: 0 12px; cursor: pointer; }
+.prc[open] { border-color: var(--ink); }
+/* Значок фильтров — как в календаре (единый вид поиска на списках) */
+.myf__fbtn { position: relative; box-sizing: border-box; flex: none; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--control-border); background: var(--surface); color: var(--text); display: grid; place-items: center; cursor: pointer; }
+.myf__fbtn.is-on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.myf__when .seg3__item { padding: 0 6px; gap: 4px; }
+@media (max-width: 400px) { .myf__when .seg3__item { font-size: 13px; } }

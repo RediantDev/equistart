@@ -24,7 +24,7 @@
           <form method="post">{% csrf_token %}<input type="hidden" name="member" value="{{ m.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="transfer">Сделать владельцем</button></form>
         {% endif %}
         {% if owner %}
-          <form method="post">{% csrf_token %}<input type="hidden" name="member" value="{{ m.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="remove">{% if m.state == "pending" %}Отозвать{% else %}Убрать{% endif %}</button></form>
+          <form method="post">{% csrf_token %}<input type="hidden" name="member" value="{{ m.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="remove" data-confirm="{% if m.state == 'pending' %}Отозвать приглашение?{% else %}Убрать {{ m.user.full_name|default:m.phone }} из управляющих клуба?{% endif %}" data-confirm-ok="{% if m.state == 'pending' %}Отозвать{% else %}Убрать{% endif %}">{% if m.state == "pending" %}Отозвать{% else %}Убрать{% endif %}</button></form>
         {% elif m.user_id == user.pk %}
           <form method="post">{% csrf_token %}<input type="hidden" name="member" value="{{ m.pk }}"><button class="btn btn--ghost btn--sm" name="action" value="remove">Перестать управлять</button></form>
         {% endif %}

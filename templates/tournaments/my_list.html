@@ -13,8 +13,8 @@
 <form method="get" class="myf" id="myf" role="search">
   {% if past %}<input type="hidden" name="when" value="past">{% endif %}
   <div class="myf__row">
-    <input type="search" name="q" value="{{ q }}" placeholder="Название, клуб или город" aria-label="Поиск по моим соревнованиям" autocomplete="off" enterkeyhint="search">
-    <button type="button" class="btn btn--ghost btn--sm myf__btn" data-sheet-open="myf-sheet">{% include "partials/icon.html" with name="filter" size=18 %}Фильтры{% if active %} <span class="count-pill">{{ active|length }}</span>{% endif %}</button>
+    <div class="cal-search__box">{% include "partials/icon.html" with name="search" size=18 %}<input type="search" name="q" value="{{ q }}" placeholder="Название, клуб или город" aria-label="Поиск по моим соревнованиям" autocomplete="off" enterkeyhint="search"></div>
+    <button type="button" class="cal-search__fbtn myf__fbtn{% if active %} is-on{% endif %}" data-sheet-open="myf-sheet" aria-label="Фильтры{% if active %}: выбрано {{ active|length }}{% endif %}" title="Фильтры">{% include "partials/icon.html" with name="filter" size=20 %}{% if active %}<span class="cal-search__count">{{ active|length }}</span>{% endif %}</button>
   </div>
   {% if active %}<div class="chips myf__active">{% for label, url in active %}<a class="chip chip--x" href="{{ url }}" aria-label="Убрать фильтр {{ label }}">{{ label }} <span aria-hidden="true">×</span></a>{% endfor %}<a class="link-muted" href="?{% if past %}when=past{% endif %}">Сбросить</a></div>{% endif %}
 

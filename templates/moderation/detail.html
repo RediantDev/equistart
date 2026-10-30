@@ -7,7 +7,7 @@
     <a class="back" href="{% url 'moderation:queue' %}">← Очередь модерации</a>
     <h1 class="h1">{{ t.title }}</h1>
     <div class="chips">
-      {% if t.status == "review" %}<span class="chip chip--warning">На проверке</span>{% elif t.status == "returned" %}<span class="chip chip--danger">Возвращён</span>{% elif t.status == "approved" %}<span class="chip chip--success">Опубликован</span>{% else %}<span class="chip">Черновик организатора</span>{% endif %}
+      {% if t.status == "review" %}<span class="chip chip--warning">На проверке</span>{% elif t.status == "returned" %}<span class="chip chip--danger">Возвращён</span>{% elif t.status == "approved" %}<span class="chip chip--info">Опубликован</span>{% else %}<span class="chip">Черновик организатора</span>{% endif %}
       {% if t.is_published %}<span class="chip chip--info">Изменение опубликованного турнира</span>{% endif %}
       <span class="tag">Организатор: {{ t.owner.full_name }} · {{ t.owner.phone_display }}</span>
     </div>
