@@ -349,7 +349,7 @@ def sign(user, entry_id, letter, remark="") -> DressageSheet:
     audit(user, "dressage.sign", e, position=pos.letter, marks=sh.marks)
     slot = getattr(e, "start_slot", None)
     if slot and slot.status in (StartSlot.Status.WAITING, StartSlot.Status.STARTED):
-        slot.status = StartSlot.Status.NO_SHOW if jr.status == "no_show" else StartSlot.Status.FINISHED  # тест 6.1, п. 26: «Не стартовал» у поля
+        slot.status = StartSlot.Status.FINISHED
         slot.save(update_fields=["status", "updated_at"])
     recompute(e.program)
     return sh

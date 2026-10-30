@@ -138,8 +138,8 @@ class JumpingTests(ConductBase):
         self.assertIsNotNone(page.context["current"])
         self.assertNotEqual(page.context["current"][0].entry_id, a)
         self.assertContains(page, "Кто дальше")
-        # штраф в 1-й фазе — 2-я фаза не нужна, экран остаётся на 1-й
-        resp = self.client.post(save, {"entry": b, "stage": "phase1", **rnd(1, 0, "")})
+        # не закончил 1-ю фазу — 2-я фаза не нужна, экран остаётся на 1-й
+        resp = self.client.post(save, {"entry": b, "stage": "phase1", **rnd(0, 0, "", "retired")})
         self.assertIn("stage=phase1", resp["Location"])
         self.assertNotIn("phase2", resp["Location"])
         # «Не стартовал» — прямо у поля
@@ -147,7 +147,7 @@ class JumpingTests(ConductBase):
         self.assertEqual(StartSlot.objects.get(entry_id=c).status, StartSlot.Status.NO_SHOW)
         others = [s.entry_id for s in StartSlot.objects.filter(program=p) if s.entry_id not in (a, b, c)]
         for e in others:
-            self.client.post(save, {"entry": e, "stage": "phase1", **rnd(1, 0, "")})
+            self.client.post(save, {"entry": e, "stage": "phase1", **rnd(0, 0, "", "retired")})
         page = self.client.get(live)
         self.assertIsNone(page.context["current"])
         self.assertContains(page, f"?tab=results")
