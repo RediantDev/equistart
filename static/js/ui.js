@@ -89,10 +89,24 @@
       if (!sc || sc.scrollHeight <= sc.clientHeight) e.preventDefault();
     }, { passive: false });
     requestAnimationFrame(function () { back.classList.add("is-open"); });
-    return { back: back, box: box };
+    // Тест 6.1, п. 10: шторка занимает только видимую часть экрана — клавиатура не закрывает поиск и список
+    var vv = window.visualViewport, fit = null;
+    if (vv) {
+      fit = function () {
+        back.style.top = vv.offsetTop + "px";
+        back.style.height = vv.height + "px";
+        back.style.bottom = "auto";
+        box.style.maxHeight = Math.max(220, Math.min(vv.height * 0.82, vv.height - 24)) + "px";
+        back.classList.toggle("is-kb", vv.height < window.innerHeight - 120);
+      };
+      fit();
+      vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit);
+    }
+    return { back: back, box: box, unfit: function () { if (fit) { vv.removeEventListener("resize", fit); vv.removeEventListener("scroll", fit); } } };
   }
   function closeSheet(sh, pop, root) {
     if (!sh) return;
+    if (sh.unfit) sh.unfit();
     root.appendChild(pop);
     sh.back.classList.remove("is-open");
     setTimeout(function () { sh.back.remove(); }, 180);
@@ -740,6 +754,25 @@
       }
     } catch (err) {}
   }
+
+  /* ---------- Шторка по кнопке: data-sheet-open="id" (тест 6.1, пп. 9, 18) ---------- */
+  function sheetOpen(s) {
+    s.hidden = false;
+    requestAnimationFrame(function () { s.classList.add("is-open"); });
+    var f = s.querySelector("[data-autofocus]"); if (f) setTimeout(function () { f.focus(); }, 60);
+  }
+  function sheetClose(s) { s.classList.remove("is-open"); setTimeout(function () { s.hidden = true; }, 180); }
+  document.addEventListener("click", function (e) {
+    var o = e.target.closest("[data-sheet-open]");
+    if (o) { var s = document.getElementById(o.getAttribute("data-sheet-open")); if (s) { e.preventDefault(); sheetOpen(s); } return; }
+    var c = e.target.closest("[data-sheet-close]");
+    var sh = c ? c.closest(".sheet[data-sheet]") : (e.target.matches && e.target.matches(".sheet[data-sheet]") ? e.target : null);
+    if (sh) { e.preventDefault(); sheetClose(sh); }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    document.querySelectorAll(".sheet[data-sheet].is-open").forEach(sheetClose);
+  });
 
   /* ---------- Подтверждение ---------- */
   // Подтверждение — окно в стиле сайта вместо системного (тест 4.2, п. 23, 33)

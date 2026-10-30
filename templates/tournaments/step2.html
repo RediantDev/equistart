@@ -132,7 +132,7 @@
 
     {% if not t.is_locked %}
     <section class="card add-program" id="program-form"{% if not editing and not form.errors %} hidden{% endif %}>
-      <div class="section-head"><h2 class="h3" style="margin: 0;">{% if editing %}Изменить «{{ editing.name }}»{% else %}Новая программа <span class="muted" data-pf-day></span>{% endif %}</h2>{% if not editing %}<button type="button" class="icon-btn" data-pf-close aria-label="Закрыть">×</button>{% endif %}</div>
+      <div class="section-head"><h2 class="h3" style="margin: 0;">{% if editing %}Изменить «{{ editing.name }}»{% else %}Новая программа <span class="muted" data-pf-day></span>{% endif %}</h2>{% if not editing %}<button type="button" class="sheet-x" data-pf-close aria-label="Закрыть">×</button>{% endif %}</div>
       <form method="post" novalidate class="form" action="{% if editing %}{% url 'tournaments:program_save' t.pk editing.pk %}{% else %}{% url 'tournaments:program_add' t.pk %}{% endif %}" data-program-form>
         {% csrf_token %}
         <input type="hidden" name="revision" value="{{ t.revision }}">
@@ -184,9 +184,11 @@
 
         <div class="pf-step"><span class="pf-step__n">4</span>
           <div class="pf-step__body">
-            <details class="tpl-box"{% if form.templates.value %} open{% endif %}>
-              <summary class="plus-row">{% include "partials/icon.html" with name="plus" size=18 %}Добавить зачёт</summary>
+            {% comment %}Тест 6.1, п. 13: зачёт обязателен — при создании блок открыт и отмечен как обязательный{% endcomment %}
+            <details class="tpl-box{% if form.templates.errors %} field--error{% endif %}"{% if form.templates.value or form.templates.errors or not editing or not editing.classes.exists %} open{% endif %}>
+              <summary class="plus-row">{% include "partials/icon.html" with name="plus" size=18 %}{% if editing and editing.classes.exists %}Добавить зачёт{% else %}Зачёты <span class="field__optional">обязательно</span>{% endif %}</summary>
               <p class="field__help" style="margin: var(--space-3) 0 var(--space-2);">Отметьте один или несколько — условия можно поправить в карточке.</p>
+              {% for e in form.templates.errors %}<p class="field__error">{{ e }}</p>{% endfor %}
               <div class="tpl-chips">
                 {% for tpl in templates %}
                   <label class="tpl-chip" data-disciplines="{{ tpl.disciplines }}"><input type="checkbox" name="templates" value="{{ tpl.pk }}"{% if tpl.pk|stringformat:"s" in form.templates.value %} checked{% endif %}><span class="tpl-chip__name">{{ tpl.name }}</span><span class="tpl-chip__sub">{{ tpl|tpl_years:t.starts_on.year }}</span></label>

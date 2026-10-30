@@ -2118,3 +2118,32 @@ a.steps2__dot:hover { color: var(--text); }
 .file--tiles .file__thumbs[hidden] { display: none; }
 /* п. 7: под «Опубликовать» нет белой полосы — кнопка на фоне формы */
 .sticky-bar { background: transparent; border-top: 0; padding: 8px 0; }
+
+/* Тест 6.1, п. 9: «Мои соревнования» — поиск, шторка «Фильтры», месяцы */
+.sheet[data-sheet] { max-width: none; margin: 0; gap: 0; }
+.sheet-x { width: 44px; height: 44px; flex: none; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--ink); font-size: 26px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+.myf { margin: 0 0 var(--space-3); }
+.myf__row { display: flex; gap: 8px; align-items: center; }
+.myf__row input[type="search"] { flex: 1 1 auto; min-width: 0; }
+.myf__btn { flex: none; gap: 6px; }
+.myf__active { margin-top: 10px; align-items: center; }
+.chip--x { text-decoration: none; color: var(--text); gap: 6px; }
+.chip--x span { font-size: 16px; line-height: 1; }
+.link-muted { color: var(--text-muted); font-size: 14px; font-weight: 600; margin-left: 4px; }
+.myf__box { max-height: 88dvh; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.myf__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.myf__group { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.myf__group legend { font-size: 14px; font-weight: 700; padding: 0; margin-bottom: 8px; }
+.myf__actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; position: sticky; bottom: 0; background: var(--surface); padding-top: 8px; }
+.pick { position: relative; display: inline-flex; }
+.pick input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.pick span { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: var(--radius-pill); border: 1px solid var(--border-strong, #8a8983); background: var(--surface); font-size: 14px; font-weight: 650; cursor: pointer; }
+.pick input:checked + span { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.pick input:focus-visible + span { outline: 2px solid var(--focus, #2457ff); outline-offset: 2px; }
+.myf__when { max-width: 420px; }
+.month-h { font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); margin: var(--space-5) 0 var(--space-2); }
+.month-h:first-of-type { margin-top: var(--space-2); }
+/* Тест 6.1, п. 10: при открытой клавиатуре шторка выбора — у верхнего края видимой области, поиск сверху */
+.uisheet.is-kb { align-items: flex-start; }
+.uisheet.is-kb .uisheet__box { border-radius: 0 0 24px 24px; height: 100%; max-height: none !important; }
+.uisheet.is-kb .sheet__grip { display: none; }

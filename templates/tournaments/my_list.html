@@ -9,9 +9,52 @@
   {% if user.can_create_tournament %}<a class="btn btn--primary btn--sm" href="{% url 'tournaments:create' %}">+ Создать</a>{% endif %}
 </div>
 
+{# Тест 6.1, п. 9 (вариант Б): поиск, «Фильтры» в шторке, активные фильтры чипами, список по месяцам #}
+<form method="get" class="myf" id="myf" role="search">
+  {% if past %}<input type="hidden" name="when" value="past">{% endif %}
+  <div class="myf__row">
+    <input type="search" name="q" value="{{ q }}" placeholder="Название, клуб или город" aria-label="Поиск по моим соревнованиям" autocomplete="off" enterkeyhint="search">
+    <button type="button" class="btn btn--ghost btn--sm myf__btn" data-sheet-open="myf-sheet">{% include "partials/icon.html" with name="filter" size=18 %}Фильтры{% if active %} <span class="count-pill">{{ active|length }}</span>{% endif %}</button>
+  </div>
+  {% if active %}<div class="chips myf__active">{% for label, url in active %}<a class="chip chip--x" href="{{ url }}" aria-label="Убрать фильтр {{ label }}">{{ label }} <span aria-hidden="true">×</span></a>{% endfor %}<a class="link-muted" href="?{% if past %}when=past{% endif %}">Сбросить</a></div>{% endif %}
+
+  <div class="sheet" id="myf-sheet" hidden data-sheet>
+    <div class="sheet__box myf__box" role="dialog" aria-modal="true" aria-labelledby="myf-title">
+      <div class="sheet__grip"></div>
+      <div class="myf__head"><h2 class="sheet__title" id="myf-title">Фильтры</h2><button type="button" class="sheet-x" data-sheet-close aria-label="Закрыть">×</button></div>
+      <fieldset class="myf__group"><legend>Статус</legend>
+        <div class="chips">{% for k, label in statuses %}<label class="pick"><input type="checkbox" name="status" value="{{ k }}"{% if k in st %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}</div>
+      </fieldset>
+      <fieldset class="myf__group"><legend>Моя роль</legend>
+        <div class="chips">
+          <label class="pick"><input type="radio" name="role" value=""{% if not role %} checked{% endif %}><span>Любая</span></label>
+          <label class="pick"><input type="radio" name="role" value="organizer"{% if role == "organizer" %} checked{% endif %}><span>Организатор</span></label>
+          <label class="pick"><input type="radio" name="role" value="judge"{% if role == "judge" %} checked{% endif %}><span>Судья</span></label>
+          <label class="pick"><input type="radio" name="role" value="stable"{% if role == "stable" %} checked{% endif %}><span>Конюшня</span></label>
+        </div>
+      </fieldset>
+      {% if years %}<fieldset class="myf__group"><legend>Год</legend>
+        <div class="chips"><label class="pick"><input type="radio" name="year" value=""{% if not year %} checked{% endif %}><span>Любой</span></label>{% for y in years %}<label class="pick"><input type="radio" name="year" value="{{ y }}"{% if year == y|stringformat:"d" %} checked{% endif %}><span>{{ y }}</span></label>{% endfor %}</div>
+      </fieldset>{% endif %}
+      {% if venues|length > 1 %}<div class="field myf__group"><label class="field__label" for="myf-venue">Клуб, место</label>
+        <select id="myf-venue" name="venue"><option value="">Любой</option>{% for vid, vname in venues %}<option value="{{ vid }}"{% if venue == vid|stringformat:"d" %} selected{% endif %}>{{ vname }}</option>{% endfor %}</select>
+      </div>{% endif %}
+      <div class="myf__actions"><a class="btn btn--ghost" href="?{% if past %}when=past{% endif %}">Сбросить</a><button class="btn btn--primary">Показать</button></div>
+    </div>
+  </div>
+</form>
+
+<nav class="seg3 myf__when" aria-label="Период">
+  <a class="seg3__item{% if not past %} is-active{% endif %}" href="{{ now_url }}"{% if not past %} aria-current="page"{% endif %}>Текущие и будущие <span class="count-pill">{{ n_now }}</span></a>
+  <a class="seg3__item{% if past %} is-active{% endif %}" href="{{ past_url }}"{% if past %} aria-current="page"{% endif %}>Прошедшие <span class="count-pill">{{ n_past }}</span></a>
+</nav>
+
 {% if rows %}
+  {% regroup rows by month as months %}
+  {% for m in months %}
+  <h2 class="month-h">{% if m.grouper %}{{ m.grouper|date:"F Y" }}{% else %}Без дат{% endif %}</h2>
   <div class="tcards">
-    {% for r in rows %}
+    {% for r in m.list %}
       {% with t=r.t %}
       <article class="tcard2">
         <div class="tcard2__top">
@@ -50,6 +93,13 @@
       </article>
       {% endwith %}
     {% endfor %}
+  </div>
+  {% endfor %}
+{% elif filtered or past %}
+  <div class="card empty">
+    <h2 class="h3">Ничего не найдено</h2>
+    <p class="muted">{% if filtered %}Измените запрос или сбросьте фильтры.{% else %}Прошедших соревнований пока нет.{% endif %}</p>
+    {% if filtered %}<p style="margin-top: var(--space-4);"><a class="btn btn--ghost" href="?{% if past %}when=past{% endif %}">Сбросить фильтры</a></p>{% endif %}
   </div>
 {% else %}
   <div class="card empty">
