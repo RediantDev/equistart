@@ -930,10 +930,8 @@
       var rev = form.querySelector("[name=revision]"), key = form.querySelector("[name=create_key]");
       if (rev) rev.value = j.revision;
       if (key && j.url) {
-        // первый автосейв нового турнира: дальше работаем с созданным черновиком
-        var inp = document.createElement("input"); inp.type = "hidden"; inp.name = "revision"; inp.value = j.revision;
-        form.appendChild(inp); key.remove();
-        form.setAttribute("action", j.url);
+        // Тест 6.1, п. 17: ключ черновика остаётся в форме, а форма по-прежнему отправляется на «новое соревнование» —
+        // сервер по ключу находит уже созданный черновик (раньше «Далее» без ключа создавало второй турнир)
         try { history.replaceState(history.state, "", j.url); } catch (e) {}
       }
       status("Черновик сохранён в " + j.at);

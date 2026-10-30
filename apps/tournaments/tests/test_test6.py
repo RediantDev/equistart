@@ -102,3 +102,18 @@ class AutosaveTests(Base):
         t.refresh_from_db()
         self.assertEqual(t.cancel_terms, "Новые условия")
         self.assertTrue(t.regulation)  # файл не тронут
+
+
+class AutosaveThenNextTests(Base):
+    def test_autosave_then_next_is_one_tournament(self):
+        """Тест 6.1, п. 17: автосохранение и затем «Далее» с тем же ключом — один черновик."""
+        self.client.force_login(self.org)
+        url = reverse("tournaments:create")
+        self.client.post(url, {"autosave": "1", "create_key": "k9", "title": "Кубок главы"})
+        venue = self.make_ready().venue
+        n = Tournament.objects.count()
+        resp = self.client.post(url, {"create_key": "k9", "next": "1", "title": "Кубок главы", "starts_on": self.start.isoformat(),
+                                      "venue": venue.pk, "contact_name": "КСК", "contact": "+7 900 000-00-00", "level": "club"})
+        self.assertEqual(Tournament.objects.count(), n)
+        t = Tournament.objects.filter(title="Кубок главы").get()
+        self.assertRedirects(resp, reverse("tournaments:step", args=[t.pk, 2]), fetch_redirect_response=False)

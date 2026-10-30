@@ -1962,17 +1962,17 @@ a.steps2__dot:hover { color: var(--text); }
 .day-pane { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 var(--space-4); }
 .day-pane[hidden] { display: none; }
 .day-pane__empty { margin: 4px 0; font-size: 14px; }
-.pcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
-.pcard__head { list-style: none; display: flex; align-items: flex-start; gap: 10px; padding: 12px 12px 12px 14px; cursor: pointer; }
-.pcard__head::-webkit-details-marker { display: none; }
-.pcard__main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.pcard__title { font-size: 16px; font-weight: 700; }
-.pcard__sub { font-size: 13px; color: var(--text-muted); }
-.pcard__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
-.pcard__chev { color: var(--text-muted); transition: transform .15s; display: grid; padding-top: 2px; }
-.pcard[open] > .pcard__head .pcard__chev { transform: rotate(180deg); }
-.pcard__body { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
-.pcard__tools { display: flex; align-items: center; gap: 8px; }
+.prc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.prc__head { list-style: none; display: flex; align-items: flex-start; gap: 10px; padding: 12px 12px 12px 14px; cursor: pointer; }
+.prc__head::-webkit-details-marker { display: none; }
+.prc__main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.prc__title { font-size: 16px; font-weight: 700; }
+.prc__sub { font-size: 13px; color: var(--text-muted); }
+.prc__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+.prc__chev { color: var(--text-muted); transition: transform .15s; display: grid; padding-top: 2px; }
+.prc[open] > .prc__head .prc__chev { transform: rotate(180deg); }
+.prc__body { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
+.prc__tools { display: flex; align-items: center; gap: 8px; }
 .zlist { list-style: none; margin: 0; padding: 0; }
 .zrow { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--border); }
 .zrow:first-child { border-top: 0; }

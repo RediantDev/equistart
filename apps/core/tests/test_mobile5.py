@@ -268,3 +268,20 @@ class ClubRedesignTests(Base):
         self.assertEqual(self.client.post(reverse("clubs:photo_cover", args=[p1.pk])).status_code, 403)
         self.client.logout()
         self.assertEqual(self.client.post(reverse("clubs:photo_cover", args=[p1.pk])).status_code, 302)
+
+
+class TemplateCommentTests(TestCase):
+    """Тест 6.1, пп. 11, 20: многострочный {# … #} в шаблоне выводится текстом — такие комментарии запрещены."""
+
+    def test_no_multiline_hash_comments(self):
+        import pathlib
+        import re
+
+        from django.conf import settings
+
+        bad = []
+        for d in settings.TEMPLATES[0]["DIRS"]:
+            for f in pathlib.Path(d).rglob("*.html"):
+                for m in re.finditer(r"\{#(?:(?!#\}).)*$", f.read_text(encoding="utf-8"), re.M):
+                    bad.append(f"{f.name}: {m.group(0)[:40]}")
+        self.assertEqual(bad, [])

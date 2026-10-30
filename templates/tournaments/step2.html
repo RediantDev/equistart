@@ -15,8 +15,8 @@
       </section>
     {% endif %}
 
-    {# Тест 6, пп. 10–12, 14–17, 19 (вариант А): чипы дней сверху, программа выбранного дня, маршруты свёрнуты,
-       «+ Добавить зачёт» — последней строкой, форма маршрута — только после «+ Добавить программу» #}
+    {% comment %} Тест 6, пп. 10–12, 14–17, 19 (вариант А): чипы дней сверху, программа выбранного дня, маршруты свёрнуты,
+       «+ Добавить зачёт» — последней строкой, форма маршрута — только после «+ Добавить программу» {% endcomment %}
     <div class="dchips" role="tablist" aria-label="Дни соревнования" data-day-chips>
       {% for d in by_day %}
         <button type="button" class="dchips__item" role="tab" data-day-chip="{{ d.day|date:'Y-m-d' }}" aria-pressed="false">{{ d.day|date:"D, j E"|capfirst }}{% if d.programs %} <span class="dchips__n">· {{ d.programs|length }}</span>{% endif %}</button>
@@ -27,18 +27,18 @@
       <section class="day-pane" data-day-pane="{{ d.day|date:'Y-m-d' }}">
       {% if not d.programs %}<p class="muted day-pane__empty">{{ d.day|date:"l, j E"|capfirst }} — программы пока нет.</p>{% endif %}
       {% for p in d.programs %}
-        <details class="pcard" id="program-{{ p.pk }}"{% if p.expanded %} open{% endif %}>
-          <summary class="pcard__head">
-            <span class="pcard__main">
-              <span class="pcard__title">{% if p.start_time %}{{ p.start_time|time:"H:i" }} · {% endif %}{{ p.name }}</span>
-              <span class="pcard__sub">{% if p.is_jumping %}{{ p.program_type_name }}{% if p.variant %} ({{ p.variant }}){% endif %}{% if p|heights_extra %} · {{ p|heights_extra }}{% endif %}{% else %}{{ p.program_type_name }}{% if p.test_snapshot.level %} · {{ p.test_snapshot.level }}{% endif %}{% endif %} · Зачётов: {{ p.classes.all|length }}</span>
-              <span class="pcard__tags"><span class="tag tag--{{ p.discipline_color }}">{{ p.get_discipline_display }}</span>{% if not p.classes.all %}<span class="chip chip--warning">Нет зачётов</span>{% endif %}</span>
+        <details class="prc" id="program-{{ p.pk }}"{% if p.expanded %} open{% endif %}>
+          <summary class="prc__head">
+            <span class="prc__main">
+              <span class="prc__title">{% if p.start_time %}{{ p.start_time|time:"H:i" }} · {% endif %}{{ p.name }}</span>
+              <span class="prc__sub">{% if p.is_jumping %}{{ p.program_type_name }}{% if p.variant %} ({{ p.variant }}){% endif %}{% if p|heights_extra %} · {{ p|heights_extra }}{% endif %}{% else %}{{ p.program_type_name }}{% if p.test_snapshot.level %} · {{ p.test_snapshot.level }}{% endif %}{% endif %} · Зачётов: {{ p.classes.all|length }}</span>
+              <span class="prc__tags"><span class="tag tag--{{ p.discipline_color }}">{{ p.get_discipline_display }}</span>{% if not p.classes.all %}<span class="chip chip--warning">Нет зачётов</span>{% endif %}</span>
             </span>
-            <span class="pcard__chev" aria-hidden="true">{% include "partials/icon.html" with name="chevron-down" size=20 %}</span>
+            <span class="prc__chev" aria-hidden="true">{% include "partials/icon.html" with name="chevron-down" size=20 %}</span>
           </summary>
-          <div class="pcard__body">
+          <div class="prc__body">
             {% if not t.is_locked %}
-            <div class="pcard__tools">
+            <div class="prc__tools">
               {% if p.is_jumping and p.article_label %}<span class="table__sub" style="flex: 1 1 auto;">{{ p.article_label }}</span>{% else %}<span style="flex: 1 1 auto;"></span>{% endif %}
               <details class="kebab">
                 <summary aria-label="Действия: {{ p.name }}">{% include "partials/icon.html" with name="dots" size=20 %}</summary>
@@ -240,7 +240,7 @@
   if (!first && pane) first = pane.dataset.dayPane;
   if (!first && q) first = q;
   if (!first) { try { first = sessionStorage.getItem("st-day-{{ t.pk }}"); } catch (e) {} }
-  if (!first) { var withP = document.querySelector("[data-day-pane] .pcard"); first = withP ? withP.closest("[data-day-pane]").dataset.dayPane : (chips[0] && chips[0].dataset.dayChip); }
+  if (!first) { var withP = document.querySelector("[data-day-pane] .prc"); first = withP ? withP.closest("[data-day-pane]").dataset.dayPane : (chips[0] && chips[0].dataset.dayChip); }
   {% if editing or form.errors %}if (box) box.setAttribute("data-editing", "1");{% endif %}
   if (first) pick(first);
   document.querySelectorAll("[data-add-day]").forEach(function (b) {
@@ -277,7 +277,7 @@
   var id = location.hash.replace("#", ""); if (!id) return;
   var el = document.getElementById(id); if (!el) return;
   if (new URLSearchParams(location.search).get("day")) return;
-  var card = el.closest(".pcard"); if (card) card.open = true;
+  var card = el.closest(".prc"); if (card) card.open = true;
   if (el.tagName === "DETAILS") el.open = true;
 })();
 </script>

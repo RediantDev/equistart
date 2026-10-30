@@ -1,7 +1,7 @@
 {% extends "tournaments/_wizard.html" %}
 {% block step %}
 {# Тест 6, п. 8: «Сохранить черновик» нет — черновик сохраняется сам (data-autosave), начиная с названия #}
-<form method="post" novalidate class="card form" style="margin-top: 0;" data-autosave{% if t %} action="{% url 'tournaments:step' t.pk 1 %}"{% endif %}>
+<form method="post" novalidate class="card form" style="margin-top: 0;" data-autosave action="{% if t %}{% url 'tournaments:step' t.pk 1 %}{% else %}{% url 'tournaments:create' %}{% endif %}">
   {% csrf_token %}
   {% if t %}<input type="hidden" name="revision" value="{{ t.revision }}">{% else %}<input type="hidden" name="create_key" value="{{ create_key }}">
   <p class="muted" style="margin: 0;">Понадобятся даты и место, маршруты с зачётами и положение в PDF.</p>{% endif %}
