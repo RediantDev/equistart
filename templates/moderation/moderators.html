@@ -1,8 +1,7 @@
-{% extends "base.html" %}
+{% extends "moderation/_cabinet.html" %}
 {% block title %}Модераторы — СтартЛист{% endblock %}
-{% block content %}
+{% block cabinet %}
 <div class="page-head"><div>
-  <a class="back" href="{% url 'moderation:panel' %}">← Пульт</a>
   <h1 class="h1">Модераторы</h1>
   <p class="muted">Модератор проверяет турниры и клубы и отвечает в поддержке. Их может быть несколько. Назначает и снимает модераторов только главный модератор. Человек сначала регистрируется сам, потом вы добавляете его по номеру телефона.</p>
 </div></div>

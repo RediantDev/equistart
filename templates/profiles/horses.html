@@ -3,10 +3,10 @@
 {% block content %}
 {# Макеты R2_05 и R2_06C (утверждены 28.10.2026) #}
 <div class="ps-screen">
-  <a class="ps-back" href="{% url 'accounts:cabinet' %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Кабинет</a>
+  <a class="back" href="{% url 'accounts:cabinet' %}">← Кабинет</a>
   <div class="ps-headrow">
     <h1 class="h1 ps-h1">Мои лошади</h1>
-    <a class="ps-ib ps-ib--y" href="{% url 'profiles:horse_new' %}" aria-label="Добавить лошадь" title="Добавить лошадь"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a>
+    <a class="btn btn--primary btn--sm" href="{% url 'profiles:horse_new' %}">+ Добавить</a>
   </div>
 
   {% for o in invites %}

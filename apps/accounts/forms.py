@@ -141,7 +141,7 @@ class LoginForm(forms.Form):
         if user is None:
             throttle.register_failure(phone, ip)
             # Сообщаем о блокировке только тому, кто знает верный пароль.
-            blocked = User.objects.filter(phone=phone, is_active=False).first() if phone else None
+            blocked = User.objects.filter(phone=phone, is_active=False, deleted_at__isnull=True).first() if phone else None
             if blocked and blocked.check_password(password):
                 raise ValidationError(self.error_messages["inactive"], code="inactive")
             raise ValidationError(self.error_messages["invalid_login"], code="invalid_login")

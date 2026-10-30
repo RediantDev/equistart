@@ -1,0 +1,47 @@
+{% extends "moderation/_cabinet.html" %}
+{% block title %}Система — Пульт — СтартЛист{% endblock %}
+{% block cabinet %}
+<div class="page-head">
+  <div>
+    <h1 class="h1">Система</h1>
+    <p class="muted">Как работает сервис: база, резервные копии, ошибки, почта и место на диске.</p>
+  </div>
+</div>
+<div class="stat-grid">
+  <div class="stat{% if not db_ok %} stat--accent{% endif %}"><div class="table__sub">База данных</div><div class="stat__value">{% if db_ok %}Работает{% else %}Нет связи{% endif %}</div></div>
+  <div class="stat{% if not backup_ok %} stat--accent{% endif %}"><div class="table__sub">Последняя копия</div><div class="stat__value">{% if last_backup %}{{ last_backup.created_at|date:"j E, H:i" }}{% else %}Не было{% endif %}</div>
+    {% if not backup_ok %}<span class="chip chip--danger">{% if last_backup %}Старше суток{% else %}Копии не настроены{% endif %}</span>{% endif %}</div>
+  <div class="stat{% if errors_day %} stat--accent{% endif %}"><div class="table__sub">Ошибок за сутки</div><div class="stat__value">{{ errors_day }}</div></div>
+  <div class="stat{% if mail_failed %} stat--accent{% endif %}"><div class="table__sub">Писем не отправлено</div><div class="stat__value">{{ mail_failed }}</div></div>
+  {% if disk %}<div class="stat{% if disk.used_pct >= 85 %} stat--accent{% endif %}"><div class="table__sub">Свободно на диске</div><div class="stat__value">{{ disk.free_gb }} ГБ</div><span class="table__sub">из {{ disk.total_gb }} ГБ · занято {{ disk.used_pct }}%</span></div>{% endif %}
+  <div class="stat"><div class="table__sub">Окружение</div><div class="stat__value">{% if env == "production" %}Боевой{% elif env == "development" %}Разработка{% else %}{{ env }}{% endif %}</div></div>
+</div>
+
+<section class="stack" style="margin-top: var(--space-6);">
+  <div class="page-head" style="margin-bottom: 0;">
+    <h2 class="h2">Почта</h2>
+    <div class="chips">
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="test_mail"><button class="btn btn--sm">Отправить тестовое письмо</button></form>
+      {% if mail_failed %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="retry_mail"><button class="btn btn--sm btn--dark">Повторить неотправленные</button></form>{% endif %}
+    </div>
+  </div>
+  {% if not mail_configured %}<div class="alert alert--warning" role="note">Почтовый сервер не подключён — письма не уходят, только записываются в журнал. Отправитель: {{ from_email }}.</div>{% endif %}
+  {% if mails %}
+  <table class="mtable">
+    <thead><tr><th>Когда</th><th>Кому</th><th>Тема</th><th>Состояние</th></tr></thead>
+    <tbody>{% for m in mails %}
+      <tr>
+        <td data-label="Когда">{{ m.created_at|date:"d.m H:i" }}</td>
+        <td data-label="Кому" class="break">{{ m.recipients|join:", " }}</td>
+        <td data-label="Тема" class="break">{{ m.subject }}</td>
+        <td data-label="Состояние">{% if m.state == "sent" %}<span class="chip chip--success">Отправлено</span>{% elif m.state == "failed" %}<span class="chip chip--danger">Ошибка</span> <span class="table__sub">{{ m.error }} · попыток {{ m.attempts }}</span>{% else %}<span class="chip chip--warning">В очереди</span>{% endif %}</td>
+      </tr>{% endfor %}</tbody>
+  </table>
+  {% else %}<p class="muted">Писем пока не было.</p>{% endif %}
+</section>
+
+<section class="stack" style="margin-top: var(--space-6);">
+  <h2 class="h2">Ошибки за сутки</h2>
+  {% if errors %}{% include "moderation/_journal_rows.html" with rows=errors %}{% else %}<p class="muted">Ошибок не было.</p>{% endif %}
+</section>
+{% endblock %}

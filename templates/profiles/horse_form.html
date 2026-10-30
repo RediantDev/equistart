@@ -4,14 +4,10 @@
 {# Макеты R2_07A / R2_07B (утверждены 28.10.2026): два шага на клиенте, без JS — одна форма #}
 {% with f=form %}
 <div class="ps-screen ps-hform">
-  <a class="ps-back" href="{% if next %}{{ next }}{% elif horse %}{% url 'profiles:horse' horse.pk %}{% else %}{% url 'profiles:horses' %}{% endif %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>{% if next %}Вернуться к заявке{% elif horse %}{{ horse.name }}{% else %}Мои лошади{% endif %}</a>
+  <a class="back" href="{% if next %}{{ next }}{% elif horse %}{% url 'profiles:horse' horse.pk %}{% else %}{% url 'profiles:horses' %}{% endif %}">← {% if next %}Вернуться к заявке{% elif horse %}{{ horse.name }}{% else %}Мои лошади{% endif %}</a>
   <h1 class="h1 ps-h1">{% if horse %}Изменить лошадь{% else %}Новая лошадь{% endif %}</h1>
   {% if not horse %}
-  <ol class="ps-steps ps-js" aria-label="Шаги" data-steps-nav>
-    <li class="ps-st" data-step-dot="1"><span class="ps-sn"><span class="ps-sn__n">1</span><svg class="ps-sn__ok" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Основное</li>
-    <li class="ps-steps__line" aria-hidden="true"></li>
-    <li class="ps-st" data-step-dot="2"><span class="ps-sn"><span class="ps-sn__n">2</span></span>Дополнительно</li>
-  </ol>
+  {% include "partials/steps.html" with names="Основное|Дополнительно" %}
   {% endif %}
   {% if similar %}
     <div class="alert alert--warning" role="alert">
@@ -85,7 +81,8 @@
         {% endif %}
       </div>
       <div class="ps-bar">
-        {% if not horse %}<button type="submit" class="ps-btn ps-grow ps-js" name="skip_extra" value="1" data-skip>Пропустить</button>{% endif %}
+        {% if horse %}<a class="ps-btn" href="{% if next %}{{ next }}{% else %}{% url 'profiles:horse' horse.pk %}{% endif %}">Отмена</a>
+        {% else %}<button type="submit" class="ps-btn ps-grow ps-js" name="skip_extra" value="1" data-skip>Пропустить</button>{% endif %}
         <button type="submit" class="ps-btn ps-btn--y ps-grow">{% if similar %}Это другая лошадь — сохранить{% else %}Сохранить{% endif %}</button>
       </div>
     </div>

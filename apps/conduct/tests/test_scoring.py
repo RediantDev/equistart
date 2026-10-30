@@ -105,10 +105,52 @@ class JumpingTests(ConductBase):
         p = self.p1
         p.program_type, p.table, p.variant = "two_phases_special", "B2", ""
         p.save()
+        scoring.save_course(self.judge, p, {"phase1_time_allowed": "70", "phase2_time_allowed": "40"})
         self.client.force_login(self.judge)
         resp = self.client.post(reverse("conduct:jump_save", args=[self.t.pk, p.pk]), {"entry": self.e2.pk, "stage": "phase1", **rnd(0, 0, "")})
         self.assertIn("stage=phase2", resp["Location"])
         self.assertIn(f"entry={self.e2.pk}", resp["Location"])
+
+    def test_two_phases_flow_with_several_riders(self):
+        """Тест 6.1, п. 28: после 2-й фазы — следующий всадник с 1-й фазы; итог — когда прошли все."""
+        p = self.p1
+        p.program_type, p.table, p.variant = "two_phases_special", "B2", ""
+        p.save()
+        self.client.force_login(self.judge)
+        live = reverse("conduct:jump_live", args=[self.t.pk, p.pk])
+        save = reverse("conduct:jump_save", args=[self.t.pk, p.pk])
+        # без нормы ввод закрыт: блок нормы на экране и отказ на сервере
+        self.assertContains(self.client.get(live), "Сначала внесите норму времени")
+        resp = self.client.post(save, {"entry": self.e2.pk, "stage": "phase1", **rnd(0, 0, "")}, HTTP_X_REQUESTED_WITH="fetch")
+        self.assertEqual(resp.status_code, 422)
+        resp = self.client.post(reverse("conduct:course", args=[self.t.pk, p.pk]),
+                                {"next": "live", "stage": "phase1", "phase1_time_allowed": "70", "phase2_time_allowed": "40", "timing": "electronic"})
+        self.assertIn(live, resp["Location"])
+        order = [s.entry_id for s in StartSlot.objects.filter(program=p).order_by("position")
+                 if s.entry_id in (self.e2.pk, self.e3.pk, self.e4.pk)]
+        a, b, c = order
+        resp = self.client.post(save, {"entry": a, "stage": "phase1", **rnd(0, 0, "")})
+        self.assertIn(f"stage=phase2&entry={a}", resp["Location"])
+        resp = self.client.post(save, {"entry": a, "stage": "phase2", **rnd(0, 0, "35")})
+        self.assertIn("stage=phase1", resp["Location"])
+        page = self.client.get(resp["Location"])
+        self.assertEqual(page.context["stage"]["key"], "phase1")
+        self.assertIsNotNone(page.context["current"])
+        self.assertNotEqual(page.context["current"][0].entry_id, a)
+        self.assertContains(page, "Кто дальше")
+        # не закончил 1-ю фазу — 2-я фаза не нужна, экран остаётся на 1-й
+        resp = self.client.post(save, {"entry": b, "stage": "phase1", **rnd(0, 0, "", "retired")})
+        self.assertIn("stage=phase1", resp["Location"])
+        self.assertNotIn("phase2", resp["Location"])
+        # «Не стартовал» — прямо у поля
+        resp = self.client.post(save, {"entry": c, "stage": "phase1", **rnd(0, 0, "", "no_show")})
+        self.assertEqual(StartSlot.objects.get(entry_id=c).status, StartSlot.Status.NO_SHOW)
+        others = [s.entry_id for s in StartSlot.objects.filter(program=p) if s.entry_id not in (a, b, c)]
+        for e in others:
+            self.client.post(save, {"entry": e, "stage": "phase1", **rnd(0, 0, "", "retired")})
+        page = self.client.get(live)
+        self.assertIsNone(page.context["current"])
+        self.assertContains(page, f"?tab=results")
 
 
 @override_settings(MEDIA_ROOT=TMP)

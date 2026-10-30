@@ -1,0 +1,15 @@
+{% load cabinet %}
+<table class="mtable">
+  <thead><tr><th>Время</th><th>Кто</th><th>Действие</th><th>Объект</th><th>Сведения</th></tr></thead>
+  <tbody>
+  {% for r in rows %}{% with tg=r|audit_target %}
+    <tr>
+      <td data-label="Время">{{ r.created_at|date:"d.m.Y H:i:s" }}</td>
+      <td data-label="Кто">{% if r.actor %}<a href="{% url 'moderation:user' r.actor.pk %}">{{ r.actor.full_name }}</a>{% else %}сервис{% endif %}{% if r.data.as_admin %} <span class="chip chip--info">администратор</span>{% endif %}</td>
+      <td data-label="Действие"><strong>{{ r.label }}</strong></td>
+      <td data-label="Объект">{% if tg.url %}<a href="{{ tg.url }}">{{ tg.label }}</a>{% else %}{{ tg.label }}{% endif %}</td>
+      <td data-label="Сведения" class="break"><span class="table__sub">{{ r.data|audit_data }}</span></td>
+    </tr>
+  {% endwith %}{% endfor %}
+  </tbody>
+</table>

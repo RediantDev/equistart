@@ -4,7 +4,7 @@
 {# Макеты R2_06A, R2_06B, R2_06D, S08A (утверждены 28.10.2026) #}
 {% url 'profiles:horse' h.pk as self_url %}
 <div class="ps-screen">
-  <a class="ps-back" href="{% url 'profiles:horses' %}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Мои лошади</a>
+  <a class="back" href="{% url 'profiles:horses' %}">← Мои лошади</a>
   <div class="ps-headrow">
     <div class="ps-title">
       <h1 class="h1 ps-h1">{{ h.name }}{% if my_access %} <span class="ps-chip ps-chip--info ps-chip--lg">Доступ</span>{% endif %}</h1>

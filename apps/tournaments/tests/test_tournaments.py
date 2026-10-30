@@ -10,6 +10,7 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.core.models import AuditLog
 from apps.tournaments import services
+from apps.sport.models import ClassTemplate
 from apps.tournaments.models import ProgramItem, TeamMember, Tournament, TournamentClass, Venue
 
 PDF = b"%PDF-1.4\n%test\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
@@ -109,6 +110,7 @@ class WizardTests(Base):
         resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), {
             "revision": t.revision, "day": (self.start + datetime.timedelta(days=1)).isoformat(), "start_time": "12:30",
             "discipline": "jumping", "name": "Маршрут №2 · 110 см", "program_type": "jumpoff", "table": "A", "heights_text": "100, 110",
+            "templates": [str(ClassTemplate.objects.get(name="Юноши").pk)],
         })
         self.assertEqual(resp.status_code, 302)
         p = ProgramItem.objects.get(name__startswith="Маршрут №2")
@@ -122,8 +124,6 @@ class WizardTests(Base):
         c = TournamentClass.objects.get(name="Взрослые")
         self.assertEqual((c.birth_year_to, c.height, c.label), (self.start.year - 18, 110, "Взрослые · 110 см"))
         # шаблон зачёта: возраст пересчитывается в годы рождения от года турнира
-        from apps.sport.models import ClassTemplate
-
         tpl = ClassTemplate.objects.get(name="Дети")
         t.refresh_from_db()
         resp = self.client.post(reverse("tournaments:class_from_template", args=[t.pk, p.pk]), {"revision": t.revision, "template": tpl.pk, "height": "100"})
@@ -153,6 +153,7 @@ class WizardTests(Base):
         self.client.force_login(self.org)
         resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), {
             "revision": t.revision, "day": (self.start + datetime.timedelta(days=9)).isoformat(), "discipline": "jumping", "name": "Х", "program_type": "no_time", "table": "A", "heights_text": "80",
+            "templates": [str(ClassTemplate.objects.get(name="Юноши").pk)],
         })
         self.assertEqual(resp.status_code, 422)
 
@@ -161,6 +162,7 @@ class WizardTests(Base):
         self.client.force_login(self.org)
         resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), {
             "revision": t.revision - 1, "day": self.start.isoformat(), "discipline": "jumping", "name": "Х", "program_type": "no_time", "table": "A", "heights_text": "80",
+            "templates": [str(ClassTemplate.objects.get(name="Юноши").pk)],
         }, follow=True)
         self.assertContains(resp, "изменились")
         self.assertEqual(t.programs.count(), 1)
@@ -222,7 +224,7 @@ class ModerationTests(Base):
         t.refresh_from_db()
         self.assertEqual(t.status, Tournament.Status.REVIEW)
         # во время проверки правка закрыта
-        resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), {"revision": t.revision, "day": self.start.isoformat(), "discipline": "jumping", "name": "Х", "program_type": "no_time", "table": "A", "heights_text": "80"})
+        resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), {"revision": t.revision, "day": self.start.isoformat(), "discipline": "jumping", "name": "Х", "program_type": "no_time", "table": "A", "heights_text": "80", "templates": [str(ClassTemplate.objects.get(name="Юноши").pk)]})
         self.assertEqual(t.programs.count(), 1)
         # черновик не публичен
         self.client.logout()

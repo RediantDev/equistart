@@ -217,7 +217,7 @@ def save_round(user, entry_id, stage, data: dict, client_key: str = "") -> JumpR
     jr.save()
     slot = getattr(e, "start_slot", None)
     if slot and stage == J.rounds_of(program.route, program.variant)[0].key and slot.status in (StartSlot.Status.WAITING, StartSlot.Status.STARTED):
-        slot.status = StartSlot.Status.FINISHED
+        slot.status = StartSlot.Status.NO_SHOW if jr.status == "no_show" else StartSlot.Status.FINISHED  # тест 6.1, п. 26: «Не стартовал» у поля
         slot.save(update_fields=["status", "updated_at"])
     audit(user, "round.save", e, round=stage, knockdowns=jr.knockdowns, refusals=jr.refusals, time=str(jr.time) if jr.time else None,
           status=jr.status, fall=jr.fall, before=old)
@@ -763,3 +763,32 @@ def jump_queue(program, stage):
             continue
         out.append((s, rounds.get(s.entry_id)))
     return out
+
+
+def preview_round(program, stage, data: dict) -> str:
+    """Итог гита до сохранения — для экрана судьи (тест 6.1, п. 26). Ничего не записывает."""
+    keys = [r.key for r in J.rounds_of(program.route, program.variant)]
+    if stage not in keys:
+        raise ValueError("Нет такого гита.")
+    jr = JumpRound(round=stage)
+    try:
+        jr.knockdowns = max(0, int(data.get("knockdowns") or 0))
+        jr.refusals = max(0, int(data.get("refusals") or 0))
+        jr.corrections = max(0, int(data.get("corrections") or 0))
+    except ValueError:
+        raise ValueError("Числа")
+    raw = str(data.get("time", "") or "").strip().replace(",", ".")
+    try:
+        jr.time = Decimal(raw) if raw else None
+    except Exception:
+        raise ValueError("Время")
+    if jr.time is not None and jr.time <= 0:
+        raise ValueError("Время")
+    jr.status = "ok"
+    r = _score(program, stage, jr)
+    if r.status != "ok":
+        return r.reason or "Исключён"
+    table = round_params(program, stage)["table"]
+    if table == "C":
+        return f"{J.fmt(r.penalties)} с"
+    return f"{J.fmt(r.penalties)} ш." + (f" · {J.fmt(r.time)} с" if r.time is not None else "")

@@ -56,7 +56,18 @@ def course_save(request, pk, program_id):
         messages.success(request, "Параметры маршрута сохранены. Результаты пересчитаны.")
     except ValueError as e:
         messages.error(request, str(e))
+    if request.POST.get("next") == "live":  # тест 6.1, п. 25: норма внесена прямо на экране судьи
+        stage = request.POST.get("stage", "")
+        return redirect(reverse("conduct:jump_live", args=[pk, p.pk]) + (f"?stage={stage}" if stage.isalnum() else ""))
     return redirect(reverse("conduct:program", args=[pk, p.pk]) + "?tab=course")
+
+
+TWO_PHASES = ("two_phases", "two_phases_special")
+
+
+def _needs_norm(st):
+    """Штраф за время по таблицам A/B считается от нормы — без неё ввод гита закрыт (тест 6.1, пп. 25, 29)."""
+    return st["table"] != "C" and st["time_allowed"] is None
 
 
 def _stage_list(p):
@@ -77,15 +88,22 @@ def jump_live(request, pk, program_id):
         return redirect("conduct:live", pk=pk, program_id=p.pk)
     stages = _stage_list(p)
     keys = [s["key"] for s in stages]
+    two = p.route.key in TWO_PHASES
     stage = request.GET.get("stage") if request.GET.get("stage") in keys else keys[0]
-    st = next(s for s in stages if s["key"] == stage)
+    want = request.GET.get("entry")
     queue = scoring.jump_queue(p, stage)
     current = None
-    want = request.GET.get("entry")
     if want:
         current = next(((s, r) for s, r in queue if str(s.entry_id) == want), None)
     if current is None:
         current = next(((s, r) for s, r in queue if r is None), None)
+    # Тест 6.1, п. 28: «В две фазы» — когда 1-ю фазу прошли все, экран сам переходит к оставшимся во 2-й фазе
+    if two and current is None and not want and stage == keys[0] and len(keys) > 1:
+        q2 = scoring.jump_queue(p, keys[1])
+        if any(r is None for _, r in q2):
+            stage, queue = keys[1], q2
+            current = next(((s, r) for s, r in q2 if r is None), None)
+    st = next(s for s in stages if s["key"] == stage)
     counts = {k: len([1 for _, r in scoring.jump_queue(p, k) if r is not None]) for k in keys}
     places = {}
     for items in scoring.standings(p).values():
@@ -114,7 +132,30 @@ def jump_live(request, pk, program_id):
 
             d = dj_tz.localtime(last_change.created_at, tz)
             last_change.local_str = f"{d.day} {MONTHS_GEN[d.month - 1]} {d:%H:%M}"
+    # Тест 6.1, п. 26: «Кто дальше» — следующие пары в порядке (для 2-й фазы — следующие по 1-й)
+    base_q = queue if not (two and stage != keys[0]) else scoring.jump_queue(p, keys[0])
+    after = False if (current and base_q is queue) else True
+    upcoming = []
+    for sl, r in base_q:
+        if current and base_q is queue and sl.pk == current[0].pk:
+            after = True
+            continue
+        if after and r is None:
+            upcoming.append(sl)
+    upcoming = upcoming[:5]
+    prev_round = None
+    if two and current and stage != keys[0]:
+        prev_round = JumpRound.objects.filter(entry_id=current[0].entry_id, round=keys[0]).first()
+    norm_block = _needs_norm(st)
+    norm_rounds = []
+    if norm_block:
+        for x in stages:
+            rp = scoring.course(p)["rounds"].get(x["key"], {})
+            show = x["key"] == stage or (two and x["table"] != "C")
+            norm_rounds.append({"key": x["key"], "title": x["title"], "show": show, "length": rp.get("length", ""),
+                                "speed": rp.get("speed", ""), "time_allowed": rp.get("time_allowed", "")})
     return render(request, "conduct/jump_live.html", {
+        "two": two, "upcoming": upcoming, "prev_round": prev_round, "norm_block": norm_block, "norm_rounds": norm_rounds,
         "current_no": current_no, "skipped": skipped, "last_change": last_change,
         "t": p.tournament, "p": p, "stages": stages, "stage": st, "queue": queue, "current": current,
         "counts": counts, "places": places, "last": last, "reasons": EXCLUSION_REASONS,
@@ -140,6 +181,9 @@ def jump_save(request, pk, program_id):
         if not Entry.objects.filter(pk=entry_id, program=p).exists():
             raise Http404
         data = dict(request.POST.items())
+        st = next((x for x in _stage_list(p) if x["key"] == stage), None)
+        if st and _needs_norm(st) and data.get("status", "ok") == "ok":
+            raise ValueError("Сначала внесите норму времени — без неё штраф за время не посчитать.")
         jr = scoring.save_round(request.user, entry_id, stage, data, request.POST.get("client_key", ""))
     except ValueError as e:
         if _fetch(request):
@@ -150,15 +194,33 @@ def jump_save(request, pk, program_id):
     url = reverse("conduct:jump_live", args=[pk, p.pk])
     nxt = _next_stage(p, stage)
     go = f"?stage={stage}&saved={entry_id}"
-    if nxt and p.route.key in ("two_phases", "two_phases_special") and stage == "phase1":
-        if not JumpRound.objects.filter(entry_id=entry_id, round=nxt).exists() and jr.entry in scoring.next_stage_candidates(p, nxt):
+    keys = [r.key for r in J.rounds_of(p.route, p.variant)]
+    if p.route.key in TWO_PHASES and stage == keys[0] and nxt:
+        if jr.status == "ok" and not JumpRound.objects.filter(entry_id=entry_id, round=nxt).exists() and jr.entry in scoring.next_stage_candidates(p, nxt):
             go = f"?stage={nxt}&entry={entry_id}&saved={entry_id}"
+    elif p.route.key in TWO_PHASES and stage != keys[0]:
+        # Тест 6.1, п. 28: после 2-й фазы — следующий всадник с 1-й фазы; к результатам — только когда прошли все
+        go = f"?stage={keys[0]}&saved={entry_id}"
     res = getattr(Entry.objects.get(pk=entry_id), "result", None)
     text = f"Сохранено: {jr.entry.athlete_snapshot.get('name')}" + (f" — {res.place} место" if res and res.place else "")
     if _fetch(request):
         return JsonResponse({"ok": True, "message": text, "next": url + go})
     messages.success(request, text)
     return redirect(url + go)
+
+
+@login_required
+@require_POST
+def jump_preview(request, pk, program_id):
+    """Итог гита до сохранения (тест 6.1, п. 26): считается по тем же правилам, что и при сохранении."""
+    p = _judge_program(request, pk, program_id)
+    if not p.is_jumping or p.route.manual:
+        raise Http404
+    try:
+        text = scoring.preview_round(p, request.POST.get("stage", ""), request.POST)
+    except ValueError:
+        text = ""
+    return JsonResponse({"text": text})
 
 
 # ======================= ВЫЕЗДКА =======================

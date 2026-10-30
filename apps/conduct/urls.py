@@ -15,6 +15,7 @@ urlpatterns = [
     path("organizer/t/<int:pk>/conduct/p/<int:program_id>/course/", judging.course_save, name="course"),
     path("organizer/t/<int:pk>/conduct/p/<int:program_id>/field/", judging.jump_live, name="jump_live"),
     path("organizer/t/<int:pk>/conduct/p/<int:program_id>/field/save/", judging.jump_save, name="jump_save"),
+    path("organizer/t/<int:pk>/conduct/p/<int:program_id>/field/preview/", judging.jump_preview, name="jump_preview"),
     path("organizer/t/<int:pk>/conduct/p/<int:program_id>/panel/", judging.panel, name="panel"),
     path("organizer/t/<int:pk>/conduct/p/<int:program_id>/judge/<str:letter>/", judging.judge_sheet, name="judge_sheet"),
     path("organizer/t/<int:pk>/conduct/p/<int:program_id>/judge/<str:letter>/mark/", judging.judge_mark, name="judge_mark"),

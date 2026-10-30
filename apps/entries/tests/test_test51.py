@@ -54,8 +54,8 @@ class MyCompetitionsTests(T51Base):
         self.assertNotIn(f"№{self.app.pk}", page)
         # поиск и фильтр — на странице
         self.assertIn("data-mc-q", page)
-        for label in ("Все", "На рассмотрении", "Принято", "Отклонено"):
-            self.assertIn(f">{label}</button>", page)
+        for label in ("На рассмотрении", "Принято", "Отклонено"):  # 30.10.2026: фильтры — в окне снизу
+            self.assertIn(f'data-label="{label}"', page)
         self.assertNotIn("?tab=apps", page)
         self.assertNotIn("Ваши заявки, выступления", page)
 

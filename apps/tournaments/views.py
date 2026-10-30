@@ -8,7 +8,7 @@ from django.core.exceptions import PermissionDenied
 from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
-from django.db.models import Q
+from django.db.models import F, Q
 from django.http import FileResponse, Http404
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.shortcuts import get_object_or_404, redirect, render
@@ -115,8 +115,38 @@ def my_tournaments(request):
         Tournament.objects.filter(Q(owner=user) | Q(pk__in=team_ids))
         .select_related("venue")
         .distinct()
-        .order_by("-starts_on", "-created_at")
+        .order_by(F("starts_on").desc(nulls_first=True), "-created_at")
     )
+    # Тест 6.1, п. 9 (вариант Б): поиск и фильтры — статус, моя роль, год, клуб; список по месяцам
+    q = request.GET.get("q", "").strip()
+    st = [x for x in request.GET.getlist("status") if x in dict(MY_STATUSES)]
+    role = request.GET.get("role", "")
+    year = request.GET.get("year", "")
+    venue = request.GET.get("venue", "")
+    all_items = list(items)
+    years = sorted({t.starts_on.year for t in all_items if t.starts_on}, reverse=True)
+    venues = sorted({(t.venue_id, t.venue.name) for t in all_items if t.venue_id}, key=lambda v: v[1])
+    if q:
+        ql = q.lower().replace("ё", "е")
+        all_items = [t for t in all_items if ql in " ".join([t.title or "", t.venue.name if t.venue else "", t.venue.settlement if t.venue else ""]).lower().replace("ё", "е")]
+    if st:
+        all_items = [t for t in all_items if _my_status(t) in st]
+    if year.isdigit():
+        all_items = [t for t in all_items if t.starts_on and t.starts_on.year == int(year)]
+    if venue.isdigit():
+        all_items = [t for t in all_items if t.venue_id == int(venue)]
+    # По умолчанию — текущие и будущие (и черновики без дат); прошедшие — отдельной вкладкой
+    today = timezone.localdate()
+    past = request.GET.get("when") == "past"
+    def is_past(t):
+        end = t.ends_on or t.starts_on
+        return bool(end and end < today)
+    n_past = sum(1 for t in all_items if is_past(t))
+    n_now = len(all_items) - n_past
+    if past:
+        items = [t for t in all_items if is_past(t)]
+    else:
+        items = sorted((t for t in all_items if not is_past(t)), key=lambda t: (t.starts_on is not None, t.starts_on or today))
     # Тест 6, п. 25: в карточке — дисциплины, число маршрутов/езд, срок заявок и принятые пары
     from django.db.models import Count
 
@@ -133,14 +163,57 @@ def my_tournaments(request):
                     .annotate(n=Count("id")).values_list("tournament_id", "n"))
     rows = []
     for t in items:
+        roles = services.roles_of(user, t)
+        if role in ("organizer", "judge", "stable") and role not in roles:
+            continue
         discs = progs.get(t.pk, [])
         uniq = [d for i, d in enumerate(discs) if d not in discs[:i]]
-        rows.append({"t": t, "roles": services.roles_of(user, t), "programs": len(discs),
+        rows.append({"t": t, "roles": roles, "programs": len(discs), "month": t.starts_on.replace(day=1) if t.starts_on else None,
                      "disciplines": [(d, DISCIPLINE_NAMES.get(d, d), DISCIPLINE_COLORS.get(d, "")) for d in uniq],
                      "only_dressage": bool(discs) and set(discs) == {"dressage"},
                      "accepted": accepted.get(t.pk, 0),
                      "can_delete": t.owner_id == user.pk and not t.is_published and t.status != Tournament.Status.REVIEW})
-    return render(request, "tournaments/my_list.html", {"rows": rows})
+    active = []
+    labels = dict(MY_STATUSES)
+    for x in st:
+        active.append((labels[x], _drop(request, "status", x)))
+    if role in ("organizer", "judge", "stable"):
+        active.append(({"organizer": "Организатор", "judge": "Судья", "stable": "Конюшня"}[role], _drop(request, "role")))
+    if year.isdigit():
+        active.append((year, _drop(request, "year")))
+    if venue.isdigit():
+        active.append((dict(venues).get(int(venue), "Клуб"), _drop(request, "venue")))
+    return render(request, "tournaments/my_list.html", {
+        "rows": rows, "q": q, "st": st, "role": role, "year": year, "venue": venue, "years": years, "venues": venues,
+        "statuses": MY_STATUSES, "active": active, "filtered": bool(q or active),
+        "past": past, "n_past": n_past, "n_now": n_now,
+        "now_url": _drop(request, "when"), "past_url": _drop(request, "when") + ("&" if _drop(request, "when") != "?" else "") + "when=past",
+    })
+
+
+MY_STATUSES = [("draft", "Черновик"), ("review", "На проверке"), ("published", "Опубликован"), ("finished", "Завершён"), ("cancelled", "Отменён")]
+
+
+def _my_status(t):
+    if t.publication == Tournament.Publication.CANCELLED:
+        return "cancelled"
+    if t.publication == Tournament.Publication.FINISHED:
+        return "finished"
+    if t.status == Tournament.Status.REVIEW:
+        return "review"
+    if t.is_published:
+        return "published"
+    return "draft"
+
+
+def _drop(request, key, value=None):
+    """Адрес текущего списка без одного фильтра (для крестика на чипе)."""
+    qd = request.GET.copy()
+    if value is None:
+        qd.pop(key, None)
+    else:
+        qd.setlist(key, [v for v in qd.getlist(key) if v != value])
+    return "?" + qd.urlencode() if qd else "?"
 
 
 @login_required

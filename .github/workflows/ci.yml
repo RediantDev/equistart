@@ -34,7 +34,29 @@ jobs:
       - name: Нет незаписанных миграций
         run: python manage.py makemigrations --check --dry-run
       - name: Тесты
-        run: python manage.py test --verbosity 2
+        run: |
+          set -o pipefail
+          python manage.py test --verbosity 2 2>&1 | tee test.log
+      - name: Ошибки тестов — в аннотации (видны через API без логов)
+        if: failure()
+        run: |
+          python - <<'PY'
+          import re
+          try:
+              s = open("test.log", encoding="utf8").read()
+          except FileNotFoundError:
+              raise SystemExit
+          blocks = re.split(r"\n={50,}\n", s)
+          n = 0
+          for b in blocks:
+              if b.startswith(("ERROR:", "FAIL:")) and n < 10:
+                  msg = b[-3000:].replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+                  print(f"::error title=test::{msg}")
+                  n += 1
+          if not n:
+              tail = s[-3000:].replace("%", "%25").replace("\n", "%0A")
+              print(f"::error title=tail::{tail}")
+          PY
       - name: Проверка production-настроек
         env:
           DJANGO_ENV: production

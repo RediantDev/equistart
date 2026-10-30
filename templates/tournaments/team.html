@@ -22,7 +22,7 @@
             {% if m.state == "pending" %}<span class="chip chip--warning">Ждёт принятия</span>{% else %}<span class="chip chip--success">Принято</span>{% endif %}
             {% if m.role == "stable" and m.state == "accepted" %}{% if m.stable_contact %}<span class="chip chip--info">Ответственный за денники</span>{% elif manage %}<form method="post" action="{% url 'tournaments:team_stable_contact' t.pk m.pk %}">{% csrf_token %}<button type="submit" class="btn btn--ghost btn--sm" title="Его имя и телефон увидят участники со своей бронью">Сделать ответственным за денники</button></form>{% endif %}{% endif %}
             {% if manage %}
-              <form method="post" action="{% url 'tournaments:team_revoke' t.pk m.pk %}">{% csrf_token %}<button type="submit" class="btn btn--danger btn--sm">Отозвать</button></form>
+              <form method="post" action="{% url 'tournaments:team_revoke' t.pk m.pk %}">{% csrf_token %}<button type="submit" class="btn btn--danger btn--sm" data-confirm="Отозвать приглашение и доступ к турниру?" data-confirm-ok="Отозвать">Отозвать</button></form>
             {% endif %}
           </li>
         {% endfor %}
@@ -37,7 +37,7 @@
         {% csrf_token %}
         {% include "partials/field.html" with field=form.phone %}
         {% include "partials/field.html" with field=form.role %}
-        <button type="submit" class="btn btn--dark btn--block">Отправить приглашение</button>
+        <button type="submit" class="btn btn--primary btn--block">Отправить приглашение</button>
       </form>
       <ul class="role-help">
         <li><strong>Организатор</strong> — всё по турниру.</li>

@@ -101,7 +101,8 @@ class SupportTests(TestCase):
     def test_staff_reply_notifies_and_mails_then_user_reopens(self):
         t = Ticket.objects.create(author=self.u, topic="other", text="Вопрос")
         self.client.force_login(self.mod)
-        self.client.post(reverse("moderation:support_detail", args=[t.pk]), {"text": "Ответ поддержки", "status": "resolved"})
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(reverse("moderation:support_detail", args=[t.pk]), {"text": "Ответ поддержки", "status": "resolved"})
         t.refresh_from_db()
         self.assertEqual(t.status, Ticket.Status.RESOLVED)
         self.assertTrue(Notification.objects.filter(user=self.u, kind="support.answer").exists())
@@ -144,11 +145,64 @@ class SupportTests(TestCase):
     # ---- «Идёт турнир» ----
     def test_urgent_for_team_on_tournament_day(self):
         self.client.force_login(self.judge)
-        self.client.post(reverse("support:new"), {"topic": "bug", "text": "Не сохраняется", "tournament": self.t.pk, "urgent": "on"})
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(reverse("support:new"), {"topic": "bug", "text": "Не сохраняется", "tournament": self.t.pk, "urgent": "on"})
         t = Ticket.objects.get()
         self.assertTrue(t.urgent)
         self.assertTrue(Notification.objects.filter(user=self.mod, kind="support.urgent").exists())
         self.assertTrue(any("mod@example.test" in m.to for m in mail.outbox))
+        self.assertTrue(mail.outbox[0].subject.startswith("СРОЧНО"))
+
+    # ---- письма модератору о каждом обращении (SUP-14) ----
+    def test_every_new_ticket_mails_moderator_without_phone(self):
+        from apps.core.models import OutgoingMail, SiteSettings
+
+        SiteSettings.objects.create(moderator_emails="ivan@example.test, second@example.test")
+        long_text = "Не могу войти. " * 60
+        with self.captureOnCommitCallbacks(execute=True):
+            self.guest_post(text=long_text)
+        t = Ticket.objects.get()
+        self.assertTrue(Notification.objects.filter(user=self.mod, kind="support.new", url=f"/moderation/support/{t.pk}/").exists())
+        m = mail.outbox[-1]
+        self.assertEqual(set(m.to), {"ivan@example.test", "second@example.test", "mod@example.test"})
+        self.assertIn(f"№{t.pk}", m.subject)
+        self.assertIn("Вход и пароль", m.subject)
+        self.assertIn("гость Мария", m.body)
+        self.assertIn(f"/moderation/support/{t.pk}/", m.body)
+        self.assertNotIn("000-11-22", m.body)
+        self.assertNotIn("+79000001122", m.body)
+        self.assertLess(len(m.body), len(long_text))
+        self.assertEqual(OutgoingMail.objects.get(kind="support.moderator").state, OutgoingMail.State.SENT)
+
+    def test_every_user_reply_mails_moderator(self):
+        t = Ticket.objects.create(author=self.u, topic="other", text="Вопрос", status=Ticket.Status.RESOLVED)
+        self.client.force_login(self.u)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(reverse("support:detail", args=[t.pk]), {"text": "Не помогло"})
+            self.client.post(reverse("support:detail", args=[t.pk]), {"text": "Ещё вопрос"})
+        mod_mails = [m for m in mail.outbox if "mod@example.test" in m.to]
+        self.assertEqual(len(mod_mails), 2)
+        self.assertIn("Обращение открыто снова", mod_mails[0].subject)
+        self.assertIn("Ответ пользователя", mod_mails[1].subject)
+        self.assertEqual(Notification.objects.filter(user=self.mod, kind="support.reply").count(), 2)
+
+    def test_failed_mail_is_kept_and_retried(self):
+        from unittest import mock
+
+        from apps.core.mail import retry_pending
+        from apps.core.models import OutgoingMail
+
+        with mock.patch("apps.core.mail.send_mail", side_effect=OSError("smtp down")):
+            with self.captureOnCommitCallbacks(execute=True):
+                self.guest_post()
+        self.assertEqual(Ticket.objects.count(), 1)  # обращение не потерялось
+        m = OutgoingMail.objects.get(kind="support.moderator")
+        self.assertEqual(m.state, OutgoingMail.State.FAILED)
+        self.assertIn("smtp down", m.error)
+        self.assertEqual(retry_pending(), (1, 0))
+        m.refresh_from_db()
+        self.assertEqual(m.state, OutgoingMail.State.SENT)
+        self.assertEqual(m.attempts, 2)
 
     def test_urgent_not_for_outsider(self):
         self.client.force_login(self.u)

@@ -9,7 +9,7 @@
     <form method="post" novalidate class="form">
       {% csrf_token %}
       <div class="field{% if form.category.errors %} field--error{% endif %}">{% include "partials/role_choices.html" with field=form.category %}</div>
-      <button type="submit" class="btn btn--primary btn--block">Добавить</button>
+      <button type="submit" class="btn btn--primary btn--block btn--lg">Добавить</button>
     </form>
   </div>
 </section>

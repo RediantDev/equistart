@@ -1,12 +1,12 @@
-{% extends "base.html" %}
+{% extends "moderation/_cabinet.html" %}
 {% block title %}Обращения — Пульт — СтартЛист{% endblock %}
-{% block content %}
-<a class="back" href="{% url 'moderation:panel' %}">← Пульт</a>
+{% block cabinet %}
 <div class="page-head">
   <div>
     <h1 class="h1">Обращения в поддержку</h1>
     <p class="muted">Срочные «Идёт турнир» — первыми. Срок ответа — 1 рабочий день{% if overdue %}; <strong>просрочено: {{ overdue }}</strong>{% endif %}.</p>
   </div>
+  {% if user.is_admin %}<a class="btn btn--sm" href="{% url 'moderation:export' 'tickets' %}">Выгрузить в Excel</a>{% endif %}
 </div>
 <form method="get" class="card filters__body" style="margin: 0 0 var(--space-4);">
   <div class="field"><label class="field__label" for="f-status">Статус</label>
@@ -15,7 +15,7 @@
     <select id="f-topic" name="topic"><option value="">Все темы</option>{% for v, l in topics %}<option value="{{ v }}"{% if f.topic == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
   <div class="field"><label class="field__label" for="f-q">Номер или текст</label><input id="f-q" name="q" value="{{ f.q }}" placeholder="№ или слово"></div>
   <label class="check"><input type="checkbox" name="urgent" value="1"{% if f.urgent == "1" %} checked{% endif %}><span>Только срочные</span></label>
-  <div class="filters__actions"><button class="btn btn--dark">Показать</button></div>
+  <div class="filters__actions"><button class="btn btn--primary btn--sm">Показать</button></div>
 </form>
 {% if tickets %}
   <div class="list-cards">

@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{{ title }} — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head"><div><a class="back" href="{{ next }}">← Назад</a><h1 class="h1">{{ title }}</h1></div></div>
-<form method="post" class="card form" style="max-width: 720px;" novalidate>{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+<a class="back" href="{{ next }}">← Денники и услуги</a>
+<h1 class="h1">{{ title }}</h1>
+<form method="post" class="card form form--narrow" novalidate>{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
   {% if form.non_field_errors %}<div class="alert alert--error">{% for e in form.non_field_errors %}{{ e }} {% endfor %}</div>{% endif %}
   {% for field in form %}{% include "partials/field.html" %}{% endfor %}
-  <div class="form-actions"><button class="btn btn--primary">Сохранить</button><a class="btn btn--ghost" href="{{ next }}">Отмена</a></div>
+  <div class="form-actions"><a class="btn btn--ghost" href="{{ next }}">Отмена</a><button class="btn btn--primary">Сохранить</button></div>
 </form>
 {% endblock %}

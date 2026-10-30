@@ -1,0 +1,13 @@
+{% comment %}Окно снизу «Отклонить / Отменить бронь» с причиной — единый вид с «Отклонить заявку» (30.10.2026).
+   Параметры: sid (начало id окна, к нему добавляется номер брони), action (reject|cancel), b (бронь), title, ok, chips («A|B|C»).{% endcomment %}{% load tournaments %}
+<div class="sheet" id="{{ sid }}{{ b.pk }}" hidden data-sheet data-sheet-portal>
+  <form class="sheet__box rej" method="post" action="{% url 'stables:action' t.pk action %}" role="dialog" aria-modal="true" aria-labelledby="{{ sid }}{{ b.pk }}-t">{% csrf_token %}
+    <input type="hidden" name="booking" value="{{ b.pk }}">{% if action == "reject" %}<input type="hidden" name="revision" value="{{ b.revision }}">{% endif %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <div class="sheet__grip"></div>
+    <div class="rej__head"><div><h2 class="sheet__title" id="{{ sid }}{{ b.pk }}-t">{{ title }}</h2><p class="rej__who">{{ b.horse_name }} · {{ b.category.name }}, {{ b.arrive|date:"j E" }} — {{ b.depart|date:"j E" }}</p></div><button type="button" class="sheet-x" data-sheet-close aria-label="Закрыть">×</button></div>
+    <p class="rej__lbl">Причина — её увидит заказавший</p>
+    <div class="chips">{% for r in chips|split:"|" %}<button type="button" class="pick-btn" data-fill="{{ sid }}{{ b.pk }}-r">{{ r }}</button>{% endfor %}</div>
+    <input id="{{ sid }}{{ b.pk }}-r" name="reason" required placeholder="Или напишите свою причину" aria-label="Причина" maxlength="300">
+    <div class="rej__act"><button type="button" class="btn btn--ghost" data-sheet-close>Отмена</button><button class="btn btn--danger-solid">{{ ok }}</button></div>
+  </form>
+</div>

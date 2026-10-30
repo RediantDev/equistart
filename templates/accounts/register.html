@@ -8,9 +8,7 @@
       <img class="auth__icon" src="{% static 'brand/startlist-icon.svg' %}" width="56" height="56" alt="">
       <div><h1 class="h1 auth__title">Регистрация</h1><p class="muted auth__sub">Три коротких шага — около минуты</p></div>
     </div>
-    <ol class="steps-mini" aria-label="Шаги регистрации" data-steps-nav>
-      <li data-step-dot="1">1. О вас</li><li data-step-dot="2">2. Роли</li><li data-step-dot="3">3. Телефон и пароль</li>
-    </ol>
+    {% include "partials/steps.html" with names="О вас|Роли|Телефон и пароль" label="Шаги регистрации" %}
     <form method="post" novalidate class="form" data-steps>
       {% csrf_token %}
       {% for error in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ error }}</div>{% endfor %}

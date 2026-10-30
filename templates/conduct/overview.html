@@ -53,7 +53,7 @@
       <h2 class="h3">Интервалы</h2>
       <form method="post" action="{% url 'conduct:settings' t.pk %}" class="form" style="margin-top: var(--space-3);">{% csrf_token %}
         <div class="field"><label class="field__label" for="mr">Минимум других стартов между выступлениями одной лошади или всадника</label><input id="mr" name="min_gap_starts" type="number" min="0" value="{{ t.min_gap_starts }}"><p class="field__help">0 — не проверять. Нарушения покажем как конфликты; судья может оставить исключение с причиной.</p></div>
-        <button class="btn btn--dark btn--sm">Сохранить</button>
+        <button class="btn btn--primary btn--sm">Сохранить</button>
       </form>
     </section>
     {% if manage and t.publication == "published" %}

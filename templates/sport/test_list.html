@@ -1,13 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Езды выездки — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <h1 class="h1">Езды выездки</h1>
-    <p class="muted">Езда — это судейский лист: упражнения, коэффициенты и схема штрафов. Официальные езды вносит модератор, свои езды видны только вам.</p>
-  </div>
-  <a class="btn btn--primary" href="{% url 'sport:test_new' %}">+ Своя езда</a>
-</div>
+<div class="head-row head-row--tight"><h1 class="h1">Езды выездки</h1><a class="btn btn--primary btn--sm" href="{% url 'sport:test_new' %}">+ Своя езда</a></div>
+<p class="muted page-lead">Езда — это судейский лист: упражнения, коэффициенты и схема штрафов. Официальные езды вносит модератор, свои езды видны только вам.</p>
 <section class="stack">
   <h2 class="h3">Официальные</h2>
   <div class="list-cards">

@@ -10,7 +10,7 @@
         {% if t.status == "review" %}<span class="chip chip--warning">На проверке у модератора</span>
         {% elif t.status == "returned" %}<span class="chip chip--danger">Нужны исправления</span>
         {% elif t.status == "rejected" %}<span class="chip chip--danger">Отклонён модератором</span>
-        {% elif t.status == "approved" %}<span class="chip chip--success">Опубликован</span>
+        {% elif t.status == "approved" %}<span class="chip chip--info">Опубликован</span>
         {% elif t.is_published %}<span class="chip chip--warning">Есть неопубликованные изменения</span>
         {% else %}<span class="chip">Черновик</span>{% endif %}
         {% if t.publication == "cancelled" %}<span class="chip chip--danger">Отменён</span>{% endif %}

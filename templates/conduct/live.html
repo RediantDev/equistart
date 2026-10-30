@@ -4,7 +4,7 @@
 {% block content %}
 <div class="live">
   <div class="live__head">
-    <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← Порядок и результаты</a>
+    <a class="back" href="{% url 'conduct:program' t.pk p.pk %}">← {{ p.name }}</a>
     <h1 class="h3" style="margin: 0;">{{ p.name }}</h1>
     <div class="table__sub">{{ p.day|date:"j E" }} · прошли {{ done }} из {{ total }}</div>
   </div>

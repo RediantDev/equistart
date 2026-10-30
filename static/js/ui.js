@@ -89,10 +89,24 @@
       if (!sc || sc.scrollHeight <= sc.clientHeight) e.preventDefault();
     }, { passive: false });
     requestAnimationFrame(function () { back.classList.add("is-open"); });
-    return { back: back, box: box };
+    // Тест 6.1, п. 10: шторка занимает только видимую часть экрана — клавиатура не закрывает поиск и список
+    var vv = window.visualViewport, fit = null;
+    if (vv) {
+      fit = function () {
+        back.style.top = vv.offsetTop + "px";
+        back.style.height = vv.height + "px";
+        back.style.bottom = "auto";
+        box.style.maxHeight = Math.max(220, Math.min(vv.height * 0.82, vv.height - 24)) + "px";
+        back.classList.toggle("is-kb", vv.height < window.innerHeight - 120);
+      };
+      fit();
+      vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit);
+    }
+    return { back: back, box: box, unfit: function () { if (fit) { vv.removeEventListener("resize", fit); vv.removeEventListener("scroll", fit); } } };
   }
   function closeSheet(sh, pop, root) {
     if (!sh) return;
+    if (sh.unfit) sh.unfit();
     root.appendChild(pop);
     sh.back.classList.remove("is-open");
     setTimeout(function () { sh.back.remove(); }, 180);
@@ -511,7 +525,16 @@
     var clear = el("button", "file__clear"); clear.type = "button"; clear.setAttribute("aria-label", "Убрать файл");
     clear.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
     card.appendChild(cardIco); card.appendChild(cardTxt); card.appendChild(clear);
-    if (imgOnly) { thumbs.appendChild(plus); root.appendChild(thumbs); thumbs.hidden = false; }
+    if (imgOnly) {
+      // Тест 6.1, п. 6: фото — кнопка «+ Добавить фото» справа от подписи поля, миниатюры ниже
+      plus.className = "btn btn--ghost btn--sm file__add";
+      plus.textContent = input.multiple ? "+ Добавить фото" : (input.getAttribute("data-plus-label") || "+ Добавить фото");
+      var head = el("div", "file__head"), fld = root.closest(".field");
+      var lbl = fld && fld.querySelector(":scope > .field__label");
+      if (lbl) { fld.insertBefore(head, lbl); head.appendChild(lbl); } else { root.insertBefore(head, root.firstChild); }
+      head.appendChild(plus);
+      root.appendChild(thumbs);
+    }
     else { root.appendChild(plus); root.appendChild(card); }
     var err = el("p", "field__error"); err.hidden = true; err.setAttribute("role", "alert"); root.appendChild(err);
     function size(f) { return f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + " КБ" : (f.size / 1048576).toFixed(1).replace(".", ",") + " МБ"; }
@@ -545,9 +568,9 @@
           } else { t.appendChild(el("span", "file__thumb-name", f.name)); }
           var x = el("button", "file__thumb-x", "×"); x.type = "button"; x.setAttribute("aria-label", "Убрать " + f.name);
           x.onclick = function () { removeAt(i); };
-          t.appendChild(x); thumbs.insertBefore(t, plus);
+          t.appendChild(x); thumbs.appendChild(t);
         });
-        plus.hidden = !input.multiple && files.length > 0;
+        thumbs.hidden = !files.length;
       } else {
         var f = files[0];
         card.hidden = !f; plus.hidden = !!f;
@@ -731,6 +754,38 @@
       }
     } catch (err) {}
   }
+
+  /* ---------- Шторка по кнопке: data-sheet-open="id" (тест 6.1, пп. 9, 18) ---------- */
+  function sheetOpen(s) {
+    if (s.hasAttribute("data-sheet-portal") && s.parentNode !== document.body) document.body.appendChild(s);  // fixed не зависит от родителей
+    s.hidden = false;
+    requestAnimationFrame(function () { s.classList.add("is-open"); });
+    var f = s.querySelector("[data-autofocus]"); if (f) setTimeout(function () { f.focus(); }, 60);
+  }
+  function sheetClose(s) { s.classList.remove("is-open"); setTimeout(function () { s.hidden = true; }, 180); }
+  document.addEventListener("click", function (e) {
+    var o = e.target.closest("[data-sheet-open]");
+    if (o) {
+      var s = document.getElementById(o.getAttribute("data-sheet-open"));
+      if (s) { e.preventDefault(); var d = o.closest("details[open]"); if (d) d.open = false; sheetOpen(s); }
+      return;
+    }
+    // Чип-подсказка заполняет поле (причина отклонения и т. п.)
+    var p = e.target.closest("[data-fill]");
+    if (p) {
+      var inp = document.getElementById(p.getAttribute("data-fill"));
+      if (inp) { inp.value = p.textContent.trim(); inp.dispatchEvent(new Event("input", { bubbles: true })); }
+      var box = p.parentNode; box.querySelectorAll("[data-fill]").forEach(function (x) { x.classList.toggle("is-on", x === p); x.setAttribute("aria-pressed", x === p ? "true" : "false"); });
+      return;
+    }
+    var c = e.target.closest("[data-sheet-close]");
+    var sh = c ? c.closest(".sheet[data-sheet]") : (e.target.matches && e.target.matches(".sheet[data-sheet]") ? e.target : null);
+    if (sh) { e.preventDefault(); sheetClose(sh); }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    document.querySelectorAll(".sheet[data-sheet].is-open").forEach(sheetClose);
+  });
 
   /* ---------- Подтверждение ---------- */
   // Подтверждение — окно в стиле сайта вместо системного (тест 4.2, п. 23, 33)
@@ -930,10 +985,8 @@
       var rev = form.querySelector("[name=revision]"), key = form.querySelector("[name=create_key]");
       if (rev) rev.value = j.revision;
       if (key && j.url) {
-        // первый автосейв нового турнира: дальше работаем с созданным черновиком
-        var inp = document.createElement("input"); inp.type = "hidden"; inp.name = "revision"; inp.value = j.revision;
-        form.appendChild(inp); key.remove();
-        form.setAttribute("action", j.url);
+        // Тест 6.1, п. 17: ключ черновика остаётся в форме, а форма по-прежнему отправляется на «новое соревнование» —
+        // сервер по ключу находит уже созданный черновик (раньше «Далее» без ключа создавало второй турнир)
         try { history.replaceState(history.state, "", j.url); } catch (e) {}
       }
       status("Черновик сохранён в " + j.at);

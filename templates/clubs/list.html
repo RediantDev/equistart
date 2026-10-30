@@ -5,7 +5,7 @@
 {# Тест 6, п. 1: «Мой клуб» — в строке заголовка, у правого края #}
 <div class="head-row">
   <h1 class="h1">Клубы</h1>
-  {% if user.is_authenticated and user.is_club %}{% if my_club %}<a class="btn btn--ghost btn--sm" href="{% url 'clubs:mine' %}">Мой клуб</a>{% else %}<a class="btn btn--dark btn--sm" href="{% url 'clubs:mine' %}">+ Добавить клуб</a>{% endif %}{% endif %}
+  {% if user.is_authenticated and user.is_club %}{% if my_club %}<a class="btn btn--ghost btn--sm" href="{% url 'clubs:mine' %}">Мой клуб</a>{% else %}<a class="btn btn--primary btn--sm" href="{% url 'clubs:mine' %}">+ Добавить клуб</a>{% endif %}{% endif %}
 </div>
 <form method="get" role="search" class="club-search" data-live="#club-results">
   <label class="visually-hidden" for="q">Название, город или регион</label>
@@ -25,7 +25,7 @@
       {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}{% if with_t %}<input type="hidden" name="with_t" value="1">{% endif %}
       <label class="visually-hidden" for="region">Регион</label>
       <select id="region" name="region"><option value="">Все регионы</option>{% for v, l in regions %}<option value="{{ v }}"{% if v == region %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
-      <button class="btn btn--dark btn--sm">Показать</button>
+      <button class="btn btn--primary btn--sm">Показать</button>
     </form>
   </details>
 </div>

@@ -116,7 +116,7 @@ class ProgramForm(forms.ModelForm):
         variants = [(v, f"{r.name}: {label}") for r in ROUTE_TYPES for v, label in r.variants]
         self.fields["variant"] = forms.ChoiceField(label="Вариант формулы", required=False, choices=[("", "—")] + variants)
         self.fields["table"] = forms.ChoiceField(label="Таблица штрафов", required=False,
-                                                 choices=[("", "по типу маршрута")] + [(k, v) for k, v in TABLES.items() if k != "STYLE"])
+                                                 choices=[("", "— выберите —")] + [(k, v) for k, v in TABLES.items() if k != "STYLE"])
         owner = user or tournament.owner
         self.fields["dressage_test"].queryset = DressageTest.objects.filter(is_active=True).filter(Q(is_official=True) | Q(owner=owner))
         self.fields["dressage_test"].required = False
@@ -138,6 +138,9 @@ class ProgramForm(forms.ModelForm):
         self.fields["heights_text"].show_required = True
         self.fields["dressage_test"].show_required = True
         self.fields["variant"].show_required = True
+        # Тест 6.1, п. 13: без зачёта и без таблицы штрафов маршрут не сохраняется
+        self.fields["table"].show_required = True
+        self.fields["templates"].show_required = True
 
     def clean(self):
         from apps.sport.jumping import route, table_allowed
@@ -161,8 +164,10 @@ class ProgramForm(forms.ModelForm):
             if any(h < 10 or h > 220 for h in heights):
                 self.add_error("heights_text", "Высота — от 10 до 220 см.")
             c["heights"] = heights
-            table = c.get("table") or rt.default_table
-            if rt.tables and table not in rt.tables:
+            table = c.get("table") or (rt.tables[0] if len(rt.tables) == 1 else "")
+            if rt.tables and not table:
+                self.add_error("table", "Выберите таблицу штрафов.")
+            elif rt.tables and table not in rt.tables:
                 self.add_error("table", f"Для «{rt.name}» допустимы таблицы: {', '.join(rt.tables)}.")
             msg = table_allowed(table, max(heights) if heights else None, self.tournament.is_official)
             if msg:
@@ -180,6 +185,8 @@ class ProgramForm(forms.ModelForm):
             if not c.get("dressage_test"):
                 self.add_error("dressage_test", "Выберите езду из справочника или создайте свою.")
             c["program_type"], c["variant"], c["table"], c["heights"] = "dressage_test", "", "", []
+        if d in ("jumping", "dressage") and not c.get("templates") and not (self.instance.pk and self.instance.classes.exists()):
+            self.add_error("templates", "Выберите хотя бы один зачёт.")
         return c
 
     def save(self, commit=True):

@@ -925,7 +925,8 @@ def my_competitions(request):
                                      + [e.athlete_snapshot.get("name", "") + " " + e.horse_snapshot.get("name", "") for e in c["entries"]]
                                      + [g["label"] for g in c["stable"].values()]))
         c["stable"] = list(c["stable"].values())
-        (past if end and end < today else upcoming).append(c)
+        c["past"] = bool(end and end < today)
+        (past if c["past"] else upcoming).append(c)
     upcoming.sort(key=lambda c: c["t"].pub_starts_on or c["t"].starts_on)
     past.sort(key=lambda c: c["t"].pub_starts_on or c["t"].starts_on, reverse=True)
     for e in entries:
@@ -935,7 +936,10 @@ def my_competitions(request):
     calendar_dates = {"upcoming": _days_iso(upcoming), "past": _days_iso(past)}
     return render(request, "entries/my_competitions.html", {
         "calendar_dates": calendar_dates,
-        "tab": tab, "cards": past if tab == "past" else upcoming,
+        # 30.10.2026: без вкладки «Прошедшие» — список показывает предстоящие, прошедшие открываются выбором даты в календаре
+        "tab": tab, "cards": upcoming + past,
+        "riders": sorted({e.athlete_snapshot.get("name", "") for e in entries} - {""}),
+        "horses": sorted({e.horse_snapshot.get("name", "") for e in entries} - {""}),
         "counts": {"upcoming": len(upcoming), "past": len(past)}, "q": request.GET.get("q", "").strip()[:100],
-        "status_filters": [("", "Все"), ("pending", "На рассмотрении"), ("accepted", "Принято"), ("rejected", "Отклонено")],
+        "status_filters": [("pending", "На рассмотрении"), ("accepted", "Принято"), ("rejected", "Отклонено")],
     })

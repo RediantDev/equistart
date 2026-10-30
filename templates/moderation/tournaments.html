@@ -1,0 +1,47 @@
+{% extends "moderation/_cabinet.html" %}
+{% load tournaments %}
+{% block title %}Все турниры — Пульт — СтартЛист{% endblock %}
+{% block cabinet %}
+<div class="page-head">
+  <div>
+    <h1 class="h1">Все турниры <span class="tag">{{ total }}</span></h1>
+    <p class="muted">Любой статус и публикация.{% if user.is_admin %} Кнопка «Открыть» — с полными правами организатора и судьи; действия пишутся в журнал с отметкой «администратор».{% endif %}</p>
+  </div>
+  <a class="btn btn--sm" href="{% url 'moderation:export' 'tournaments' %}?{{ request.GET.urlencode }}">Выгрузить в Excel</a>
+</div>
+<form method="get" class="mfilters">
+  <div class="field"><label class="field__label" for="t-q">Название или организатор</label><input id="t-q" name="q" value="{{ f.q }}"></div>
+  <div class="field"><label class="field__label" for="t-status">Проверка</label>
+    <select id="t-status" name="status"><option value="">Любая</option>{% for v, l in statuses %}<option value="{{ v }}"{% if f.status == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="field"><label class="field__label" for="t-pub">Публикация</label>
+    <select id="t-pub" name="pub"><option value="">Любая</option>{% for v, l in pubs %}<option value="{{ v }}"{% if f.pub == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="field"><label class="field__label" for="t-region">Регион</label>
+    <select id="t-region" name="region"><option value="">Все регионы</option>{% for v, l in regions %}<option value="{{ v }}"{% if f.region == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="field"><label class="field__label" for="t-from">Начало с</label><input id="t-from" type="date" name="from" value="{{ f.from }}"></div>
+  <div class="field"><label class="field__label" for="t-to">по</label><input id="t-to" type="date" name="to" value="{{ f.to }}"></div>
+  <div class="mfilters__actions"><button class="btn btn--dark">Показать</button>{% if f %}<a class="btn btn--ghost" href="{% url 'moderation:tournaments' %}">Сбросить</a>{% endif %}</div>
+</form>
+{% if page.object_list %}
+<div class="list-cards">
+  {% for t in page.object_list %}
+    <article class="row-card">
+      <div style="flex: 1 1 240px; min-width: 0;" class="break">
+        <a class="h3 row-card__title" href="{% url 'moderation:detail' t.pk %}">{{ t.pub_title|default:t.title }}</a>
+        <div class="table__sub">{% if t.pub_starts_on or t.starts_on %}{{ t.pub_starts_on|default:t.starts_on|isodate }}{% else %}без даты{% endif %}{% if t.venue %} · {{ t.venue.name }}, {{ t.venue.settlement }}{% endif %} · <a href="{% url 'moderation:user' t.owner_id %}">{{ t.owner.full_name }}</a></div>
+      </div>
+      <div class="chips">
+        {% if t.status == "review" %}<span class="chip chip--warning">На проверке</span>{% elif t.status == "returned" %}<span class="chip chip--danger">Нужны исправления</span>{% elif t.status == "rejected" %}<span class="chip chip--danger">Отклонён</span>{% elif t.status == "draft" and not t.is_published %}<span class="chip">Черновик</span>{% endif %}
+        {% if t.publication == "published" %}<span class="chip chip--success">Опубликован</span>{% elif t.publication == "cancelled" %}<span class="chip chip--danger">Отменён</span>{% elif t.publication == "finished" %}<span class="chip">Завершён</span>{% endif %}
+      </div>
+      <div class="chips">
+        <a class="btn btn--sm" href="{% url 'moderation:detail' t.pk %}">Сведения</a>
+        {% if user.is_admin %}<a class="btn btn--sm btn--dark" href="{% url 'tournaments:hub' t.pk %}">Открыть</a>{% endif %}
+      </div>
+    </article>
+  {% endfor %}
+</div>
+{% include "moderation/_pager.html" %}
+{% else %}
+<div class="card empty"><h2 class="h3">Турниров не нашли</h2><p class="muted">Измените условия.</p></div>
+{% endif %}
+{% endblock %}

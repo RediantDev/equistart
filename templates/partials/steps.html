@@ -1,0 +1,8 @@
+{% load tournaments %}{% comment %}Шаги мастера — кружки в линию, как в мастере турнира (решение 30.10.2026: во всех мастерах создания одинаково).
+   Параметры: names — «Название и адрес|Контакты|Логотип», label — подпись для чтения с экрана.
+   Текущий и пройденные шаги отмечает ui.js (initSteps) по data-step-dot.{% endcomment %}
+<nav class="steps2 steps2--js" aria-label="{{ label|default:'Шаги' }}" data-steps-nav>
+  <ol class="steps2__row">{% for name in names|split:"|" %}
+    <li class="steps2__item{% if forloop.first %} is-current{% endif %}" data-step-dot="{{ forloop.counter }}"><span class="steps2__dot"><span class="steps2__n">{{ forloop.counter }}</span><svg class="steps2__ok" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12l5 5 9-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="steps2__name">{{ name }}</span></li>{% endfor %}
+  </ol>
+</nav>

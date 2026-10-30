@@ -97,6 +97,7 @@
         {% endfor %}
       </div>
     {% endif %}
+    {% if ADMIN_OVERRIDE %}<div class="admin-banner" role="note">Вы работаете как администратор <span class="table__sub">Вы не в команде этого турнира. Все действия записываются в журнал с отметкой «администратор».</span></div>{% endif %}
     {% block content %}{% endblock %}
   </main>
 
@@ -123,6 +124,8 @@
       <span>© СтартЛист</span>
       <a href="{% url 'support:faq' %}">Помощь и частые вопросы</a>
       {% if SUPPORT_TELEGRAM %}<a href="https://t.me/{{ SUPPORT_TELEGRAM|cut:'@' }}" target="_blank" rel="noopener">Поддержка в Telegram</a>{% endif %}
+      {% if SITE_SETTINGS.footer_phone %}<a href="tel:{{ SITE_SETTINGS.footer_phone|cut:' '|cut:'-' }}">{{ SITE_SETTINGS.footer_phone }}</a>{% endif %}
+      {% if SITE_SETTINGS.footer_email %}<a href="mailto:{{ SITE_SETTINGS.footer_email }}">{{ SITE_SETTINGS.footer_email }}</a>{% endif %}
       <a href="{% url 'core:privacy' %}">Обработка персональных данных</a>
     </div>
   </footer>

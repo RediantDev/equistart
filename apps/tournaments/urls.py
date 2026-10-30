@@ -48,6 +48,21 @@ def _support_mod(name):
     return view
 
 
+def _cabinet_patterns():
+    from apps.moderation import views as mv
+
+    return [
+        path("users/", mv.users, name="users"),
+        path("users/<int:pk>/", mv.user_detail, name="user"),
+        path("duplicates/", mv.duplicates, name="duplicates"),
+        path("tournaments/", mv.tournaments, name="tournaments"),
+        path("journal/", mv.journal, name="journal"),
+        path("settings/", mv.settings_view, name="settings"),
+        path("system/", mv.system, name="system"),
+        path("export/<str:kind>.xlsx", mv.export, name="export"),
+    ]
+
+
 moderation_patterns = (
     [
         path("", moderation.queue, name="queue"),
@@ -59,6 +74,7 @@ moderation_patterns = (
         path("clubs/<int:pk>/", _club_mod("mod_detail"), name="club"),
         path("support/", _support_mod("mod_queue"), name="support"),
         path("support/<int:pk>/", _support_mod("mod_detail"), name="support_detail"),
+        *_cabinet_patterns(),
     ],
     "moderation",
 )

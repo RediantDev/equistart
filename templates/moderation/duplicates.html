@@ -1,0 +1,43 @@
+{% extends "moderation/_cabinet.html" %}
+{% block title %}Дубли — Пульт — СтартЛист{% endblock %}
+{% block cabinet %}
+<div class="page-head">
+  <div>
+    <h1 class="h1">Дубли</h1>
+    <p class="muted">Записи с одинаковыми ФИО и годом рождения (спортсмены) или кличкой и годом рождения (лошади). Выберите основную запись и отметьте дубли — выступления, заявки и документы перейдут к основной. Отменить объединение нельзя. Дубли клубов — в разделе <a href="{% url 'moderation:clubs' %}">«Клубы»</a>.</p>
+  </div>
+</div>
+<nav class="tabs" aria-label="Вид записей">
+  <a class="tabs__item{% if kind == 'athlete' %} is-active{% endif %}" href="?kind=athlete">Спортсмены{% if athlete_groups %} <span class="tag tag--lemon">{{ athlete_groups }}</span>{% endif %}</a>
+  <a class="tabs__item{% if kind == 'horse' %} is-active{% endif %}" href="?kind=horse">Лошади{% if horse_groups %} <span class="tag tag--lemon">{{ horse_groups }}</span>{% endif %}</a>
+</nav>
+{% if groups %}
+  <div class="stack">
+  {% for g in groups %}
+    <form method="post" class="card stack">{% csrf_token %}
+      <input type="hidden" name="kind" value="{{ kind }}">
+      <h2 class="h3">{% if kind == 'athlete' %}{{ g.0.full_name }}, {{ g.0.birth_date.year }} г.р.{% else %}{{ g.0.name }}, {{ g.0.birth_year }}{% endif %} <span class="tag">{{ g|length }} записи</span></h2>
+      <div class="dup-group">
+        {% for o in g %}
+          <div class="dup-row">
+            <label class="dup-row__pick"><input type="radio" name="main" value="{{ o.pk }}"{% if forloop.first %} checked{% endif %} aria-label="Основная запись"><span>основная</span></label>
+            <label class="dup-row__pick"><input type="checkbox" name="dup" value="{{ o.pk }}"{% if not forloop.first %} checked{% endif %} aria-label="Дубль"><span>дубль</span></label>
+            <div class="break">
+              <strong>{% if kind == 'athlete' %}{{ o.full_name }}{% else %}{{ o.name }}{% endif %}</strong> <span class="table__sub">№{{ o.pk }}</span>
+              <div class="table__sub">
+                {% if kind == 'athlete' %}{{ o.birth_date|date:"d.m.Y" }}{% if o.get_rank_display %} · {{ o.get_rank_display }}{% endif %}{% if o.club %} · {{ o.club }}{% endif %}{% else %}{{ o.summary }}{% endif %}{% if o.fksr_number %} · ФКСР {{ o.fksr_number }}{% endif %}
+              </div>
+              <div class="table__sub">Ведёт: <a href="{% url 'moderation:user' o.manager_id %}">{{ o.manager.full_name }}</a> · стартов: {{ o.starts }} · создана {{ o.created_at|date:"j E Y" }}{% if o.added_by_judge %} · внесена судьёй{% endif %}</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      <label class="check"><input type="checkbox" name="confirm" value="1" required><span>Это один и тот же {% if kind == 'athlete' %}спортсмен{% else %}конь{% endif %} — объединить</span></label>
+      <div><button class="btn btn--primary">Объединить</button></div>
+    </form>
+  {% endfor %}
+  </div>
+{% else %}
+  <div class="card empty"><h2 class="h3">Дублей не найдено</h2><p class="muted">Похожие записи появятся здесь.</p></div>
+{% endif %}
+{% endblock %}

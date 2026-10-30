@@ -2,8 +2,8 @@
 {% load tournaments %}
 {% block title %}{{ p.name }} — проведение — СтартЛист{% endblock %}
 {% block content %}
-{# Тест 6, п. 32: название со стрелкой — смена маршрута; вкладки по порядку работы; «Экран судьи» — одна заметная кнопка;
-   параметры и объединение зачётов — в меню «три точки»; «Как видят участники» — иконка #}
+{% comment %} Тест 6, п. 32: название со стрелкой — смена маршрута; вкладки по порядку работы; «Экран судьи» — одна заметная кнопка;
+   параметры и объединение зачётов — в меню «три точки»; «Как видят участники» — иконка {% endcomment %}
 {% url 'conduct:overview' t.pk as ov %}{% include "partials/crumbs.html" with mid="Проведение" mid_url=ov here=p.name %}
 <div class="rhead">
   <details class="rswitch">
@@ -23,10 +23,9 @@
   <details class="kebab">
     <summary aria-label="Ещё действия">{% include "partials/icon.html" with name="dots" size=20 %}</summary>
     <div class="kebab__menu">
-      {% for k, label in more_tabs %}<a href="?tab={{ k }}">{{ label }}</a>{% endfor %}
+      {% for k, label in more_tabs %}{% if k != "course" %}<a href="?tab={{ k }}">{{ label }}</a>{% endif %}{% endfor %}
       <a href="{% url 'tournaments:public' t.pk %}">Программа турнира</a>
       <a href="{% url 'entries:manage' t.pk %}">Все заявки турнира</a>
-      <a href="{% url 'tournaments:hub' t.pk %}">Панель турнира</a>
     </div>
   </details>
 </div>
@@ -39,12 +38,14 @@
     {% if is_scorer or user.pk == t.owner_id %}<a class="btn {% if my_letters %}btn--ghost{% else %}btn--primary{% endif %}" href="{% url 'conduct:scorer' t.pk p.pk %}">Итоги езды</a>{% endif %}
   {% else %}
     <a class="btn btn--primary" href="{% url 'conduct:live' t.pk p.pk %}">{% include "partials/icon.html" with name="flag" size=20 %}Экран судьи</a>
+    {% comment %}Тест 6.1, п. 22: параметры маршрута — кнопкой рядом; без нормы времени — оранжевая метка{% endcomment %}
+    {% if course_rounds %}<a class="btn btn--ghost rjudge__params{% if tab == 'course' %} is-active{% endif %}" href="?tab=course">Параметры маршрута{% if no_norm %} <span class="chip chip--warning rjudge__mark">нет нормы</span>{% endif %}</a>{% endif %}
   {% endif %}
 </div>
 
 <nav class="rtabs" aria-label="Работа с маршрутом">
   {% for k, label in main_tabs %}<a class="rtabs__item{% if tab == k %} is-active{% endif %}" href="?tab={{ k }}"{% if tab == k %} aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
-  {% for k, label in more_tabs %}{% if tab == k %}<a class="rtabs__item is-active" href="?tab={{ k }}" aria-current="page">{{ label }}</a>{% endif %}{% endfor %}
+  {% for k, label in more_tabs %}{% if tab == k and k != "course" %}<a class="rtabs__item is-active" href="?tab={{ k }}" aria-current="page">{{ label }}</a>{% endif %}{% endfor %}
 </nav>
 
 <div class="rmain">
@@ -124,9 +125,14 @@
       </div>
     {% endif %}
 
-    <div class="publish-bar publish-bar--sticky">
-      <div><strong>Стартовый протокол</strong><span class="table__sub">{% if published %}Опубликована версия {{ published.version }}. Изменения порядка увидят после новой публикации.{% else %}Участники увидят порядок только после публикации.{% endif %}</span></div>
-      <form method="post" action="{% url 'conduct:action' t.pk p.pk 'publish' %}">{% csrf_token %}<button class="btn btn--primary"{% if not slots %} disabled{% endif %}>{% if published %}Опубликовать новую версию{% else %}Опубликовать протокол{% endif %}</button></form>
+    {% comment %}Тест 6.1, п. 19: кнопка — только когда порядок изменился после публикации; обычной кнопкой внизу блока{% endcomment %}
+    <div class="publish-bar">
+      {% if published and not order_changed %}
+        <div><strong>Стартовый протокол</strong><span class="table__sub">Опубликована версия {{ published.version }}, изменений нет.</span></div>
+      {% else %}
+        <div><strong>Стартовый протокол</strong><span class="table__sub">{% if published %}Порядок изменился после версии {{ published.version }} — участники увидят изменения после публикации.{% else %}Участники увидят порядок только после публикации.{% endif %}</span></div>
+        <form method="post" action="{% url 'conduct:action' t.pk p.pk 'publish' %}">{% csrf_token %}<button class="btn btn--primary"{% if not slots %} disabled{% endif %}>{% if published %}Опубликовать новую версию{% else %}Опубликовать протокол{% endif %}</button></form>
+      {% endif %}
     </div>
   </section>
 
@@ -148,9 +154,8 @@
                 <form method="post" action="{% url 'entries:decide' t.pk %}">{% csrf_token %}<input type="hidden" name="confirm" value="1"><input type="hidden" name="action" value="accept"><input type="hidden" name="items" value="{{ e.pk }}:{{ e.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn--primary btn--sm">Принять</button></form>
               {% endif %}
               {% if e.decision == "pending" or e.decision == "accepted" %}
-                <details class="inline-details reject"><summary class="btn btn--danger btn--sm">Отклонить</summary>
-                  <form method="post" action="{% url 'entries:decide' t.pk %}" class="reject__form">{% csrf_token %}<input type="hidden" name="confirm" value="1"><input type="hidden" name="action" value="reject"><input type="hidden" name="items" value="{{ e.pk }}:{{ e.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
-                    <label class="field"><span class="field__label">Причина — увидит подавший заявку</span><input name="reason" required placeholder="Обязательно"></label><button class="btn btn--danger btn--sm">Отклонить</button></form></details>
+                <button type="button" class="btn btn--ghost btn--sm" data-sheet-open="rej{{ e.pk }}">Отклонить</button>
+                {% include "entries/_reject_sheet.html" %}
               {% endif %}
             </div>
           </li>
@@ -216,8 +221,8 @@
         <div class="table-wrap"><table class="table table--res">
           <colgroup><col class="c-place"><col class="c-pair">{% for c in columns %}<col class="c-val">{% endfor %}<col class="c-act"></colgroup>
           <thead><tr><th class="num">Место</th><th>Пара</th>{% for c in columns %}<th class="num">{{ c }}</th>{% endfor %}<th></th></tr></thead>
-          <tbody>{% for r in g.rows %}<tr><td class="num"><strong>{{ r.r.place|default:"—" }}</strong></td><td class="nowrap">{{ r.e.athlete_snapshot.name }}<span class="table__sub">{{ r.e.horse_snapshot.name }}{% if r.r.status %} · {{ r.r.get_status_display }}{% endif %}</span></td>{% for v in r.cells %}<td class="num">{{ v|default_if_none:"" }}</td>{% endfor %}
-            <td class="num">{% if p.is_jumping and auto %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:jump_live' t.pk p.pk %}?entry={{ r.e.pk }}">Исправить</a>{% elif p.is_dressage and auto %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:scorer' t.pk p.pk %}#e{{ r.e.pk }}">Итоги</a>{% endif %}</td></tr>{% endfor %}</tbody>
+          <tbody>{% for r in g.rows %}<tr><td class="num res-place"><strong>{{ r.r.place|default:"—" }}</strong></td><td class="res-pair">{{ r.e.athlete_snapshot.name }}<span class="table__sub">{{ r.e.horse_snapshot.name }}{% if r.r.status %} · {{ r.r.get_status_display }}{% endif %}</span></td>{% for v in r.cells %}<td class="num res-val{% if forloop.last %} res-val--total{% endif %}" data-label="{{ columns|at:forloop.counter0 }}">{{ v|default_if_none:"" }}</td>{% endfor %}
+            <td class="num res-act">{% if p.is_jumping and auto %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:jump_live' t.pk p.pk %}?entry={{ r.e.pk }}">Исправить</a>{% elif p.is_dressage and auto %}<a class="btn btn--ghost btn--sm" href="{% url 'conduct:scorer' t.pk p.pk %}#e{{ r.e.pk }}">Итоги</a>{% endif %}</td></tr>{% endfor %}</tbody>
         </table></div>
       </div>
     {% empty %}
@@ -236,14 +241,17 @@
     {% endfor %}
   </section>
 
+  {% comment %}Тест 6.1, п. 33 (вариант А): строка на зачёт — статус и кнопка только когда нужна{% endcomment %}
   <section class="card section-gap">
-    <h2 class="h3">Публикация результатов по зачётам</h2>
-    <p class="table__sub" style="margin-top: 0;">Пока результаты не опубликованы, участники их не видят. Исправление после публикации — новая версия.</p>
-    <ul class="list">{% for r in classes %}
-      <li class="list__row"><span style="flex: 1;"><strong>{{ r.c.label }}</strong><span class="table__sub">{% if r.count %}результатов: {{ r.count }}{% else %}результатов пока нет{% endif %}</span></span>
-        {% if r.published %}<span class="chip chip--info">Опубликовано · v{{ r.published.version }}</span>{% endif %}
-        {% if can_publish %}<form method="post" action="{% url 'conduct:action' t.pk p.pk 'publish_results' %}">{% csrf_token %}<input type="hidden" name="tclass" value="{{ r.c.pk }}"><button class="btn btn--primary btn--sm"{% if not r.count %} disabled title="Нет результатов для публикации"{% endif %}>{% if r.published %}Опубликовать исправление{% else %}Опубликовать результаты{% endif %}</button></form>
-        {% else %}<span class="table__sub">Публикует судья по итогам</span>{% endif %}
+    <h2 class="h3">Публикация результатов</h2>
+    <p class="table__sub" style="margin-top: 0;">Участники видят только опубликованное. После исправления — «Обновить».</p>
+    <ul class="pubrows">{% for r in classes %}
+      <li class="pubrows__row" id="pub-{{ r.c.pk }}">
+        <span class="pubrows__main"><strong>{{ r.c.label }}</strong><span class="table__sub">{% if r.count %}{{ r.count }} {{ r.count|plural:"результат,результата,результатов" }}{% if r.published %} · v{{ r.published.version }}{% if r.changed %} · есть исправление{% endif %}{% endif %}{% else %}результатов пока нет{% endif %}</span></span>
+        {% if not r.count %}<span class="chip">Ждём</span>
+        {% elif not can_publish %}<span class="table__sub">{% if r.published %}Опубликовано{% else %}Публикует судья по итогам{% endif %}</span>
+        {% elif r.published and not r.changed %}<span class="chip chip--info">Без изменений</span>
+        {% else %}<form method="post" action="{% url 'conduct:action' t.pk p.pk 'publish_results' %}">{% csrf_token %}<input type="hidden" name="tclass" value="{{ r.c.pk }}"><button class="btn {% if r.published %}btn--ghost{% else %}btn--primary{% endif %} btn--sm">{% if r.published %}Обновить{% else %}Опубликовать{% endif %}</button></form>{% endif %}
       </li>{% endfor %}</ul>
   </section>
 

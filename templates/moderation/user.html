@@ -1,0 +1,97 @@
+{% extends "moderation/_cabinet.html" %}
+{% block title %}{{ u.full_name }} — Пользователи — СтартЛист{% endblock %}
+{% block cabinet %}
+<a class="back" href="{% url 'moderation:users' %}">← Пользователи</a>
+<div class="page-head">
+  <div>
+    <h1 class="h1 break">{{ u.full_name|default:"Без имени" }}</h1>
+    <div class="chips">{% include "moderation/_user_state.html" %}{% for l in u.category_labels %}<span class="tag">{{ l }}</span>{% endfor %}</div>
+  </div>
+</div>
+
+{% if temp_password %}
+<section class="card stack" role="alert" style="border-color: var(--accent); margin-bottom: var(--space-4);">
+  <h2 class="h3">Временный пароль</h2>
+  <div class="secret">{{ temp_password }}</div>
+  <p class="muted">Пароль показан один раз — передайте его пользователю. При входе сервис попросит придумать свой. Все прежние входы завершены.</p>
+</section>
+{% endif %}
+
+{% if u.is_blocked and not u.deleted_at %}
+<div class="alert alert--error" role="note"><strong>Заблокирован {{ u.blocked_at|date:"j E Y, H:i" }}</strong>{% if u.blocked_by %} — {{ u.blocked_by.full_name }}{% endif %}. Причина: {{ u.blocked_reason }}</div>
+{% endif %}
+{% if u.deleted_at %}<div class="alert alert--error" role="note">Аккаунт удалён {{ u.deleted_at|date:"j E Y, H:i" }}. Данные удаляются через 30 дней; опубликованные результаты остаются.</div>{% endif %}
+
+<div class="grid-2" style="align-items: start;">
+  <section class="card stack">
+    <h2 class="h3">Сведения</h2>
+    <div class="summary__grid">
+      {% if user.is_admin %}<div><span class="table__sub">Телефон</span>{{ u.phone_display }}{% if u.phone_verified %} <span class="chip chip--success">подтверждён</span>{% endif %}</div>
+      <div><span class="table__sub">Email</span>{{ u.email|default:"—" }}</div>{% else %}
+      <div><span class="table__sub">Телефон</span>{% if u.phone_verified %}подтверждён{% else %}не подтверждён{% endif %} <span class="table__sub">номер видит администратор</span></div>{% endif %}
+      <div><span class="table__sub">Зарегистрирован</span>{{ u.date_joined|date:"j E Y, H:i" }}</div>
+      <div><span class="table__sub">Последний вход</span>{{ u.last_login|date:"j E Y, H:i"|default:"не входил" }}</div>
+    </div>
+  </section>
+
+  <section class="card stack">
+    <h2 class="h3">Действия</h2>
+    {% if u.is_blocked and not u.deleted_at %}
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="unblock">
+        <button class="btn btn--primary">Разблокировать</button></form>
+    {% elif can_block %}
+      <form method="post" class="stack">{% csrf_token %}<input type="hidden" name="action" value="block">
+        <div class="field"><label class="field__label" for="b-reason">Причина блокировки</label>
+          <input id="b-reason" name="reason" maxlength="300" required placeholder="Например: фальшивые заявки на чужих спортсменов"></div>
+        <div><button class="btn btn--dark">Заблокировать</button></div>
+        <p class="table__sub">Пользователь не сможет войти, его текущие входы завершатся. Разблокировать можно здесь же.</p>
+      </form>
+    {% elif u.is_moderator or u.is_superuser %}
+      <p class="muted">Модератора и администратора нельзя заблокировать или удалить. Сначала снимите роль в разделе «Модераторы».</p>
+    {% endif %}
+    {% if user.is_admin and not u.deleted_at %}
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="reset_password">
+        <button class="btn">Сбросить пароль</button>
+        <p class="table__sub">Сервис создаст временный пароль и покажет его один раз.</p></form>
+      {% if can_block %}
+      <details class="stack">
+        <summary class="btn btn--ghost btn--sm">Удалить аккаунт</summary>
+        <form method="post" class="stack" style="margin-top: var(--space-3);">{% csrf_token %}<input type="hidden" name="action" value="delete">
+          <label class="check"><input type="checkbox" name="confirm" value="1" required><span>Понимаю: вход закроется сразу, данные удалятся через 30 дней, опубликованные результаты останутся</span></label>
+          <div><button class="btn btn--danger">Удалить</button></div>
+        </form>
+      </details>
+      {% endif %}
+    {% endif %}
+  </section>
+</div>
+
+<section class="stack" style="margin-top: var(--space-5);">
+  <h2 class="h2">Турниры</h2>
+  {% if own_tournaments or team %}
+  <div class="list-cards">
+    {% for t in own_tournaments %}<a class="row-card row-card--link" href="{% url 'moderation:detail' t.pk %}"><strong class="break" style="flex: 1 1 200px;">{{ t.pub_title|default:t.title }}</strong><span class="tag">создатель</span><span class="table__sub">{{ t.get_status_display }} · {{ t.get_publication_display }}</span></a>{% endfor %}
+    {% for m in team %}<a class="row-card row-card--link" href="{% url 'moderation:detail' m.tournament.pk %}"><strong class="break" style="flex: 1 1 200px;">{{ m.tournament.pub_title|default:m.tournament.title }}</strong><span class="tag">{{ m.get_role_display }}</span></a>{% endfor %}
+  </div>
+  {% else %}<p class="muted">Нет турниров.</p>{% endif %}
+
+  <div class="grid-2" style="align-items: start;">
+    <div class="card stack"><h2 class="h3">Спортсмены</h2>
+      {% for a in athletes %}<div>{{ a.full_name }} <span class="table__sub">{% if a.birth_date %}{{ a.birth_date.year }} г.р.{% endif %}{% if a.linked_user_id == u.pk %} · это сам пользователь{% endif %}</span></div>{% empty %}<p class="muted">Нет.</p>{% endfor %}</div>
+    <div class="card stack"><h2 class="h3">Лошади</h2>
+      {% for h in horses %}<div>{{ h.name }} <span class="table__sub">{{ h.birth_year }}</span></div>{% empty %}<p class="muted">Нет.</p>{% endfor %}</div>
+    <div class="card stack"><h2 class="h3">Клуб</h2>
+      {% for c in clubs %}<a href="{% url 'moderation:club' c.pk %}">{{ c.name }}</a> <span class="table__sub">{{ c.get_status_display }}</span>{% empty %}<p class="muted">Нет.</p>{% endfor %}</div>
+    <div class="card stack"><h2 class="h3">Обращения</h2>
+      {% for t in tickets %}<a href="{% url 'moderation:support_detail' t.pk %}">№{{ t.pk }} · {{ t.get_topic_display }}</a> <span class="table__sub">{{ t.get_status_display }} · {{ t.created_at|date:"j E" }}</span>{% empty %}<p class="muted">Нет.</p>{% endfor %}</div>
+  </div>
+</section>
+
+{% if history %}
+<section class="stack" style="margin-top: var(--space-5);">
+  <h2 class="h2">Журнал</h2>
+  {% include "moderation/_journal_rows.html" with rows=history %}
+  <a class="btn btn--sm" href="{% url 'moderation:journal' %}?target=user&id={{ u.pk }}">Весь журнал по пользователю</a>
+</section>
+{% endif %}
+{% endblock %}

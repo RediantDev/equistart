@@ -79,6 +79,9 @@ class Athlete(models.Model):
     added_by_judge = models.BooleanField("внесён судьёй вручную", default=False,
                                          help_text="Быстрое добавление пары судьёй: профиль не попадает в списки «Мои спортсмены» судьи.")
     archived = models.BooleanField(default=False)
+    merged_into = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                                    verbose_name="объединён с")  # ADM-05
+    merged_at = models.DateTimeField("объединён", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -167,6 +170,9 @@ class Horse(models.Model):
     manager = models.ForeignKey(User, on_delete=models.PROTECT, related_name="managed_horses", verbose_name="управляющий")
     added_by_judge = models.BooleanField("внесена судьёй вручную", default=False)
     archived = models.BooleanField(default=False)
+    merged_into = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                                    verbose_name="объединена с")  # ADM-05
+    merged_at = models.DateTimeField("объединена", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

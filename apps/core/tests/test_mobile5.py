@@ -234,7 +234,8 @@ class MyCompetitionsTests(Base):
         self.assertContains(r, f'href="{app_url}"')
         self.assertNotContains(r, f"№{app.pk}")  # тест 5.1: без номеров заявок в карточках
         self.assertNotContains(self.client.get(url + "?tab=apps"), "?tab=apps")  # вкладки «Заявки» больше нет
-        self.assertContains(self.client.get(url + "?tab=past"), "Прошедших стартов пока нет")
+        # 30.10.2026: вкладки «Прошедшие» нет — прошедшие открываются датой в календаре
+        self.assertNotContains(self.client.get(url), "?tab=past")
         self.client.force_login(self.other)
         self.assertNotContains(self.client.get(url), self.t.pub_title)
 
@@ -249,13 +250,14 @@ class ClubRedesignTests(Base):
 
     def test_wizard_then_dashboard_tabs_and_cover(self):
         r = self.client.get(reverse("clubs:mine"))
-        self.assertContains(r, "1. Название и адрес")  # нет клуба — мастер
+        self.assertContains(r, 'data-step-dot="1"><span class="steps2__dot">')  # нет клуба — мастер (шаги кружками)
+        self.assertContains(r, "Название и адрес")
         data = {"name": "КСК «Вега»", "region": "mos", "settlement": "Москва", "address": "ул. 1", "phone": "+79990007001"}
         self.client.post(reverse("clubs:mine"), data)
         club = Club.objects.get(manager=self.cu)
         r = self.client.get(reverse("clubs:mine"))
         self.assertContains(r, "Страница заполнена")  # кабинет
-        self.assertContains(self.client.get(reverse("clubs:mine") + "?edit=1"), "2. Контакты")
+        self.assertContains(self.client.get(reverse("clubs:mine") + "?edit=1"), "Контакты и о клубе")  # тест 6.1: одной страницей
         self.client.post(reverse("clubs:photo_add"), {"file": [png(), png()], "once": "c1"})
         p1, p2 = list(ClubPhoto.objects.filter(club=club))
         self.client.post(reverse("clubs:photo_cover", args=[p2.pk]))
@@ -268,3 +270,20 @@ class ClubRedesignTests(Base):
         self.assertEqual(self.client.post(reverse("clubs:photo_cover", args=[p1.pk])).status_code, 403)
         self.client.logout()
         self.assertEqual(self.client.post(reverse("clubs:photo_cover", args=[p1.pk])).status_code, 302)
+
+
+class TemplateCommentTests(TestCase):
+    """Тест 6.1, пп. 11, 20: многострочный {# … #} в шаблоне выводится текстом — такие комментарии запрещены."""
+
+    def test_no_multiline_hash_comments(self):
+        import pathlib
+        import re
+
+        from django.conf import settings
+
+        bad = []
+        for d in settings.TEMPLATES[0]["DIRS"]:
+            for f in pathlib.Path(d).rglob("*.html"):
+                for m in re.finditer(r"\{#(?:(?!#\}).)*$", f.read_text(encoding="utf-8"), re.M):
+                    bad.append(f"{f.name}: {m.group(0)[:40]}")
+        self.assertEqual(bad, [])

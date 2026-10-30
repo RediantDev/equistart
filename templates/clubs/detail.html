@@ -30,7 +30,7 @@
 </section>
 
 <div id="club-view">
-<nav class="tabs tabs--sticky club-tabs" aria-label="Разделы клуба" data-swap="#club-view">
+<nav class="tabs tabs--sticky club-tabs tp-seg" aria-label="Разделы клуба" data-swap="#club-view">
   <a class="tabs__item{% if tab == 'tournaments' %} is-active{% endif %}" href="?tab=tournaments">Турниры</a>
   <a class="tabs__item{% if tab == 'news' %} is-active{% endif %}" href="?tab=news">Новости{% if news %} · {{ news|length }}{% endif %}</a>
   <a class="tabs__item{% if tab == 'photos' %} is-active{% endif %}" href="?tab=photos">Фото{% if photos %} · {{ photos|length }}{% endif %}</a>

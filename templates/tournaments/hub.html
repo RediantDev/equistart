@@ -14,7 +14,7 @@
       {% elif t.status == "returned" %}<span class="chip chip--danger">Нужны исправления</span>
       {% elif t.status == "rejected" %}<span class="chip chip--danger">Отклонён модератором</span>
       {% elif t.is_published and t.status != "approved" %}<span class="chip chip--warning">Опубликован · есть непроверенные изменения</span>
-      {% elif t.is_published %}<span class="chip chip--success">Опубликован</span>
+      {% elif t.is_published %}<span class="chip chip--info">Опубликован</span>
       {% else %}<span class="chip">Черновик</span>{% endif %}
       {% for r in roles %}<span class="tag tag--lilac">{% if r == "organizer" %}Вы организатор{% elif r == "judge" %}Вы судья{% else %}Вы — конюшня и услуги{% endif %}</span>{% endfor %}
     </div>
@@ -39,7 +39,6 @@
     {% elif t.status == "draft" or t.status == "returned" %}
       <a class="btn btn--primary btn--sm" href="{% url 'tournaments:step' t.pk 4 %}">Отправить на проверку</a>
     {% endif %}
-    <a class="btn btn--ghost btn--sm" href="{% if t.is_published %}{% url 'tournaments:public' t.pk %}{% else %}{% url 'tournaments:step' t.pk 4 %}{% endif %}">{% include "partials/icon.html" with name="eye" size=18 %}Как видят участники</a>
   </div>
 </section>
 {% endif %}
@@ -59,7 +58,8 @@
     <span class="nav-row__go" aria-hidden="true">{% include "partials/icon.html" with name="chevron-right" size=18 %}</span>
   </a>
   {% endif %}
-  {% if stable and t.is_published %}
+  {# Тест 6.1, п. 16: денники и услуги можно заполнить до публикации — организатору, судье и клубу #}
+  {% if stable %}
   <a class="nav-row" href="{% url 'stables:manage' t.pk %}">
     <span class="nav-row__ico">{% include "partials/icon.html" with name="stable" size=22 %}</span>
     <span class="nav-row__body"><span class="nav-row__title">Денники и услуги</span><span class="nav-row__text">Брони, опилки и сено, бронь за участника</span></span>

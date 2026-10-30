@@ -18,12 +18,12 @@
       <div class="kebab__menu">
         <a href="{% url 'entries:application' e.application_id %}">Заявка №{{ e.application.number }}{% if e.application.contact_name %} · {{ e.application.contact_name }}{% endif %}</a>
         {% if e.decision == "pending" or e.decision == "accepted" %}
-        <form method="post" action="{% url 'entries:decide' t.pk %}" class="kebab__form">{% csrf_token %}<input type="hidden" name="confirm" value="1"><input type="hidden" name="action" value="reject"><input type="hidden" name="items" value="{{ e.pk }}:{{ e.revision }}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
-          <label class="field"><span class="field__label">Причина отклонения — увидит подавший</span><input name="reason" required placeholder="Например: не подходит по году рождения"></label>
-          <button class="btn btn--danger btn--sm">Отклонить</button>
-        </form>
+        <button type="button" class="is-danger" data-sheet-open="rej{{ e.pk }}">Отклонить…</button>
         {% endif %}
       </div>
     </details>
   </div>
+  {% if e.decision == "pending" or e.decision == "accepted" %}
+  {% include "entries/_reject_sheet.html" %}
+  {% endif %}
 </li>
