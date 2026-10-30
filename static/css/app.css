@@ -2148,3 +2148,97 @@ a.steps2__dot:hover { color: var(--text); }
 .uisheet.is-kb .uisheet__box { border-radius: 0 0 24px 24px; height: 100%; max-height: none !important; }
 .uisheet.is-kb .sheet__grip { display: none; }
 .tcard2__when { font-size: 20px; line-height: 1.2; font-weight: 800; color: var(--text); }
+/* Тест 6.1, п. 18: окно «Отклонить заявку» */
+.rej { display: flex; flex-direction: column; gap: 12px; }
+.rej__head { display: flex; align-items: flex-start; gap: 12px; justify-content: space-between; }
+.rej__who { margin: 4px 0 0; color: var(--text-muted); font-size: 14px; }
+.rej__lbl { margin: 0; font-size: 14px; font-weight: 700; }
+.rej input[name="reason"] { width: 100%; }
+.rej__act { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+.rej__open { text-align: center; color: var(--text-muted); font-size: 14px; }
+.pick-btn { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: var(--radius-pill); border: 1px solid var(--border-strong, #8a8983); background: var(--surface); color: var(--text); font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
+.pick-btn.is-on { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+
+/* Тест 6.1, пп. 24–29: экран судьи у поля (конкур) */
+.jl-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-top: var(--space-3); display: flex; flex-direction: column; gap: 10px; }
+.jl-card.is-locked { opacity: .45; }
+.jl-steps { list-style: none; margin: 0 0 4px; padding: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--text-muted); }
+.jl-steps li { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.jl-steps li span { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; background: var(--surface-2); color: var(--text-muted); font-weight: 800; }
+.jl-steps li.is-on { color: var(--text); } .jl-steps li.is-on span { background: var(--accent); color: var(--on-accent, var(--ink)); }
+.jl-steps li.is-done { color: var(--text); } .jl-steps li.is-done span { background: var(--ink); color: var(--surface); }
+.jl-steps__line { flex: 1 1 auto; height: 2px; background: var(--border); min-width: 16px; }
+.jl-cnt { font-size: 12px; font-weight: 800; letter-spacing: .04em; color: var(--text-muted); }
+.jl-who { font-size: 22px; line-height: 1.2; font-weight: 800; }
+.jl-sub { color: var(--text-muted); font-size: 14px; margin-top: -6px; }
+.jl-prev { font-size: 14px; background: var(--success-soft); color: var(--success); border-radius: 12px; padding: 8px 12px; font-weight: 650; }
+.jl-form { display: flex; flex-direction: column; gap: 12px; }
+.jl-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.jl-tile { border: 1px solid var(--border); border-radius: 16px; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; background: var(--surface); }
+.jl-tile--wide { grid-column: 1 / -1; }
+.jl-tile label { font-size: 13px; font-weight: 700; color: var(--text-muted); text-align: center; }
+.jl-tile__val { width: 100%; border: 0 !important; background: transparent !important; text-align: center; font-size: 32px !important; font-weight: 800; height: 40px; padding: 0 !important; -moz-appearance: textfield; }
+.jl-tile__val::-webkit-inner-spin-button, .jl-tile__val::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.jl-tile__pm { display: flex; gap: 8px; width: 100%; }
+.jl-tile__pm .counter__btn { flex: 1 1 0; height: 44px; width: auto; border-radius: 12px; }
+.jl-time { font-size: 24px !important; font-weight: 800; height: 56px; }
+.jl-sum { display: flex; justify-content: space-between; align-items: center; background: var(--surface-2); border-radius: 12px; padding: 10px 14px; font-size: 14px; }
+.jl-sum b { font-size: 16px; }
+.jl-save { margin-top: 8px; }
+.jl-alt { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.jl-alt .btn:only-child { grid-column: 1 / -1; }
+.jl-sheet { display: flex; flex-direction: column; gap: 10px; }
+.jl-opt { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); font: inherit; color: var(--text); cursor: pointer; }
+.jl-opt b { font-size: 17px; } .jl-opt span { font-size: 13px; color: var(--text-muted); }
+.jl-opt--danger b { color: var(--danger); }
+.jl-norm { margin-top: var(--space-3); background: var(--warning-soft); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.jl-norm__title { margin: 0; font-size: 18px; font-weight: 800; color: var(--warning); }
+.jl-norm__text { margin: 0; font-size: 14px; }
+.jl-norm__round { border: 0; margin: 0; padding: 0; }
+.jl-norm__round legend { font-weight: 800; font-size: 14px; padding: 0; margin-bottom: 6px; }
+.jl-norm__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.jl-norm__ta { grid-column: 1 / -1; }
+.jl-next { margin-top: var(--space-4); }
+.jl-next__h { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 8px; }
+.jl-next__list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.jl-next__list li + li { border-top: 1px solid var(--border); }
+.jl-next__list a { display: flex; align-items: center; gap: 12px; padding: 10px 14px; color: var(--text); text-decoration: none; min-height: 52px; }
+.jl-next__list li.is-next { background: var(--surface-2); }
+.jl-next__no { width: 28px; flex: none; font-weight: 800; color: var(--text-muted); }
+.jl-next__who { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.jl-next__who small { color: var(--text-muted); font-size: 13px; }
+.jl-all { margin-top: var(--space-4); }
+.jl-all > summary { cursor: pointer; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); min-height: 36px; display: flex; align-items: center; }
+.jl-tile__pm .counter__btn { min-height: 44px; }
+/* Тест 6.1, пп. 22–23: «Параметры маршрута» рядом с «Экран судьи»; вкладки — ровная сетка без прокрутки */
+.rjudge { flex-wrap: wrap; }
+.rjudge__params { flex: 0 1 auto !important; gap: 6px; }
+.rjudge__params.is-active { border-color: var(--ink); }
+.rjudge__mark { font-size: 11px; min-height: 0; padding: 2px 8px; }
+@media (max-width: 480px) { .rjudge .btn { flex: 1 1 100% !important; } }
+.rtabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0; overflow: visible; }
+.rtabs__item { text-align: center; padding: 10px 2px 9px; overflow: hidden; text-overflow: ellipsis; font-size: 15px; }
+@media (max-width: 380px) { .rtabs__item { font-size: 14px; } }
+/* Тест 6.1, п. 33: публикация результатов — строка на зачёт */
+.pubrows { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.pubrows__row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; scroll-margin-top: 90px; }
+.pubrows__row + .pubrows__row { border-top: 1px solid var(--border); }
+.pubrows__main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pubrows__row:target { background: var(--surface-2); }
+/* Тест 6.1, п. 31: колонка «Пара» не сжимается (≥160 px), таблица прокручивается вбок; на телефоне — карточки */
+.table--res { table-layout: auto; min-width: 100%; width: max-content; }
+.table--res col.c-pair, .table--res td.res-pair, .table--res th:nth-child(2) { min-width: 160px; }
+.table--res td.res-pair { white-space: normal; overflow: visible; max-width: 280px; }
+@media (max-width: 640px) {
+  .table--res { width: 100%; min-width: 0; }
+  .table--res thead { display: none; }
+  .table--res, .table--res tbody { display: block; }
+  .table--res tr { display: grid; grid-template-columns: 40px 1fr auto; gap: 2px 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .table--res td { display: block; border: 0 !important; padding: 0 !important; }
+  .table--res td.res-place { grid-row: 1 / span 2; font-size: 20px; text-align: center; }
+  .table--res td.res-pair { grid-column: 2; max-width: none; font-weight: 700; }
+  .table--res td.res-act { grid-column: 3; grid-row: 1 / span 2; }
+  .table--res td.res-val { grid-column: 2; display: inline; font-size: 13px; color: var(--text-muted); text-align: left; }
+  .table--res td.res-val::before { content: attr(data-label) ": "; }
+  .table--res td.res-val:empty { display: none; }
+}

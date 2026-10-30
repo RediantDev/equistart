@@ -163,3 +163,27 @@ def tpl_years(tpl, year):
     if b:
         return f"{b} г.р. и моложе"
     return "без ограничений по возрасту"
+
+
+@register.filter
+def plural(n, forms):
+    """Русское окончание: {{ n|plural:"результат,результата,результатов" }}."""
+    one, few, many = (forms.split(",") + ["", "", ""])[:3]
+    try:
+        n = abs(int(n))
+    except (TypeError, ValueError):
+        return many
+    if n % 10 == 1 and n % 100 != 11:
+        return one
+    if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
+        return few
+    return many
+
+
+@register.filter
+def at(seq, i):
+    """Элемент списка по номеру: {{ columns|at:forloop.counter0 }}."""
+    try:
+        return seq[int(i)]
+    except (TypeError, ValueError, IndexError, KeyError):
+        return ""

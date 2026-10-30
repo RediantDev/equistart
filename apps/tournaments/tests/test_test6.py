@@ -117,3 +117,43 @@ class AutosaveThenNextTests(Base):
         self.assertEqual(Tournament.objects.count(), n)
         t = Tournament.objects.filter(title="Кубок главы").get()
         self.assertRedirects(resp, reverse("tournaments:step", args=[t.pk, 2]), fetch_redirect_response=False)
+
+
+class MyListFiltersTests(Base):
+    """Тест 6.1, п. 9: поиск и фильтры в «Мои соревнования», прошедшие — отдельной вкладкой; чужие не видны."""
+
+    def test_search_filters_and_past(self):
+        self.client.force_login(self.org)
+        today = datetime.date.today()
+        Tournament.objects.create(owner=self.org, title="Кубок главы", starts_on=today + datetime.timedelta(days=20), ends_on=today + datetime.timedelta(days=21))
+        Tournament.objects.create(owner=self.org, title="Осенний старт", starts_on=today - datetime.timedelta(days=40), ends_on=today - datetime.timedelta(days=40))
+        other = user("+79990007777")
+        Tournament.objects.create(owner=other, title="Чужой кубок", starts_on=today + datetime.timedelta(days=5), ends_on=today + datetime.timedelta(days=5))
+        url = reverse("tournaments:mine")
+        r = self.client.get(url)
+        self.assertContains(r, "Кубок главы")
+        self.assertNotContains(r, "Осенний старт")
+        self.assertNotContains(r, "Чужой кубок")
+        self.assertContains(self.client.get(url + "?when=past"), "Осенний старт")
+        r = self.client.get(url + "?q=кубок")
+        self.assertContains(r, "Кубок главы")
+        self.assertNotContains(r, "Чужой кубок")
+        r = self.client.get(url + "?status=finished")
+        self.assertContains(r, "Ничего не найдено")
+        self.assertEqual(self.client.get(url + "?status=bogus&year=abc&venue=x").status_code, 200)
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)
+
+
+class ProgramRequiresClassTests(Base):
+    """Тест 6.1, п. 13: без зачёта и без таблицы штрафов маршрут не сохраняется."""
+
+    def test_no_class_no_table(self):
+        t = self.make_ready()
+        self.client.force_login(self.org)
+        data = {"revision": t.revision, "day": self.start.isoformat(), "discipline": "jumping", "program_type": "no_time", "heights_text": "80"}
+        resp = self.client.post(reverse("tournaments:program_add", args=[t.pk]), data)
+        self.assertEqual(resp.status_code, 422)
+        self.assertContains(resp, "Выберите хотя бы один зачёт", status_code=422)
+        self.assertContains(resp, "Выберите таблицу штрафов", status_code=422)
+        self.assertEqual(t.programs.count(), 1)

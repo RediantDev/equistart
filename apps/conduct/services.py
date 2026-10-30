@@ -392,24 +392,12 @@ def save_result(user, entry_id, values: dict, place, status, note="", finish=Tru
     return r
 
 
-@transaction.atomic
-def publish_results(user, class_id) -> ResultPublication:
-    c = TournamentClass.objects.select_for_update().select_related("program__tournament").get(pk=class_id)
+def result_rows(c):
+    """Строки публикации зачёта по текущим результатам (ничего не записывает)."""
     p = c.program
-    require_judge(user, p.tournament)
-    if c.merged_into_id:
-        raise ValueError(f"Зачёт объединён с «{c.merged_into.label}» — публикуйте результаты объединённого зачёта.")
-    if p.is_dressage and not p.is_manual and not scoring.is_scorer(user, p) and not can_manage(user, p.tournament):
-        raise ValueError("Результаты езды публикует судья по итогам.")
     classes = [c] + list(c.merged.all())
     entries = list(Entry.objects.filter(tclass__in=classes, decision=Entry.Decision.ACCEPTED).select_related("result", "tclass"))
     with_results = [e for e in entries if hasattr(e, "result") and not (e.result.values or {}).get("pending")]
-    if not with_results:
-        raise ValueError("Нет результатов для публикации.")
-    if p.is_dressage and not p.is_manual:
-        waiting = [e for e in with_results if not e.result.status and not (e.result.values or {}).get("approved")]
-        if waiting:
-            raise ValueError(f"Не утверждены результаты: {', '.join(e.athlete_snapshot.get('name', '') for e in waiting[:5])}.")
     rows = []
     multi = len(p.heights or []) > 1
     for e in with_results:
@@ -423,6 +411,25 @@ def publish_results(user, class_id) -> ResultPublication:
             "status": r.get_status_display() if r.status else "",
         })
     rows.sort(key=lambda x: (x["height"] or 0, x["place"] is None, x["place"] or 0, x["athlete"]["name"] or ""))
+    return with_results, rows
+
+
+@transaction.atomic
+def publish_results(user, class_id) -> ResultPublication:
+    c = TournamentClass.objects.select_for_update().select_related("program__tournament").get(pk=class_id)
+    p = c.program
+    require_judge(user, p.tournament)
+    if c.merged_into_id:
+        raise ValueError(f"Зачёт объединён с «{c.merged_into.label}» — публикуйте результаты объединённого зачёта.")
+    if p.is_dressage and not p.is_manual and not scoring.is_scorer(user, p) and not can_manage(user, p.tournament):
+        raise ValueError("Результаты езды публикует судья по итогам.")
+    with_results, rows = result_rows(c)
+    if not with_results:
+        raise ValueError("Нет результатов для публикации.")
+    if p.is_dressage and not p.is_manual:
+        waiting = [e for e in with_results if not e.result.status and not (e.result.values or {}).get("approved")]
+        if waiting:
+            raise ValueError(f"Не утверждены результаты: {', '.join(e.athlete_snapshot.get('name', '') for e in waiting[:5])}.")
     version = (c.result_publications.aggregate(m=Max("version"))["m"] or 0) + 1
     pub = ResultPublication.objects.create(tclass=c, version=version, rows=rows, fields=scoring.result_columns(p), published_by=user)
     audit(user, "results.publish", p.tournament, tclass=c.pk, version=version)

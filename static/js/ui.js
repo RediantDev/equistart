@@ -757,6 +757,7 @@
 
   /* ---------- Шторка по кнопке: data-sheet-open="id" (тест 6.1, пп. 9, 18) ---------- */
   function sheetOpen(s) {
+    if (s.hasAttribute("data-sheet-portal") && s.parentNode !== document.body) document.body.appendChild(s);  // fixed не зависит от родителей
     s.hidden = false;
     requestAnimationFrame(function () { s.classList.add("is-open"); });
     var f = s.querySelector("[data-autofocus]"); if (f) setTimeout(function () { f.focus(); }, 60);
@@ -764,7 +765,19 @@
   function sheetClose(s) { s.classList.remove("is-open"); setTimeout(function () { s.hidden = true; }, 180); }
   document.addEventListener("click", function (e) {
     var o = e.target.closest("[data-sheet-open]");
-    if (o) { var s = document.getElementById(o.getAttribute("data-sheet-open")); if (s) { e.preventDefault(); sheetOpen(s); } return; }
+    if (o) {
+      var s = document.getElementById(o.getAttribute("data-sheet-open"));
+      if (s) { e.preventDefault(); var d = o.closest("details[open]"); if (d) d.open = false; sheetOpen(s); }
+      return;
+    }
+    // Чип-подсказка заполняет поле (причина отклонения и т. п.)
+    var p = e.target.closest("[data-fill]");
+    if (p) {
+      var inp = document.getElementById(p.getAttribute("data-fill"));
+      if (inp) { inp.value = p.textContent.trim(); inp.dispatchEvent(new Event("input", { bubbles: true })); }
+      var box = p.parentNode; box.querySelectorAll("[data-fill]").forEach(function (x) { x.classList.toggle("is-on", x === p); x.setAttribute("aria-pressed", x === p ? "true" : "false"); });
+      return;
+    }
     var c = e.target.closest("[data-sheet-close]");
     var sh = c ? c.closest(".sheet[data-sheet]") : (e.target.matches && e.target.matches(".sheet[data-sheet]") ? e.target : null);
     if (sh) { e.preventDefault(); sheetClose(sh); }

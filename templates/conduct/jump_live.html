@@ -9,13 +9,14 @@
     <div class="table__sub">{{ p.program_type_name }} · {{ p.article_label }}</div>
   </div>
 
-  {% if stages|length > 1 %}
+  {% comment %}Тест 6.1, пп. 24–29: светлая карточка с плитками и итогом сразу (26А), фазы — шагами в карточке (24В),
+     без нормы времени ввод закрыт — норма вносится тут же (25А), «Кто дальше» — список следующих пар.{% endcomment %}
+  {% if stages|length > 1 and not two %}
     <nav class="segmented segmented--wrap" aria-label="Гит" style="margin-top: var(--space-3);">
       {% for s in stages %}<a class="segmented__item{% if s.key == stage.key %} is-active{% endif %}" href="?stage={{ s.key }}">{{ s.title }}{% if counts|get:s.key %} · {{ counts|get:s.key }}{% endif %}</a>{% endfor %}
     </nav>
   {% endif %}
-  <p class="table__sub" style="margin: var(--space-2) 0 0;">Табл. {{ stage.table }}{% if stage.timed %} · на время{% else %} · без учёта времени{% endif %}{% if stage.time_allowed %} · норма {{ stage.time_allowed|num }} с{% endif %}{% if stage.limit %} · лимит {{ stage.limit|num }} с{% endif %}{% if course.indoor %} · в помещении{% endif %}
-    {% if not stage.time_allowed and stage.table != "C" %}<br><a href="{% url 'conduct:program' t.pk p.pk %}?tab=course" style="color: var(--danger); font-weight: 600;">Внесите норму времени маршрута</a> — без неё штраф за время не посчитать.{% endif %}</p>
+  <p class="table__sub" style="margin: var(--space-2) 0 0;">Табл. {{ stage.table }}{% if stage.timed %} · на время{% else %} · без учёта времени{% endif %}{% if stage.time_allowed %} · норма {{ stage.time_allowed|num }} с{% endif %}{% if stage.limit %} · лимит {{ stage.limit|num }} с{% endif %}{% if course.indoor %} · в помещении{% endif %}</p>
 
   <div class="offline-bar" id="offline-bar" hidden role="status"></div>
 
@@ -25,58 +26,123 @@
     </div>
   {% endif %}
 
-  {% if current %}
+  {% if norm_block %}
+    <form class="jl-norm" method="post" action="{% url 'conduct:course' t.pk p.pk %}">{% csrf_token %}
+      <input type="hidden" name="next" value="live"><input type="hidden" name="stage" value="{{ stage.key }}">
+      {% if course.indoor %}<input type="hidden" name="indoor" value="1">{% endif %}<input type="hidden" name="timing" value="{{ course.timing }}">
+      <h2 class="jl-norm__title">Сначала внесите норму времени</h2>
+      <p class="jl-norm__text">Без нормы нельзя посчитать штраф за время — ввод результатов закрыт. Норму можно ввести сразу или посчитать по длине и скорости.</p>
+      {% for r in norm_rounds %}
+        {% if r.show %}
+          <fieldset class="jl-norm__round">
+            {% if two or norm_rounds|length > 1 %}<legend>{{ r.title }}</legend>{% endif %}
+            <div class="jl-norm__grid">
+              <label class="field"><span class="field__label">Длина, м</span><input name="{{ r.key }}_length" inputmode="numeric" value="{{ r.length }}" autocomplete="off"></label>
+              <label class="field"><span class="field__label">Скорость, м/мин</span><input name="{{ r.key }}_speed" inputmode="numeric" value="{{ r.speed }}" autocomplete="off"></label>
+              <label class="field jl-norm__ta"><span class="field__label">Норма времени, с</span><input name="{{ r.key }}_time_allowed" inputmode="decimal" value="{{ r.time_allowed }}" placeholder="или по длине и скорости" autocomplete="off"></label>
+            </div>
+          </fieldset>
+        {% else %}
+          <input type="hidden" name="{{ r.key }}_length" value="{{ r.length }}"><input type="hidden" name="{{ r.key }}_speed" value="{{ r.speed }}"><input type="hidden" name="{{ r.key }}_time_allowed" value="{{ r.time_allowed }}">
+        {% endif %}
+      {% endfor %}
+      {% if course.obstacles %}<input type="hidden" name="obstacles" value="{{ course.obstacles }}">{% endif %}
+      <button class="btn btn--primary btn--block btn--lg">Сохранить норму и начать</button>
+    </form>
+    {% if current %}<div class="jl-card is-locked" aria-hidden="true"><div class="jl-who">{{ current.0.entry.athlete_snapshot.name }}</div><div class="jl-sub">{{ current.0.entry.horse_snapshot.name }} · {{ current.0.entry.class_name }}</div></div>{% endif %}
+  {% elif current %}
     {% with s=current.0 jr=current.1 %}
-    <section class="live__current">
-      <div class="live__meta"><span class="caption" style="color: var(--accent);">{{ stage.title|upper }} · № {{ current_no }} из {{ queue|length }}{% if s.start_time and stage.key == stages.0.key %} · {{ s.start_time|time:"H:i" }}{% endif %}{% if jr %} · ИСПРАВЛЕНИЕ{% endif %}</span></div>
-      <div class="live__name">{{ s.entry.athlete_snapshot.name }}</div>
-      <div class="live__horse">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}{% if s.entry.height %} · {{ s.entry.height }} см{% endif %}</div>
+    <section class="jl-card">
+      {% if two %}
+        <ol class="jl-steps" aria-label="Фазы">
+          <li class="{% if stage.key == stages.0.key %}is-on{% else %}is-done{% endif %}"><span>{% if stage.key == stages.0.key %}1{% else %}✓{% endif %}</span>{{ stages.0.title }}</li>
+          <li class="jl-steps__line" aria-hidden="true"></li>
+          <li class="{% if stage.key != stages.0.key %}is-on{% endif %}"><span>2</span>{{ stages.1.title }}</li>
+        </ol>
+      {% endif %}
+      <div class="jl-cnt">{% if not two %}{{ stage.title|upper }} · {% endif %}ВСАДНИК {{ current_no }} ИЗ {{ queue|length }}{% if s.start_time and stage.key == stages.0.key %} · {{ s.start_time|time:"H:i" }}{% endif %}{% if jr %} · ИСПРАВЛЕНИЕ{% endif %}</div>
+      <div class="jl-who">{{ s.entry.athlete_snapshot.name }}</div>
+      <div class="jl-sub">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}{% if s.entry.height %} · {{ s.entry.height }} см{% endif %}</div>
+      {% if prev_round %}<div class="jl-prev">{{ stages.0.title }}: {{ prev_round.knockdowns }} пов. · {{ prev_round.refusals }} неп.{% if prev_round.time %} · {{ prev_round.time|num }} с{% endif %}</div>{% endif %}
 
-      {% if jr %}<div class="alert alert--warning" role="status" style="margin-bottom: var(--space-3);">Результат пары уже внесён{% if last_change %} — {{ last_change.actor.full_name|default:"—" }}, {{ last_change.local_str }}{% endif %}. Сохранение заменит его; прежнее значение останется в истории турнира.</div>{% endif %}
-      <form method="post" action="{% url 'conduct:jump_save' t.pk p.pk %}" class="live__form" id="jump-form" data-pair="{{ s.entry.athlete_snapshot.name }} / {{ s.entry.horse_snapshot.name }}">
+      {% if jr %}<div class="alert alert--warning" role="status">Результат пары уже внесён{% if last_change %} — {{ last_change.actor.full_name|default:"—" }}, {{ last_change.local_str }}{% endif %}. Сохранение заменит его; прежнее значение останется в истории турнира.</div>{% endif %}
+      <form method="post" action="{% url 'conduct:jump_save' t.pk p.pk %}" class="jl-form" id="jump-form" data-pair="{{ s.entry.athlete_snapshot.name }} / {{ s.entry.horse_snapshot.name }}" data-preview="{% url 'conduct:jump_preview' t.pk p.pk %}">
         {% csrf_token %}
         <input type="hidden" name="entry" value="{{ s.entry_id }}"><input type="hidden" name="stage" value="{{ stage.key }}">
         <input type="hidden" name="client_key" value="{{ client_key }}">
-        <div class="counters">
-          <div class="counter"><span class="counter__label">Повалы</span><button type="button" class="counter__btn" data-step="-1" data-for="kd" aria-label="Повалов меньше">−</button><input id="kd" name="knockdowns" type="number" min="0" max="20" value="{{ jr.knockdowns|default:0 }}" inputmode="numeric" class="counter__val"><button type="button" class="counter__btn" data-step="1" data-for="kd" aria-label="Повалов больше">+</button></div>
-          <div class="counter"><span class="counter__label">Неповиновения</span><button type="button" class="counter__btn" data-step="-1" data-for="rf" aria-label="Неповиновений меньше">−</button><input id="rf" name="refusals" type="number" min="0" max="3" value="{{ jr.refusals|default:0 }}" inputmode="numeric" class="counter__val"><button type="button" class="counter__btn" data-step="1" data-for="rf" aria-label="Неповиновений больше">+</button></div>
-          {% if with_corrections %}<div class="counter"><span class="counter__label">Неповиновение с разрушением, +6 с</span><button type="button" class="counter__btn" data-step="-1" data-for="cr" aria-label="Меньше">−</button><input id="cr" name="corrections" type="number" min="0" max="5" value="{{ jr.corrections|default:0 }}" inputmode="numeric" class="counter__val"><button type="button" class="counter__btn" data-step="1" data-for="cr" aria-label="Больше">+</button></div>{% endif %}
+        <div class="jl-tiles">
+          <div class="jl-tile"><label for="kd">Повалы</label><input id="kd" name="knockdowns" type="number" min="0" max="20" value="{{ jr.knockdowns|default:0 }}" inputmode="numeric" class="jl-tile__val"><div class="jl-tile__pm"><button type="button" class="counter__btn" data-step="-1" data-for="kd" aria-label="Повалов меньше">−</button><button type="button" class="counter__btn" data-step="1" data-for="kd" aria-label="Повалов больше">+</button></div></div>
+          <div class="jl-tile"><label for="rf">Неповиновения</label><input id="rf" name="refusals" type="number" min="0" max="3" value="{{ jr.refusals|default:0 }}" inputmode="numeric" class="jl-tile__val"><div class="jl-tile__pm"><button type="button" class="counter__btn" data-step="-1" data-for="rf" aria-label="Неповиновений меньше">−</button><button type="button" class="counter__btn" data-step="1" data-for="rf" aria-label="Неповиновений больше">+</button></div></div>
+          {% if with_corrections %}<div class="jl-tile jl-tile--wide"><label for="cr">Неповиновение с разрушением, +6 с</label><input id="cr" name="corrections" type="number" min="0" max="5" value="{{ jr.corrections|default:0 }}" inputmode="numeric" class="jl-tile__val"><div class="jl-tile__pm"><button type="button" class="counter__btn" data-step="-1" data-for="cr" aria-label="Меньше">−</button><button type="button" class="counter__btn" data-step="1" data-for="cr" aria-label="Больше">+</button></div></div>{% endif %}
         </div>
-        {% if stage.timed or stage.time_allowed or stage.table == "C" %}
-          <label class="field"><span class="field__label">Время, с{% if course.timing == "manual" %} (ручной, до 0,1){% endif %}</span><input name="time" type="text" class="live__input" inputmode="decimal" autocomplete="off" placeholder="например 38,41" value="{% if jr.time is not None %}{{ jr.time|num }}{% endif %}"></label>
-        {% else %}
-          <label class="field"><span class="field__label">Время, с <span class="field__optional">для протокола</span></span><input name="time" type="text" class="live__input" inputmode="decimal" autocomplete="off" value="{% if jr.time is not None %}{{ jr.time|num }}{% endif %}"></label>
-        {% endif %}
+        <label class="field"><span class="field__label">Время, с{% if stage.time_allowed %} · норма {{ stage.time_allowed|num }}{% endif %}{% if course.timing == "manual" %} · ручной, до 0,1{% endif %}{% if not stage.timed and not stage.time_allowed and stage.table != "C" %} <span class="field__optional">для протокола</span>{% endif %}</span>
+          <input name="time" type="text" class="live__input jl-time" inputmode="decimal" autocomplete="off" placeholder="например 38,41" value="{% if jr.time is not None %}{{ jr.time|num }}{% endif %}"></label>
+        <div class="jl-sum" aria-live="polite"><span>Итог</span><b data-sum>—</b></div>
         <input type="hidden" name="status" value="ok">
-        <button class="btn btn--primary btn--block btn--lg"{% if jr %} data-confirm="Изменить уже внесённый результат этой пары?" data-confirm-ok="Изменить"{% endif %}>{% if jr %}Сохранить исправление{% else %}Сохранить и следующий{% endif %}</button>
-        <details class="live__more"{% if jr and jr.status != "ok" %} open{% endif %}>
-          <summary>Исключён или сошёл</summary>
-          <div class="inline-row">
-            <button class="btn btn--danger" name="status" value="eliminated" data-status>Исключён</button>
-            <button class="btn btn--ghost" name="status" value="retired" data-status>Сошёл</button>
+        <button class="btn btn--primary btn--block btn--lg jl-save" data-main{% if jr %} data-confirm="Изменить уже внесённый результат этой пары?" data-confirm-ok="Изменить"{% endif %}>{% if jr %}Сохранить исправление{% elif two and stage.key != stages.0.key %}Сохранить 2-ю фазу{% else %}Сохранить и следующий{% endif %}</button>
+        <div class="jl-alt">
+          {% if stage.key == stages.0.key %}<button type="button" class="btn btn--ghost" data-sheet-open="ns-sheet">Не стартовал</button>{% endif %}
+          <button type="button" class="btn btn--ghost" data-sheet-open="ret-sheet">Сошёл / Исключён</button>
+        </div>
+
+        <div class="sheet" id="ret-sheet" hidden data-sheet>
+          <div class="sheet__box jl-sheet" role="dialog" aria-modal="true" aria-labelledby="ret-t">
+            <div class="sheet__grip"></div>
+            <div class="rej__head"><div><h2 class="sheet__title" id="ret-t">Не закончил маршрут</h2><p class="rej__who">{{ s.entry.athlete_snapshot.name }} · {{ s.entry.horse_snapshot.name }}</p></div><button type="button" class="sheet-x" data-sheet-close aria-label="Закрыть">×</button></div>
+            <button class="jl-opt" name="status" value="retired" data-status><b>Сошёл</b><span>Всадник сам прекратил выступление</span></button>
+            <button class="jl-opt jl-opt--danger" name="status" value="eliminated" data-status><b>Исключён</b><span>Решение судьи</span></button>
+            <button type="button" class="btn btn--ghost btn--block" data-sheet-close>Отмена</button>
           </div>
-        </details>
+        </div>
+        {% if stage.key == stages.0.key %}
+        <div class="sheet" id="ns-sheet" hidden data-sheet>
+          <div class="sheet__box jl-sheet" role="dialog" aria-modal="true" aria-labelledby="ns-t">
+            <div class="sheet__grip"></div>
+            <div class="rej__head"><div><h2 class="sheet__title" id="ns-t">Не стартовал?</h2><p class="rej__who">{{ s.entry.athlete_snapshot.name }} · {{ s.entry.horse_snapshot.name }}</p></div><button type="button" class="sheet-x" data-sheet-close aria-label="Закрыть">×</button></div>
+            <p class="muted" style="margin: 0;">В протоколе будет «Не стартовал». Если пара всё же выйдет — откройте её в списке ниже и внесите результат.</p>
+            <div class="rej__act"><button type="button" class="btn btn--ghost" data-sheet-close>Отмена</button><button class="btn btn--dark" name="status" value="no_show" data-status>Не стартовал</button></div>
+          </div>
+        </div>
+        {% endif %}
       </form>
     </section>
     {% endwith %}
   {% else %}
-    <div class="card empty" style="margin-top: var(--space-3);"><h2 class="h3">{% if queue %}В этом гите все пары прошли{% else %}В этом гите пока нет пар{% endif %}</h2>
-      <p class="muted">{% if next_stage %}Следующий гит откроется для прошедших пар.{% else %}Проверьте места и опубликуйте результаты по зачётам.{% endif %}</p>
-      {% if next_stage %}<a class="btn btn--dark" href="?stage={{ next_stage }}">Следующий гит</a>{% endif %}
-      <a class="btn btn--primary" href="{% url 'conduct:program' t.pk p.pk %}">К результатам</a></div>
+    <div class="card empty" style="margin-top: var(--space-3);"><h2 class="h3">{% if queue %}{% if two %}Все пары прошли обе фазы{% else %}В этом гите все пары прошли{% endif %}{% else %}В этом гите пока нет пар{% endif %}</h2>
+      <p class="muted">{% if next_stage and not two %}Следующий гит откроется для прошедших пар.{% else %}Проверьте места и опубликуйте результаты по зачётам.{% endif %}</p>
+      {% if next_stage and not two %}<a class="btn btn--dark" href="?stage={{ next_stage }}">Следующий гит</a>{% endif %}
+      <a class="btn btn--primary" href="{% url 'conduct:program' t.pk p.pk %}?tab=results">К результатам</a></div>
+  {% endif %}
+
+  {% if upcoming and not norm_block %}
+    <section class="jl-next" aria-labelledby="jl-next-h">
+      <h2 class="jl-next__h" id="jl-next-h">Кто дальше{% if two and stage.key != stages.0.key %} · {{ stages.0.title|lower }}{% endif %}</h2>
+      <ol class="jl-next__list">
+        {% for sl in upcoming %}
+          <li class="{% if forloop.first %}is-next{% endif %}"><a href="?stage={% if two %}{{ stages.0.key }}{% else %}{{ stage.key }}{% endif %}&entry={{ sl.entry_id }}">
+            <span class="jl-next__no num">{{ sl.position }}</span>
+            <span class="jl-next__who"><b>{{ sl.entry.athlete_snapshot.name }}</b><small>{{ sl.entry.horse_snapshot.name }} · {{ sl.entry.class_name }}{% if sl.entry.height and p.heights|length > 1 %} · {{ sl.entry.height }} см{% endif %}</small></span>
+            {% if forloop.first %}<span class="chip chip--info">следующий</span>{% elif sl.start_time %}<span class="table__sub num">{{ sl.start_time|time:"H:i" }}</span>{% endif %}
+          </a></li>
+        {% endfor %}
+      </ol>
+    </section>
   {% endif %}
 
   {% if queue %}
-    <div class="caption muted" style="margin-top: var(--space-4);">ПОРЯДОК · {{ stage.title|lower }}</div>
-    <div class="list-cards" style="margin-top: var(--space-2);">{% for s, jr in queue %}
-      {% with st=places|get:s.entry_id %}
-      <a class="row-card row-card--link{% if current and current.0.pk == s.pk %} is-current{% endif %}" style="padding: 10px 14px;" href="?stage={{ stage.key }}&entry={{ s.entry_id }}">
-        <span class="numeric">{{ forloop.counter }}</span>
-        <span style="flex: 1 1 180px; min-width: 0;">{{ s.entry.athlete_snapshot.name }}<span class="table__sub">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}{% if s.entry.height and p.heights|length > 1 %} · {{ s.entry.height }} см{% endif %}</span></span>
-        {% if jr %}<span class="table__sub" style="text-align: right;">{% if jr.status != "ok" %}{{ jr.get_status_display }}{% else %}{{ jr.knockdowns }} пов. · {{ jr.refusals }} неп.{% if jr.time %} · {{ jr.time|num }} с{% endif %}{% endif %}{% if st.place %}<br><strong>{{ st.place }} место</strong> <span class="table__sub" style="display:inline">в зачёте</span>{% endif %}</span>{% else %}<span class="chip">ждёт</span>{% endif %}
-      </a>
-      {% endwith %}
-    {% endfor %}</div>
+    <details class="jl-all"{% if not current %} open{% endif %}>
+      <summary>Весь порядок · {{ stage.title|lower }} · {{ queue|length }}</summary>
+      <div class="list-cards" style="margin-top: var(--space-2);">{% for s, jr in queue %}
+        {% with st=places|get:s.entry_id %}
+        <a class="row-card row-card--link{% if current and current.0.pk == s.pk %} is-current{% endif %}" style="padding: 10px 14px;" href="?stage={{ stage.key }}&entry={{ s.entry_id }}">
+          <span class="numeric">{{ forloop.counter }}</span>
+          <span style="flex: 1 1 180px; min-width: 0;">{{ s.entry.athlete_snapshot.name }}<span class="table__sub">{{ s.entry.horse_snapshot.name }} · {{ s.entry.class_name }}{% if s.entry.height and p.heights|length > 1 %} · {{ s.entry.height }} см{% endif %}</span></span>
+          {% if jr %}<span class="table__sub" style="text-align: right;">{% if jr.status != "ok" %}{{ jr.get_status_display }}{% else %}{{ jr.knockdowns }} пов. · {{ jr.refusals }} неп.{% if jr.time %} · {{ jr.time|num }} с{% endif %}{% endif %}{% if st.place %}<br><strong>{{ st.place }} место</strong> <span class="table__sub" style="display:inline">в зачёте</span>{% endif %}</span>{% else %}<span class="chip">ждёт</span>{% endif %}
+        </a>
+        {% endwith %}
+      {% endfor %}</div>
+      {% if two %}<p class="table__sub" style="margin-top: var(--space-2);">{% for x in stages %}<a href="?stage={{ x.key }}">{{ x.title }}{% if counts|get:x.key %} · {{ counts|get:x.key }}{% endif %}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+    </details>
   {% endif %}
   {% if skipped %}<p class="table__sub" style="margin-top: var(--space-3);">Не стартуют: {% for x in skipped %}{{ x.entry.athlete_snapshot.name }}{% if not forloop.last %}, {% endif %}{% endfor %}. Если пара всё-таки выступает — верните её в порядок: <a href="{% url 'conduct:program' t.pk p.pk %}">«Порядок» → «Стартует»</a>.</p>{% endif %}
 </div>
@@ -87,8 +153,20 @@
     b.addEventListener("click", function () {
       var i = document.getElementById(b.dataset.for), v = (parseInt(i.value, 10) || 0) + parseInt(b.dataset.step, 10);
       i.value = Math.max(+i.min || 0, Math.min(+i.max || 99, v));
+      i.dispatchEvent(new Event("input", { bubbles: true }));
     });
   });
+  // Итог считается сразу — тем же расчётом, что и при сохранении (тест 6.1, п. 26)
+  var pf = document.getElementById("jump-form"), sum = pf && pf.querySelector("[data-sum]"), timer = null;
+  function preview() {
+    var fd = new FormData(pf); fd.delete("status");
+    fetch(pf.dataset.preview, { method: "POST", body: fd, headers: { "X-Requested-With": "fetch" }, credentials: "same-origin" })
+      .then(function (r) { return r.json(); }).then(function (j) { sum.textContent = j.text || "—"; }).catch(function () {});
+  }
+  if (pf && sum) {
+    pf.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(preview, 250); });
+    preview();
+  }
   // Офлайн-очередь (SCR-02): если связи нет, ввод сохраняется на устройстве и отправляется, когда связь вернётся.
   var KEY = root.dataset.queueKey, bar = document.getElementById("offline-bar"), form = document.getElementById("jump-form");
   function load() { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { return []; } }
@@ -116,6 +194,7 @@
   if (form) {
     var clicked = null;
     form.querySelectorAll("[data-status]").forEach(function (b) { b.addEventListener("click", function () { clicked = b.value; }); });
+    var main = form.querySelector("[data-main]"); if (main) main.addEventListener("click", function () { clicked = null; });
     form.addEventListener("submit", function (ev) {
       ev.preventDefault();
       var fd = new FormData(form);
@@ -123,14 +202,14 @@
       fd.set("client_key", (window.crypto && crypto.randomUUID) ? crypto.randomUUID().replace(/-/g, "") : String(Date.now()) + Math.random().toString(16).slice(2));
       var data = []; fd.forEach(function (v, k) { data.push([k, v]); });
       var item = { url: form.action, data: data, pair: form.dataset.pair };
-      form.querySelector("button.btn--primary").disabled = true;
+      form.querySelectorAll("button").forEach(function (b) { if (b.name === "status" || b.hasAttribute("data-main")) b.disabled = true; });
       send(item).then(function (res) {
         if (res.body.ok) { location.href = res.body.next; return; }
-        form.querySelector("button.btn--primary").disabled = false;
+        form.querySelectorAll("button").forEach(function (b) { b.disabled = false; });
         alert(res.body.error);
       }).catch(function () {
         var q = load(); q.push(item); store(q); show();
-        form.reset(); form.querySelector("button.btn--primary").disabled = false;
+        form.reset(); form.querySelectorAll("button").forEach(function (b) { b.disabled = false; });
       });
     });
   }

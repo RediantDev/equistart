@@ -141,7 +141,8 @@ def program(request, pk, program_id):
         last = c.result_publications.first()
         real = [e for e in Entry.objects.filter(tclass__in=[c, *c.merged.all()], decision=Entry.Decision.ACCEPTED, result__isnull=False).select_related("result")
                 if services.has_real_result(e.result)]
-        classes.append({"c": c, "published": last, "count": len(real)})
+        changed = bool(last and real and _rows_json(services.result_rows(c)[1]) != _rows_json(last.rows))
+        classes.append({"c": c, "published": last, "count": len(real), "changed": changed})
     tabs = [x for x in TABS if not (x[0] == "course" and not (p.is_jumping and not p.route.manual))
             and not (x[0] == "panel" and not (p.is_dressage and p.test_snapshot)) and not (x[0] == "merge" and len(all_classes) < 2)]
     if tab not in dict(tabs):
@@ -153,6 +154,7 @@ def program(request, pk, program_id):
         ctx_entries = ents
     else:
         ctx_entries = []
+    published = p.start_publications.first()
     ctx = {
         "program_entries": ctx_entries, "blocked_ids": blocked,
         "tab": tab, "tabs": tabs, "others": t.programs.exclude(pk=p.pk).order_by("day", "start_time", "position"),
@@ -161,7 +163,9 @@ def program(request, pk, program_id):
         "more_tabs": [x for x in tabs if x[0] in ("course", "panel", "merge")],
         "all_programs": t.programs.order_by("day", "start_time", "position"),
         "t": t, "p": p, "slots": slots, "outside": outside, "classes": classes,
-        "published": p.start_publications.first(),
+        "published": published,
+        # Тест 6.1, п. 19: «Опубликовать новую версию» — только если порядок изменился после публикации
+        "order_changed": published is None or _rows_json([services.public_row(s) for s in slots]) != _rows_json(published.rows),
         "fields": [(f, RESULT_FIELDS.get(f, f)) for f in p.result_fields], "statuses": Result.Status.choices,
         "auto": not p.is_manual,
         "merged": merged, "all_classes": all_classes,
@@ -181,11 +185,20 @@ def program(request, pk, program_id):
         ctx["course_rounds"] = [{"spec": r, "data": c["rounds"].get(r.key, {}), "params": scoring.round_params(p, r.key)}
                                 for r in J.rounds_of(p.route, p.variant)]
         ctx["has_table_c"] = any(r["params"]["table"] == "C" for r in ctx["course_rounds"])
+        ctx["no_norm"] = any(r["params"]["table"] != "C" and r["params"]["time_allowed"] is None for r in ctx["course_rounds"])
     if p.is_dressage and p.test_snapshot:
         ctx["has_panel"], ctx["panel"] = True, scoring.panel(p)
         ctx["my_letters"] = [x.letter for x in ctx["panel"] if x.user_id == request.user.pk and not x.is_scorer]
         ctx["is_scorer"] = scoring.is_scorer(request.user, p)
     return render(request, "conduct/program.html", ctx)
+
+
+def _rows_json(rows):
+    import json
+
+    from django.core.serializers.json import DjangoJSONEncoder
+
+    return json.loads(json.dumps(rows, cls=DjangoJSONEncoder))
 
 
 def _standings_tables(p):
@@ -262,7 +275,9 @@ def program_action(request, pk, program_id, action):
         elif action == "publish_results":
             c = get_object_or_404(TournamentClass, pk=request.POST.get("tclass"), program=p)
             pub = services.publish_results(request.user, c.pk)
-            messages.success(request, f"Результаты зачёта «{c.name}» опубликованы (версия {pub.version}).")
+            messages.success(request, f"Опубликовано: {c.label} (версия {pub.version}).")
+            # Тест 6.1, п. 32: остаёмся во вкладке «Результаты», у того же зачёта
+            return redirect(reverse("conduct:program", args=[pk, p.pk]) + f"?tab=results#pub-{c.pk}")
         else:
             raise Http404
     except (ValueError, KeyError, StartSlot.DoesNotExist) as e:
