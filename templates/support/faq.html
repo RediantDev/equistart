@@ -1,13 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Помощь и частые вопросы — СтартЛист{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <h1 class="h1">Помощь</h1>
-    <p class="muted">Ответы на частые вопросы. Не нашли ответ — напишите нам.</p>
-  </div>
-  <a class="btn btn--primary btn--sm" href="{% url 'support:new' %}">Написать в поддержку</a>
-</div>
+<div class="head-row head-row--tight"><h1 class="h1">Помощь</h1><a class="btn btn--primary btn--sm" href="{% url 'support:new' %}">Написать в поддержку</a></div>
+<p class="muted page-lead">Ответы на частые вопросы. Не нашли ответ — напишите нам.</p>
 {% if sections %}
   {% if sections|length > 1 %}<nav class="chips" aria-label="Разделы">{% for code, label, rows in sections %}<a class="tag" href="#faq-{{ code }}">{{ label }}</a>{% endfor %}</nav>{% endif %}
   {% for code, label, rows in sections %}

@@ -2288,3 +2288,4 @@ a.steps2__dot:hover { color: var(--text); }
 .form--narrow { max-width: 720px; }
 .inline-row--end { align-items: flex-end; }
 @media (max-width: 400px) { .rtabs__item { font-size: 13px; padding-left: 1px; padding-right: 1px; } }
+.head-row--tight { margin-bottom: var(--space-2); } .page-lead { margin: 0 0 var(--space-5); }
