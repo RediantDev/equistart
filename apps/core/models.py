@@ -26,6 +26,20 @@ ACTION_LABELS = {
     "support.staff_reply": "Ответ поддержки",
     "support.status": "Изменён статус обращения",
     "support.transfer": "Передано команде турнира",
+    "user.block": "Аккаунт заблокирован",
+    "user.unblock": "Аккаунт разблокирован",
+    "user.password_reset": "Пароль сброшен администратором",
+    "user.delete": "Аккаунт удалён",
+    "athlete.merge": "Спортсмены объединены (основная запись)",
+    "athlete.merged": "Спортсмен объединён с другой записью",
+    "horse.merge": "Лошади объединены (основная запись)",
+    "horse.merged": "Лошадь объединена с другой записью",
+    "settings.save": "Изменены настройки сервиса",
+    "export.tournaments": "Выгрузка турниров",
+    "export.users": "Выгрузка пользователей",
+    "export.tickets": "Выгрузка обращений",
+    "user.moderator_on": "Назначен модератором",
+    "user.moderator_off": "Снят с роли модератора",
     "service.backup": "Резервная копия сделана",
     "service.error": "Ошибка сервера",
 }
@@ -58,6 +72,8 @@ class AuditLog(models.Model):
 
 
 def audit(actor, action: str, obj, **data) -> AuditLog:
+    if getattr(actor, "is_admin", False):
+        data.setdefault("as_admin", True)  # ADM-06: действия администратора отмечаются в журнале
     return AuditLog.objects.create(
         actor=actor if getattr(actor, "is_authenticated", False) else None,
         action=action,
@@ -116,3 +132,67 @@ def notify_merged(users, kind: str, url: str, text_for):
             n.save(update_fields=["text", "created_at"])
         else:
             Notification.objects.create(user=u, kind=kind, url=url, text=text_for(1)[:300])
+
+
+class SiteSettings(models.Model):
+    """Настройки сервиса, которые администратор меняет без выпуска кода (ADM-08). Одна запись."""
+
+    moderator_emails = models.TextField(
+        "email для уведомлений модератору", blank=True,
+        help_text="Можно несколько — каждый с новой строки или через запятую. Сюда приходят письма о каждом обращении (SUP-14).",
+    )
+    support_telegram = models.CharField("Telegram поддержки", max_length=64, blank=True, help_text="Например, @startlist_help")
+    footer_phone = models.CharField("телефон в подвале сайта", max_length=32, blank=True)
+    footer_email = models.EmailField("email в подвале сайта", blank=True)
+    updated_at = models.DateTimeField("изменено", auto_now=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        verbose_name = "настройки сервиса"
+        verbose_name_plural = "настройки сервиса"
+
+    @classmethod
+    def get(cls) -> "SiteSettings":
+        obj = cls.objects.order_by("pk").first()
+        return obj or cls(pk=1)
+
+    @property
+    def moderator_email_list(self) -> list[str]:
+        import re
+
+        return [a for a in (x.strip() for x in re.split(r"[\s,;]+", self.moderator_emails or "")) if a]
+
+    @property
+    def telegram(self) -> str:
+        return (self.support_telegram or getattr(settings, "SUPPORT_TELEGRAM", "") or "").strip()
+
+
+class OutgoingMail(models.Model):
+    """Журнал писем (ADM-09). Письмо сначала записывается, затем отправляется; сбой не теряет письмо —
+    команда send_mail_queue повторяет отправку (SUP-14)."""
+
+    class State(models.TextChoices):
+        PENDING = "pending", "В очереди"
+        SENT = "sent", "Отправлено"
+        FAILED = "failed", "Ошибка"
+
+    MAX_ATTEMPTS = 5
+
+    created_at = models.DateTimeField("создано", auto_now_add=True, db_index=True)
+    kind = models.CharField("вид", max_length=40, blank=True)
+    to = models.TextField("кому")
+    subject = models.CharField("тема", max_length=300)
+    body = models.TextField("текст")
+    state = models.CharField("состояние", max_length=10, choices=State.choices, default=State.PENDING, db_index=True)
+    attempts = models.PositiveSmallIntegerField("попыток", default=0)
+    error = models.CharField("ошибка", max_length=300, blank=True)
+    sent_at = models.DateTimeField("отправлено", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "письмо"
+        verbose_name_plural = "журнал писем"
+        ordering = ["-created_at", "-id"]
+
+    @property
+    def recipients(self) -> list[str]:
+        return [a for a in self.to.split(",") if a]

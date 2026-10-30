@@ -7,11 +7,10 @@ import zoneinfo
 
 from django.conf import settings
 from django.core.cache import cache
-from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 
-from apps.core.models import audit, notify, notify_merged
+from apps.core.models import audit, notify
 
 from .models import Ticket, TicketAttachment, TicketMessage, Topic
 
@@ -109,26 +108,51 @@ def check_image(f):
     return f
 
 
-# ---------------- письма (SUP-05, SUP-07) ----------------
+# ---------------- письма (SUP-05, SUP-07, SUP-14) ----------------
 
 def _abs(url: str) -> str:
     return settings.APP_ORIGIN.rstrip("/") + url
 
 
-def _mail(to, subject, body):
-    to = [a for a in (to if isinstance(to, (list, tuple)) else [to]) if a]
-    if not to:
-        return
-    try:
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, to, fail_silently=False)
-    except Exception:  # письмо не должно ломать действие; модератор увидит обращение на сайте
-        log.exception("support mail failed")
+def _mail(to, subject, body, kind="support"):
+    from apps.core.mail import queue_mail
+
+    queue_mail(to, subject, body, kind=kind)
 
 
 def _moderators():
     from apps.accounts.models import User
 
     return list(User.objects.filter(is_moderator=True, is_active=True))
+
+
+def moderator_emails(mods=None) -> list[str]:
+    """SUP-14: адреса из настроек сервиса (ADM-08) + email каждого модератора; запасной — SUPPORT_ALERT_EMAIL."""
+    from apps.core.models import SiteSettings
+
+    mods = _moderators() if mods is None else mods
+    return SiteSettings.get().moderator_email_list + [m.email for m in mods] + [settings.SUPPORT_ALERT_EMAIL]
+
+
+def _snippet(text: str, n: int = 300) -> str:
+    text = " ".join((text or "").split())
+    return text if len(text) <= n else text[: n - 1].rstrip() + "…"
+
+
+def mail_moderators(t: Ticket, event: str, text: str, mods=None):
+    """SUP-14: письмо модератору о новом обращении или новом сообщении пользователя.
+    Без телефона, вложений и полного текста — они открываются по ссылке после входа (ACL-03)."""
+    author = t.author.full_name if t.author_id else (f"гость {t.name}".strip() if t.name else "гость")
+    title = (t.tournament.pub_title or t.tournament.title) if t.tournament_id else ""
+    prefix = "СРОЧНО: " if t.urgent else ""
+    subject = f"{prefix}{event} — обращение №{t.pk}: {t.get_topic_display()}"
+    lines = [f"{event}: обращение №{t.pk}", f"Тема: {t.get_topic_display()}"]
+    if t.urgent:
+        lines.append(f"Срочно — идёт турнир «{title}»")
+    elif title:
+        lines.append(f"Турнир: {title}")
+    lines += [f"Автор: {author}", "", _snippet(text), "", f"Открыть обращение: {_abs(_mod_url(t))}"]
+    _mail(moderator_emails(mods), subject, "\n".join(lines), kind="support.moderator")
 
 
 # ---------------- действия ----------------
@@ -152,12 +176,9 @@ def create(user, data: dict, files, rate_key=None) -> Ticket:
     if t.urgent:
         title = t.tournament.pub_title or t.tournament.title
         notify(mods, f"Срочно — идёт турнир «{title}»: обращение №{t.pk}", _mod_url(t), kind="support.urgent")
-        _mail([m.email for m in mods] + [settings.SUPPORT_ALERT_EMAIL],
-              f"СРОЧНО: обращение №{t.pk} — идёт турнир «{title}»",
-              f"{t.get_topic_display()}\n\n{t.text}\n\nОткрыть: {_abs(_mod_url(t))}")
     else:
-        notify_merged(mods, "support.new", "/moderation/support/",
-                      lambda n: "Новое обращение в поддержку" if n == 1 else f"Новые обращения в поддержку: {n}")
+        notify(mods, f"Новое обращение №{t.pk}: {t.get_topic_display()}", _mod_url(t), kind="support.new")
+    mail_moderators(t, "Новое обращение", t.text, mods)
     if rate_key:
         _hit(rate_key)
     return t
@@ -183,8 +204,11 @@ def user_reply(user, ticket_pk: int, text: str, token: str = "") -> Ticket:
     t.last_user_at = timezone.now()
     t.save(update_fields=["status", "last_user_at", "updated_at"])
     audit(user, "support.user_reply", t, status_from=old, status_to=t.status)
-    notify_merged(_moderators(), "support.reply", _mod_url(t),
-                  lambda n: f"Ответ пользователя в обращении №{t.pk}" + (f" ({n})" if n > 1 else ""))
+    mods = _moderators()
+    reopened = old == Ticket.Status.RESOLVED
+    event = "Обращение открыто снова" if reopened else "Ответ пользователя"
+    notify(mods, f"{event} — обращение №{t.pk}", _mod_url(t), kind="support.reply")
+    mail_moderators(t, event, text, mods)
     return t
 
 

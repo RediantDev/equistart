@@ -1,6 +1,6 @@
-{% extends "base.html" %}
+{% extends "moderation/_cabinet.html" %}
 {% block title %}{{ club.name }} — модерация — СтартЛист{% endblock %}
-{% block content %}
+{% block cabinet %}
 <a class="back" href="{% url 'moderation:clubs' %}">← Клубы на проверке</a>
 <h1 class="h1 break">{{ club.name }} <span class="chip">{% if club.merged_into %}Объединён{% else %}{{ club.get_status_display }}{% endif %}</span></h1>
 {% if club.merged_into %}<div class="alert alert--info">Объединён с <a href="{% url 'moderation:club' club.merged_into.pk %}">«{{ club.merged_into.public_name }}»</a> {{ club.merged_at|date:"d.m.Y H:i" }}.</div>{% endif %}

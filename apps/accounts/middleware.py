@@ -16,4 +16,8 @@ class PhoneVerificationMiddleware:
         if (settings.PHONE_VERIFICATION_REQUIRED and u is not None and u.is_authenticated and not u.phone_verified
                 and not u.is_superuser and not request.path.startswith(ALLOWED_PREFIXES)):
             return redirect(reverse("accounts:verify_phone") + "?next=" + request.get_full_path())
+        # ADM-04: после сброса пароля администратором — сначала сменить временный пароль
+        if (u is not None and u.is_authenticated and getattr(u, "must_change_password", False)
+                and not request.path.startswith(ALLOWED_PREFIXES + ("/cabinet/password/",))):
+            return redirect("accounts:password")
         return self.get_response(request)

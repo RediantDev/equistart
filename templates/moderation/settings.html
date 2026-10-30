@@ -1,0 +1,29 @@
+{% extends "moderation/_cabinet.html" %}
+{% block title %}Настройки — Пульт — СтартЛист{% endblock %}
+{% block cabinet %}
+<div class="page-head">
+  <div>
+    <h1 class="h1">Настройки сервиса</h1>
+    <p class="muted">Меняются сразу, без выпуска новой версии.{% if obj.updated_at %} Последнее изменение — {{ obj.updated_at|date:"j E Y, H:i" }}{% if obj.updated_by %}, {{ obj.updated_by.full_name }}{% endif %}.{% endif %}</p>
+  </div>
+</div>
+<form method="post" class="card stack" novalidate>{% csrf_token %}
+  {% for e in form.non_field_errors %}<div class="alert alert--error" role="alert">{{ e }}</div>{% endfor %}
+  <h2 class="h3">Уведомления модератору</h2>
+  {% include "partials/field.html" with field=form.moderator_emails %}
+  <p class="table__sub">Письма также получает каждый модератор на email из своего профиля.</p>
+  <h2 class="h3">Контакты поддержки</h2>
+  <div class="grid-2">
+    {% include "partials/field.html" with field=form.support_telegram %}
+    {% include "partials/field.html" with field=form.footer_phone %}
+    {% include "partials/field.html" with field=form.footer_email %}
+  </div>
+  <div><button class="btn btn--primary">Сохранить</button></div>
+</form>
+<section class="card stack" style="margin-top: var(--space-4);">
+  <h2 class="h3">Почтовый сервер</h2>
+  <p>Адрес отправителя: <strong>{{ from_email }}</strong></p>
+  {% if mail_configured %}<p class="muted">Почтовый сервер подключён. Проверить отправку — в разделе <a href="{% url 'moderation:system' %}">«Система»</a>.</p>
+  {% else %}<div class="alert alert--warning" role="note">Почтовый сервер не подключён: письма записываются в журнал, но не уходят. Адрес отправителя и пароль почты задаются на сервере (файл .env) — пришлите их исполнителю.</div>{% endif %}
+</section>
+{% endblock %}

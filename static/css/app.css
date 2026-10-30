@@ -2096,3 +2096,59 @@ a.steps2__dot:hover { color: var(--text); }
 .occ-box { margin-top: var(--space-5); }
 .occ-box > summary { cursor: pointer; }
 .empty-add { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; } .empty-add .h3, .empty-add p { margin: 0; }
+
+/* ---------- Кабинет модератора (ТЗ 13.3, ADM-01) ---------- */
+.mcab { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: var(--space-6); align-items: start; }
+.mcab__nav { position: sticky; top: 80px; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.mcab__who { display: flex; flex-direction: column; gap: 2px; padding: 0 var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); }
+.mcab__role { display: inline-flex; align-self: flex-start; padding: 3px 10px; border-radius: var(--radius-pill); background: var(--ink); color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
+.mcab__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.mcab__link { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 40px; padding: 8px 12px; border-radius: var(--radius-pill); color: var(--text-muted); font-weight: 700; font-size: 15px; text-decoration: none; }
+.mcab__link.is-active { background: var(--accent); color: var(--on-accent); }
+.mcab__link--ext { margin-top: var(--space-2); border-top: 1px solid var(--border); border-radius: 0; padding-top: 12px; }
+.mcab__count { min-width: 24px; height: 22px; padding: 0 7px; display: inline-grid; place-items: center; border-radius: var(--radius-pill); background: var(--ink); color: var(--surface); font-size: 12px; font-weight: 800; }
+.mcab__link.is-active .mcab__count { background: var(--surface); color: var(--ink); }
+.mcab__count--urgent { background: var(--danger); color: #fff; }
+.mcab__main { min-width: 0; }
+@media (hover: hover) { .mcab__link:not(.is-active):hover { background: var(--surface-2); color: var(--text); } }
+@media (max-width: 960px) {
+  .mcab { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+  .mcab__nav { position: static; padding: 0; background: none; border: 0; gap: var(--space-2); }
+  .mcab__who { flex-direction: row; align-items: center; gap: var(--space-2); padding: 0; border: 0; }
+  .mcab__list { flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; scrollbar-width: none; margin: 0 calc(-1 * var(--space-4)); padding-left: var(--space-4); padding-right: var(--space-4); }
+  .mcab__list::-webkit-scrollbar { display: none; }
+  .mcab__link { white-space: nowrap; min-height: 38px; padding: 6px 14px; background: var(--surface); border: 1px solid var(--border); font-size: 14px; }
+  .mcab__link.is-active { border-color: var(--accent); }
+  .mcab__link--ext { margin-top: 0; padding-top: 6px; border-radius: var(--radius-pill); border-top: 1px solid var(--border); }
+  .mcab__link--ext .table__sub { display: none; }
+}
+/* таблицы кабинета: на телефоне строка превращается в карточку */
+.mtable { width: 100%; border-collapse: collapse; font-size: 15px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+.mtable th { text-align: left; font-size: 13px; font-weight: 700; color: var(--text-muted); padding: 10px 14px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
+.mtable td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.mtable tr:last-child td { border-bottom: 0; }
+.mtable a.mtable__title { font-weight: 700; color: var(--text); text-decoration: none; }
+@media (max-width: 720px) {
+  .mtable, .mtable tbody, .mtable tr, .mtable td { display: block; width: 100%; }
+  .mtable thead { display: none; }
+  .mtable { background: none; border: 0; }
+  .mtable tr { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: var(--space-2); padding: 10px 14px; }
+  .mtable td { border: 0; padding: 2px 0; }
+  .mtable td[data-label]::before { content: attr(data-label) ": "; color: var(--text-muted); font-size: 13px; }
+}
+.mfilters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--space-3); align-items: end; margin-bottom: var(--space-4); padding: var(--space-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.mfilters__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.mpager { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-4); }
+.secret { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22px; font-weight: 800; letter-spacing: .04em; padding: 10px 16px; background: var(--surface-2); border-radius: var(--radius-md); user-select: all; }
+.dup-group { display: flex; flex-direction: column; gap: var(--space-2); }
+.dup-row { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: var(--space-2) var(--space-3); align-items: center; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.dup-row__pick { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; color: var(--text-muted); }
+.admin-banner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin-bottom: var(--space-4); padding: 10px 16px; border-radius: var(--radius-md); background: var(--ink); color: var(--surface); font-weight: 700; }
+.admin-banner .table__sub { color: var(--accent); }
+@media (max-width: 720px) {
+  .mfilters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); padding: var(--space-3); }
+  .mfilters > .field:first-child, .mfilters > .check, .mfilters__actions { grid-column: 1 / -1; }
+  .mcab__main .page-head { margin-bottom: var(--space-3); }
+}
+.mcab details > summary.btn { display: inline-flex; width: auto; list-style: none; }
+.mcab details > summary.btn::-webkit-details-marker { display: none; }

@@ -1,0 +1,15 @@
+<nav class="mcab__nav" aria-label="Кабинет модератора">
+  <div class="mcab__who">
+    <span class="mcab__role">{% if user.is_admin %}Администратор{% else %}Модератор{% endif %}</span>
+    <span class="table__sub">{{ user.short_name }}</span>
+  </div>
+  <ul class="mcab__list">
+    {% for it in items %}
+      <li><a class="mcab__link{% if it.active %} is-active{% endif %}" href="{{ it.url }}"{% if it.active %} aria-current="page"{% endif %}>
+        <span>{{ it.label }}</span>
+        {% if it.count %}<span class="mcab__count{% if it.urgent %} mcab__count--urgent{% endif %}" aria-label="ждут: {{ it.count }}">{{ it.count }}</span>{% endif %}
+      </a></li>
+    {% endfor %}
+    {% if admin_url %}<li><a class="mcab__link mcab__link--ext" href="{{ admin_url }}"><span>Все данные</span><span class="table__sub">справочники</span></a></li>{% endif %}
+  </ul>
+</nav>

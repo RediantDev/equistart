@@ -1,15 +1,16 @@
-{% extends "base.html" %}
+{% extends "moderation/_cabinet.html" %}
 {% load tournaments %}
 {% block title %}Проверка: {{ t.title }} — СтартЛист{% endblock %}
-{% block content %}
+{% block cabinet %}
 <div class="page-head">
   <div>
-    <a class="back" href="{% url 'moderation:queue' %}">← Очередь модерации</a>
+    <a class="back" href="{% if t.status == 'review' %}{% url 'moderation:queue' %}{% else %}{% url 'moderation:tournaments' %}{% endif %}">← {% if t.status == 'review' %}Очередь модерации{% else %}Все турниры{% endif %}</a>
     <h1 class="h1">{{ t.title }}</h1>
     <div class="chips">
       {% if t.status == "review" %}<span class="chip chip--warning">На проверке</span>{% elif t.status == "returned" %}<span class="chip chip--danger">Возвращён</span>{% elif t.status == "approved" %}<span class="chip chip--success">Опубликован</span>{% else %}<span class="chip">Черновик организатора</span>{% endif %}
       {% if t.is_published %}<span class="chip chip--info">Изменение опубликованного турнира</span>{% endif %}
       <span class="tag">Организатор: {{ t.owner.full_name }} · {{ t.owner.phone_display }}</span>
+      {% if user.is_admin %}<a class="btn btn--sm btn--dark" href="{% url 'tournaments:hub' t.pk %}">Открыть как администратор</a>{% endif %}
     </div>
   </div>
 </div>

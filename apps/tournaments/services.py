@@ -20,7 +20,8 @@ class Conflict(Exception):
 
 # ---------------- права ----------------
 
-def roles_of(user, tournament) -> set[str]:
+def real_roles_of(user, tournament) -> set[str]:
+    """Роли по команде турнира, без полномочий администратора."""
     if not user.is_authenticated:
         return set()
     roles = set(
@@ -29,6 +30,19 @@ def roles_of(user, tournament) -> set[str]:
     if tournament.owner_id == user.pk:
         roles.add(TeamMember.Role.ORGANIZER)
     return roles
+
+
+ADMIN_ROLES = frozenset({TeamMember.Role.ORGANIZER, TeamMember.Role.JUDGE, TeamMember.Role.STABLE})
+
+
+def roles_of(user, tournament) -> set[str]:
+    """Роли пользователя в турнире. Администратор работает в любом турнире с полными правами
+    Организатора и Судьи (ADM-06, решение 30.10.2026); его действия помечаются в журнале (audit)."""
+    if not user.is_authenticated:
+        return set()
+    if getattr(user, "is_admin", False):
+        return set(ADMIN_ROLES)
+    return real_roles_of(user, tournament)
 
 
 def can_manage(user, tournament) -> bool:

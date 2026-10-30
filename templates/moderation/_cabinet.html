@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% load cabinet %}
+{# ADM-01: кабинет модератора — боковое меню на компьютере, строка разделов с прокруткой на телефоне #}
+{% block content %}
+<div class="mcab">
+  {% cabinet_nav %}
+  <div class="mcab__main">
+    {% block cabinet %}{% endblock %}
+  </div>
+</div>
+{% endblock %}

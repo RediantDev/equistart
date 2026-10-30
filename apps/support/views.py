@@ -14,7 +14,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.accounts.throttle import client_ip
-from apps.core.models import AuditLog
+from apps.core.models import AuditLog, SiteSettings
 from apps.tournaments.moderation import moderator_required
 
 from . import services
@@ -126,7 +126,7 @@ def faq(request):
             sections.append((code, label, rows))
     from django.conf import settings
 
-    return render(request, "support/faq.html", {"sections": sections, "telegram": settings.SUPPORT_TELEGRAM})
+    return render(request, "support/faq.html", {"sections": sections, "telegram": SiteSettings.get().telegram})
 
 
 # ---------------- модератор (SUP-08) ----------------

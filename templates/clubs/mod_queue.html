@@ -1,8 +1,7 @@
-{% extends "base.html" %}
+{% extends "moderation/_cabinet.html" %}
 {% block title %}Клубы на проверке — СтартЛист{% endblock %}
-{% block content %}
+{% block cabinet %}
 <div class="page-head"><div>
-  <a class="back" href="{% url 'moderation:queue' %}">← Турниры на проверке</a>
   <h1 class="h1">Клубы на проверке</h1>
   <p class="muted">Проверьте, что клуб существует, адрес и контакты настоящие, название не дублирует другой клуб.</p>
 </div></div>

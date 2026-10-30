@@ -1,12 +1,12 @@
-{% extends "base.html" %}
+{% extends "moderation/_cabinet.html" %}
 {% block title %}Обращения — Пульт — СтартЛист{% endblock %}
-{% block content %}
-<a class="back" href="{% url 'moderation:panel' %}">← Пульт</a>
+{% block cabinet %}
 <div class="page-head">
   <div>
     <h1 class="h1">Обращения в поддержку</h1>
     <p class="muted">Срочные «Идёт турнир» — первыми. Срок ответа — 1 рабочий день{% if overdue %}; <strong>просрочено: {{ overdue }}</strong>{% endif %}.</p>
   </div>
+  {% if user.is_admin %}<a class="btn btn--sm" href="{% url 'moderation:export' 'tickets' %}">Выгрузить в Excel</a>{% endif %}
 </div>
 <form method="get" class="card filters__body" style="margin: 0 0 var(--space-4);">
   <div class="field"><label class="field__label" for="f-status">Статус</label>
