@@ -72,6 +72,7 @@ docker compose up -d web
 
 ```cron
 15 3 * * * cd /opt/equistart && ./deploy/backup.sh >> /var/log/equistart-backup.log 2>&1
+*/5 * * * * cd /opt/equistart && docker compose exec -T web python manage.py send_mail_queue >> /var/log/equistart-mail.log 2>&1
 ```
 
 Второе хранилище (обязательно для пилота): S3-совместимое в России (Yandex Object Storage, Selectel S3). Настроить `rclone config`, указать `RCLONE_REMOTE=имя:бакет/equistart`.
@@ -118,3 +119,11 @@ docker compose up -d web
 
 Обновить стенд до последней версии: `GITHUB_TOKEN=… bash /opt/equistart/app/deploy/stand-update.sh` от root.
 На стенде вверху каждой страницы плашка «Тестовый стенд»; реальные персональные данные туда не вводить.
+
+## Почта и кабинет администратора
+
+- Письма поддержки (ответы пользователям, SUP-05; уведомления модератору о каждом обращении, SUP-14) записываются в журнал писем и уходят сразу. Если почтовый сервер недоступен, письмо остаётся в журнале с ошибкой; `send_mail_queue` по cron повторяет отправку (до 5 попыток).
+- Почтовый сервер и отправитель — в `.env`: `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`.
+- Email для уведомлений модератору, Telegram поддержки и контакты в подвале задаёт администратор в кабинете: Пульт → Настройки. Проверка почты — Пульт → Система → «Отправить тестовое письмо».
+- Администратор — главный модератор: `python manage.py set_moderator <телефон>` и флаг суперпользователя (`createsuperuser` или админка Django).
+

@@ -291,11 +291,14 @@ def change_password(request):
     form.fields["new_password2"].help_text = ""
     if request.method == "POST" and form.is_valid():
         user = form.save()
+        if user.must_change_password:
+            user.must_change_password = False
+            user.save(update_fields=["must_change_password"])
         update_session_auth_hash(request, user)
         audit(user, "user.password_change", user)
         messages.success(request, "Пароль изменён.")
         return redirect("accounts:profile")
-    return render(request, "accounts/password.html", {"form": form})
+    return render(request, "accounts/password.html", {"form": form, "must_change": request.user.must_change_password})
 
 
 # ---------------- Восстановление пароля по СМС (тест 5, п. 6.3) ----------------

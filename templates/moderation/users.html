@@ -1,0 +1,38 @@
+{% extends "moderation/_cabinet.html" %}
+{% block title %}Пользователи — Пульт — СтартЛист{% endblock %}
+{% block cabinet %}
+<div class="page-head">
+  <div>
+    <h1 class="h1">Пользователи <span class="tag">{{ total }}</span></h1>
+    <p class="muted">{% if user.is_admin %}Поиск по ФИО или телефону.{% else %}Поиск по ФИО. Телефоны видит только администратор.{% endif %} Блокировка — с причиной.</p>
+  </div>
+  {% if user.is_admin %}<a class="btn btn--sm" href="{% url 'moderation:export' 'users' %}?{{ request.GET.urlencode }}">Выгрузить в Excel</a>{% endif %}
+</div>
+<form method="get" class="mfilters">
+  <div class="field"><label class="field__label" for="f-q">{% if user.is_admin %}ФИО или телефон{% else %}ФИО{% endif %}</label><input id="f-q" name="q" value="{{ q }}" placeholder="{% if user.is_admin %}Иванова или 900 123{% else %}Иванова Мария{% endif %}"></div>
+  <div class="field"><label class="field__label" for="f-state">Состояние</label>
+    <select id="f-state" name="state">{% for v, l in states %}<option value="{{ v }}"{% if state == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="field"><label class="field__label" for="f-cat">Роль</label>
+    <select id="f-cat" name="cat"><option value="">Все роли</option>{% for v, l in cats %}<option value="{{ v }}"{% if cat == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="mfilters__actions"><button class="btn btn--dark">Найти</button>{% if q or state or cat %}<a class="btn btn--ghost" href="{% url 'moderation:users' %}">Сбросить</a>{% endif %}</div>
+</form>
+{% if page.object_list %}
+<table class="mtable">
+  <thead><tr><th>Пользователь</th>{% if user.is_admin %}<th>Телефон</th>{% endif %}<th>Роли</th><th>Зарегистрирован</th><th>Последний вход</th></tr></thead>
+  <tbody>
+  {% for u in page.object_list %}
+    <tr>
+      <td><a class="mtable__title" href="{% url 'moderation:user' u.pk %}">{{ u.full_name|default:"Без имени" }}</a> {% include "moderation/_user_state.html" %}</td>
+      {% if user.is_admin %}<td data-label="Телефон">{{ u.phone_display }}</td>{% endif %}
+      <td data-label="Роли">{{ u.category_labels|join:", "|default:"—" }}</td>
+      <td data-label="Зарегистрирован">{{ u.date_joined|date:"j E Y" }}</td>
+      <td data-label="Последний вход">{{ u.last_login|date:"j E Y, H:i"|default:"не входил" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% include "moderation/_pager.html" %}
+{% else %}
+<div class="card empty"><h2 class="h3">Никого не нашли</h2><p class="muted">Измените запрос или сбросьте фильтры.</p></div>
+{% endif %}
+{% endblock %}

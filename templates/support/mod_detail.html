@@ -1,6 +1,6 @@
-{% extends "base.html" %}
+{% extends "moderation/_cabinet.html" %}
 {% block title %}Обращение №{{ t.pk }} — Пульт — СтартЛист{% endblock %}
-{% block content %}
+{% block cabinet %}
 <a class="back" href="{% url 'moderation:support' %}">← Все обращения</a>
 <div class="page-head">
   <div>

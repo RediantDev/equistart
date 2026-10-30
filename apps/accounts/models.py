@@ -95,6 +95,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     pd_consent_version = models.CharField("версия согласия", max_length=20, blank=True)
 
     is_active = models.BooleanField("активен", default=True)
+    # ADM-04: блокировка модератором (is_active=False + причина) и удаление аккаунта администратором
+    blocked_at = models.DateTimeField("заблокирован", null=True, blank=True)
+    blocked_reason = models.CharField("причина блокировки", max_length=300, blank=True)
+    blocked_by = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                                   verbose_name="кто заблокировал")
+    deleted_at = models.DateTimeField("удалён", null=True, blank=True)
+    must_change_password = models.BooleanField("сменить пароль при входе", default=False)
     is_staff = models.BooleanField("доступ к панели управления", default=False)
     date_joined = models.DateTimeField("зарегистрирован", default=timezone.now)
 
@@ -132,6 +139,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def phone_display(self) -> str:
         return format_phone(self.phone)
+
+    @property
+    def is_admin(self) -> bool:
+        """Администратор — главный модератор, который ведёт проект: полный доступ (ADM-02)."""
+        return bool(self.is_superuser and self.is_moderator and self.is_active)
+
+    @property
+    def is_blocked(self) -> bool:
+        return self.blocked_at is not None and not self.is_active
 
     @property
     def phone_verified(self) -> bool:

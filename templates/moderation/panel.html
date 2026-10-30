@@ -1,18 +1,11 @@
-{% extends "base.html" %}
+{% extends "moderation/_cabinet.html" %}
 {% load tournaments %}
 {% block title %}Пульт — СтартЛист{% endblock %}
-{% block content %}
+{% block cabinet %}
 <div class="page-head">
   <div>
     <h1 class="h1">Пульт</h1>
     <p class="muted">Что ждёт решения, как работает сервис и что происходит за неделю.</p>
-  </div>
-  <div class="chips">
-    <a class="btn btn--sm" href="{% url 'moderation:queue' %}">Турниры</a>
-    <a class="btn btn--sm" href="{% url 'moderation:clubs' %}">Клубы</a>
-    <a class="btn btn--sm" href="{% url 'moderation:support' %}">Поддержка</a>
-    {% if user.is_superuser %}<a class="btn btn--sm" href="{% url 'moderation:moderators' %}">Модераторы</a>{% endif %}
-    {% if user.is_staff %}<a class="btn btn--sm" href="{% url 'admin:index' %}">Все данные</a>{% endif %}
   </div>
 </div>
 
